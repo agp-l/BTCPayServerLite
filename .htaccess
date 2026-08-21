@@ -1,0 +1,5 @@
+RewriteEngine On
+RewriteBase /
+
+# Všechny požadavky začínající na /api/ pošli tiše do api.php
+RewriteRule ^api/(.*)$ api.php [QSA,L]

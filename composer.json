@@ -1,0 +1,8 @@
+{
+    "name": "ag/btcpay-lite",
+    "autoload": {
+        "psr-4": {
+            "BtcPayLite\\": "classes/"
+        }
+    }
+}
