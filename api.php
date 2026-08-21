@@ -1,10 +1,9 @@
 <?php
-// api.php - BTCPay Lite API (Pro napojení WooCommerce a dalších e-shopů)
+// api.php - BTCPay Lite API (Greenfield v1 kompatibilní pro WooCommerce)
 declare(strict_types=1);
 ini_set('display_errors', '1');
 header('Content-Type: application/json; charset=utf-8');
 
-// Načtení moderních závislostí
 require __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
 
@@ -23,12 +22,11 @@ try {
 $requestUri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Vydolujeme z URL čistou cestu (aby fungovalo např. /api.php/api/v1/stores/...)
 $path = str_replace($_SERVER['SCRIPT_NAME'], '', $requestUri);
 $path = strtok($path, '?');
 
 // ==============================================================================
-// 1. ENDPOINT: Info o obchodu (GET) - WooCommerce si přes toto ověřuje spojení
+// 1. ENDPOINT: Info o obchodu (GET)
 // ==============================================================================
 if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)$/', $path, $matches)) {
     $storeId = $matches[1];
@@ -53,7 +51,7 @@ if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)$/', $
 }
 
 // ==============================================================================
-// ENDPOINT 1.5: Detail faktury (GET) - Pro ověření stavu z e-shopu
+// 1.5 ENDPOINT: Detail faktury (GET)
 // ==============================================================================
 if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invoices\/([a-zA-Z0-9_-]+)$/', $path, $matches)) {
     $storeId = $matches[1];
@@ -64,15 +62,20 @@ if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invo
     $inv = $stmt->fetch();
     
     if ($inv) {
+        $createdTime = is_numeric($inv['created_at']) ? (int)$inv['created_at'] : strtotime((string)$inv['created_at']);
+        
         http_response_code(200);
         echo json_encode([
             "id" => $inv['id'],
             "storeId" => $inv['store_id'],
-            "amount" => $inv['amount'],
+            "amount" => (float)$inv['amount'],
+            "currency" => "BTC",
+            "type" => "Standard",
             "status" => $inv['status'],
-            "btcAddress" => $inv['btc_address'],
-            "createdTime" => is_numeric($inv['created_at']) ? (int)$inv['created_at'] : strtotime((string)$inv['created_at']),
-            "expirationTime" => $inv['expires_at']
+            "additionalStatus" => "None",
+            "createdTime" => $createdTime,
+            "expirationTime" => (int)$inv['expires_at'],
+            "metadata" => json_decode($inv['metadata'] ?? '{}', true)
         ]);
     } else {
         http_response_code(404);
@@ -82,7 +85,7 @@ if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invo
 }
 
 // ==============================================================================
-// 2. ENDPOINT: Vytvoření faktury (POST) - Volá e-shop při dokončení objednávky
+// 2. ENDPOINT: Vytvoření faktury (POST)
 // ==============================================================================
 if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invoices$/', $path, $matches)) {
     $storeId = $matches[1];
@@ -113,14 +116,13 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
         $metadata = $input['metadata'] ?? [];
         $inv = $invoiceManager->createDatabaseInvoice($storeId, $amount, $metadata, 15);
 
-        // Zápis webhooku do databáze (včetně nového secret klíče)
         $notificationUrl = $input['checkout']['redirectURL'] ?? ($input['notificationUrl'] ?? null);
         if ($notificationUrl) {
             $whStmt = $db->getPdo()->prepare("SELECT id FROM webhooks WHERE store_id = ? AND url = ?");
             $whStmt->execute([$storeId, $notificationUrl]);
             if (!$whStmt->fetch()) {
                 $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
-                $whSecret = bin2hex(random_bytes(16)); // Generování tajného klíče
+                $whSecret = bin2hex(random_bytes(16));
                 $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)")
                            ->execute([$whId, $storeId, $notificationUrl, $whSecret]);
             }
@@ -130,16 +132,22 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
         $baseDir = dirname($_SERVER['SCRIPT_NAME']);
         if ($baseDir === '/' || $baseDir === '\\') $baseDir = '';
         
-        // Cesta ukazuje správně do složky checkout!
         $checkoutLink = $protocol . $_SERVER['HTTP_HOST'] . rtrim($baseDir, '/\\') . '/checkout/pay.php?id=' . $inv['id'];
 
         http_response_code(200);
         echo json_encode([
             "id" => $inv['id'],
             "storeId" => $storeId,
-            "amount" => $inv['amount'],
+            "amount" => (float)$inv['amount'],
+            "currency" => "BTC",
+            "type" => "Standard",
             "checkoutLink" => $checkoutLink,
-            "status" => "New"
+            "createdTime" => $inv['created_at'],
+            "expirationTime" => $inv['expires_at'],
+            "monitoringTime" => $inv['expires_at'],
+            "status" => "New",
+            "additionalStatus" => "None",
+            "metadata" => $metadata
         ]);
     } catch (\Exception $e) {
         http_response_code(500);
@@ -148,14 +156,12 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
     exit;
 }
 
-
 // ==============================================================================
-// ENDPOINT 3: Vytvoření webhooku (POST) - Volá e-shop při prvotním spárování
+// 3. ENDPOINT: Vytvoření webhooku (POST)
 // ==============================================================================
 if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/webhooks$/', $path, $matches)) {
     $storeId = $matches[1];
     
-    // 1. Ověření, že obchod existuje
     $stmt = $db->getPdo()->prepare("SELECT id FROM stores WHERE id = ?");
     $stmt->execute([$storeId]);
     if (!$stmt->fetch()) {
@@ -163,7 +169,6 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/web
         die(json_encode(["message" => "Obchod nenalezen"]));
     }
 
-    // 2. Přečtení dat, která nám e-shop poslal (hledáme URL)
     $input = json_decode(file_get_contents('php://input'), true);
     $url = trim($input['url'] ?? '');
     
@@ -172,13 +177,11 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/web
         die(json_encode(["message" => "Chybi URL adresa pro webhook"]));
     }
 
-    // 3. Ochrana proti duplicitám (pokud e-shop ukládá nastavení vícekrát)
     $stmt = $db->getPdo()->prepare("SELECT * FROM webhooks WHERE store_id = ? AND url = ?");
     $stmt->execute([$storeId, $url]);
     $existingWh = $stmt->fetch();
 
     if ($existingWh) {
-        // Webhook pro tuto URL už v tomto obchodu máme, vrátíme e-shopu ten existující
         http_response_code(200);
         echo json_encode([
             "id" => $existingWh['id'],
@@ -190,14 +193,12 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/web
         exit;
     }
 
-    // 4. Vytvoření zcela nového webhooku
     $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
     $whSecret = bin2hex(random_bytes(16));
 
     $stmt = $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)");
     $stmt->execute([$whId, $storeId, $url, $whSecret]);
 
-    // 5. Odpověď e-shopu v očekávaném formátu
     http_response_code(200);
     echo json_encode([
         "id" => $whId,
@@ -209,7 +210,5 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/web
     exit;
 }
 
-
-// Pokud e-shop zavolá špatnou adresu
 http_response_code(404);
 echo json_encode(["message" => "Endpoint nenalezen"]);
