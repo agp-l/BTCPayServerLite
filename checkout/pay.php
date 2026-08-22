@@ -40,6 +40,7 @@ try {
     $wallet->loadWallet($row['wallet_path']);
     $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
 
+
     // AJAX Endpoint pro živou kontrolu (volá se z JS)
     if (isset($_GET['action']) && $_GET['action'] === 'check') {
         header('Content-Type: application/json');

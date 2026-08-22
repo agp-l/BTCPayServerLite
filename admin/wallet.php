@@ -15,6 +15,7 @@ use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\BtcDashboard;
 use Exception;
 
+
 $walletDir = dirname($config['wallet_path']);
 $currentWalletName = $_GET['w'] ?? basename($config['wallet_path']);
 $activeWalletPath = rtrim($walletDir, '/') . '/' . $currentWalletName;
@@ -31,6 +32,17 @@ $exportedXprv = '';
 $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
 $wallet = new ElectrumWallet($rpc);
 $dashboard = new BtcDashboard($wallet, $walletDir);
+
+// Doplnění chybějící proměnné pro roletku peněženek
+$availableWallets = [];
+$scanned = @scandir($walletDir);
+if (is_array($scanned)) {
+    foreach ($scanned as $f) {
+        if ($f !== '.' && $f !== '..' && !is_dir($walletDir . '/' . $f)) {
+            $availableWallets[] = $f;
+        }
+    }
+}
 
 $connStatus = 'Offline';
 $fiatText = 'Spojení ztraceno / Daemon nedostupný';
