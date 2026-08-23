@@ -107,7 +107,15 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
         die(json_encode(["message" => "Neplatna castka"]));
     }
 
+    // Získání exkluzivního zámku s vyčištěním bufferu
+    $db->getPdo()->query("SELECT GET_LOCK('electrum_rpc', 10)")->fetchColumn();
+
     try {
+        // PŘIDÁNO: Hard Fail bezpečnostní pojistka
+        if (!file_exists($store['wallet_path'])) {
+            throw new \Exception("Kritická chyba: Soubor peněženky obchodu fyzicky neexistuje.");
+        }
+
         $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
         $wallet = new ElectrumWallet($rpc);
         $wallet->loadWallet($store['wallet_path']);
@@ -134,6 +142,9 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
         
         $checkoutLink = $protocol . $_SERVER['HTTP_HOST'] . rtrim($baseDir, '/\\') . '/checkout/pay.php?id=' . $inv['id'];
 
+        // Uvolnění zámku a vyčištění bufferu
+        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+
         http_response_code(200);
         echo json_encode([
             "id" => $inv['id'],
@@ -149,11 +160,15 @@ if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/inv
             "additionalStatus" => "None",
             "metadata" => $metadata
         ]);
+        exit;
     } catch (\Exception $e) {
+        // Záchranné uvolnění zámku
+        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+        
         http_response_code(500);
         echo json_encode(["message" => "Chyba pri generovani faktury: " . $e->getMessage()]);
+        exit;
     }
-    exit;
 }
 
 // ==============================================================================

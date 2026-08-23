@@ -1,5 +1,7 @@
 Zde je tvůj kompletní, aktualizovaný a stručný instalační manuál pro tvůj projekt BTC PAY SERVER LITE. Tento návod tě provede čistou instalací od nuly až po automatický start při restartu počítače.
 
+Opatření: Vždy, když budeš démona spouštět (ať už ručně nebo přes systemd), musíš striktně používat parametr konfigurace -D /opt/electrum_config
+
 1. Stažení a instalace Electra do /opt
 Připravíme samotný program do systémové složky odděleně od tvých dat.
 

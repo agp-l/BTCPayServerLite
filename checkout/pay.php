@@ -8,7 +8,7 @@ error_reporting(E_ALL);
 require __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
 
-// 2. Import moderních tříd
+// Import moderních tříd
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
@@ -34,26 +34,43 @@ try {
         die("<div style='text-align:center; padding:50px; color:#ef4d4d; font-family:sans-serif;'><h1>Chyba faktury</h1><p>Faktura nebyla nalezena.</p></div>");
     }
 
-    // Inicializace motoru pro správnou peněženku
-    $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-    $wallet = new ElectrumWallet($rpc);
-    $wallet->loadWallet($row['wallet_path']);
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
+    // Získání exkluzivního zámku s vyčištěním bufferu
+    $db->getPdo()->query("SELECT GET_LOCK('electrum_rpc', 10)")->fetchColumn();
 
+    try {
+        $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
+        $wallet = new ElectrumWallet($rpc);
+        $wallet->loadWallet($row['wallet_path']);
+        $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
 
-    // AJAX Endpoint pro živou kontrolu (volá se z JS)
-    if (isset($_GET['action']) && $_GET['action'] === 'check') {
-        header('Content-Type: application/json');
-        echo json_encode($invoiceManager->checkDatabasePaymentStatus($invoiceId));
-        exit;
+        // AJAX Endpoint pro živou kontrolu (volá se z JS)
+        if (isset($_GET['action']) && $_GET['action'] === 'check') {
+            $statusData = $invoiceManager->checkDatabasePaymentStatus($invoiceId);
+            
+            // Odemknutí zámku před odesláním odpovědi JSON
+            $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+            
+            header('Content-Type: application/json');
+            echo json_encode($statusData);
+            exit;
+        }
+
+        // Počáteční vykreslení
+        $statusData = $invoiceManager->checkDatabasePaymentStatus($invoiceId);
+        
+        // Odemknutí zámku po prvním načtení stavu
+        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+
+        $invoice = $statusData['invoice'];
+        $currentStatus = $statusData['status']; 
+        $secondsRemaining = max(0, $invoice['expires_at'] - time());
+        if ($currentStatus === 'Expired') $secondsRemaining = 0;
+
+    } catch (Exception $e) {
+        // Záchranné uvolnění
+        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+        throw $e;
     }
-
-    // Počáteční vykreslení
-    $statusData = $invoiceManager->checkDatabasePaymentStatus($invoiceId);
-    $invoice = $statusData['invoice'];
-    $currentStatus = $statusData['status']; // 'New', 'Processing', 'Settled', 'Expired'
-    $secondsRemaining = max(0, $invoice['expires_at'] - time());
-    if ($currentStatus === 'Expired') $secondsRemaining = 0;
 
 } catch (Exception $e) {
     die("<div style='text-align:center; padding:50px; color:#ef4d4d; font-family:sans-serif;'><h1>Chyba</h1><p>" . htmlspecialchars($e->getMessage()) . "</p></div>");

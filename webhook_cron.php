@@ -23,9 +23,9 @@ try {
     $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
     $wallet = new ElectrumWallet($rpc);
     
-    // Potřebujeme i API klíč obchodu pro podepsání webhooku!
+    // Nyní už nepotřebujeme api_key, stačí nám cesty a stavy
     $stmt = $db->getPdo()->query("
-        SELECT i.id, i.store_id, i.status, s.wallet_path, s.api_key 
+        SELECT i.id, i.store_id, i.status, s.wallet_path 
         FROM invoices i
         JOIN stores s ON i.store_id = s.id
         WHERE i.status IN ('New', 'Processing')
@@ -41,8 +41,22 @@ try {
     foreach ($activeInvoices as $inv) {
         echo "Faktura {$inv['id']}... ";
         
-        $wallet->loadWallet($inv['wallet_path']);
-        $statusData = $invoiceManager->checkDatabasePaymentStatus($inv['id']);
+        // ZÍSKÁNÍ ZÁMKU PRO ELECTRUM DÉMONA
+        $db->getPdo()->query("SELECT GET_LOCK('electrum_rpc', 10)")->fetchColumn();
+        
+        try {
+            $wallet->loadWallet($inv['wallet_path']);
+            $statusData = $invoiceManager->checkDatabasePaymentStatus($inv['id']);
+            
+            // DŮLEŽITÉ: Uvolnění zámku PŘED odesíláním webhooků, aby se neblokoval démon!
+            $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+        } catch (Exception $e) {
+            // Záchranné uvolnění zámku při chybě
+            $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
+            echo "Chyba RPC: " . $e->getMessage() . ". ";
+            continue; // Přeskočíme na další fakturu
+        }
+
         $newStatus = $statusData['status'];
 
         if ($newStatus !== $inv['status']) {
@@ -54,7 +68,8 @@ try {
             elseif ($newStatus === 'Expired') $eventType = 'InvoiceExpired';
             
             if ($eventType) {
-                $whStmt = $db->getPdo()->prepare("SELECT url FROM webhooks WHERE store_id = ?");
+                // OPRAVA: Vybereme URL i SECRET pro všechny webhooky daného obchodu
+                $whStmt = $db->getPdo()->prepare("SELECT url, secret FROM webhooks WHERE store_id = ?");
                 $whStmt->execute([$inv['store_id']]);
                 
                 foreach ($whStmt->fetchAll() as $wh) {
@@ -65,18 +80,18 @@ try {
                         'timestamp' => time()
                     ]);
                     
-                    // Bezpečnostní podpis BTCPay Greenfield API
-                    $signature = 'sha256=' . hash_hmac('sha256', $payload, $inv['api_key']);
+                    // OPRAVA: Bezpečnostní podpis pomocí správného webhook secretu
+                    $signature = 'sha256=' . hash_hmac('sha256', $payload, $wh['secret']);
                     
                     $ch = curl_init($wh['url']);
                     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 10); // Prevence zaseknutí Cronu
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 10); 
                     curl_setopt($ch, CURLOPT_HTTPHEADER, [
                         'Content-Type: application/json',
                         'Content-Length: ' . strlen($payload),
-                        'BTCPay-Sig: ' . $signature // Zásadní hlavička pro e-shopy!
+                        'Btcpay-Sig: ' . $signature // Správná hlavička
                     ]);
                     curl_exec($ch);
                     curl_close($ch);

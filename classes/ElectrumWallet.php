@@ -39,6 +39,9 @@ class ElectrumWallet
         }
 
         $this->activeWalletPath = $walletPath;
+        
+        // PŘIDÁNO: Předáme cestu RPC třídě, aby ji lepila do URL!
+        $this->rpc->setWallet($walletPath);
     }
 
     public function getWalletBalance(): array

@@ -4,6 +4,7 @@ namespace BtcPayLite;
 
 use Exception;
 use stdClass;
+
 /**
  * VRSTVA 1: Nízkoúrovňová komunikace s JSON-RPC serverem.
  */
@@ -13,6 +14,7 @@ class ElectrumRPC
     private ?string $rpcUser;
     private ?string $rpcPass;
     private int $timeout;
+    private string $activeWallet = '';
 
     public function __construct(string $host, int $port, ?string $user = null, ?string $pass = null, int $timeout = 30)
     {
@@ -22,20 +24,27 @@ class ElectrumRPC
         $this->timeout = $timeout;
     }
 
+    public function setWallet(string $walletPath): void
+    {
+        $this->activeWallet = $walletPath;
+    }
+
     public function call(string $method, array $params = [])
     {
+        $url = $this->rpcUrl;
+        
+        // OPRAVA: Electrum 4.x VYŽADUJE lomítko před otazníkem (/?wallet=)
+        if ($this->activeWallet !== '') {
+            $url = rtrim($url, '/') . '/?wallet=' . rawurlencode($this->activeWallet);
+        }
+
         $request = [
             'jsonrpc' => '2.0',
-            'id'      => mt_rand(1, 1000000), // Bezpečné celočíselné ID
+            'id'      => mt_rand(1, 1000000), 
             'method'  => $method,
         ];
         
-        // ZÁSADNÍ OPRAVA: Pro metody bez argumentů (jako je history) 
-        // klíč 'params' podle specifikace JSON-RPC úplně vynecháme.
-        // Tím se 100% vyhneme zmatení Python překladače v Electru.
-        if (!empty($params)) {
-            $request['params'] = $params;
-        }
+        $request['params'] = empty($params) ? new stdClass() : $params;
 
         $payload = json_encode($request, JSON_UNESCAPED_SLASHES);
 
@@ -43,7 +52,7 @@ class ElectrumRPC
             throw new Exception("Kritická chyba: Nelze zakódovat JSON pro metodu '{$method}'.");
         }
 
-        $ch = curl_init($this->rpcUrl);
+        $ch = curl_init($url);
         
         $curlOptions = [
             CURLOPT_RETURNTRANSFER => true,
@@ -77,7 +86,6 @@ class ElectrumRPC
 
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
-            // Teď už přesně víme, která metoda případně zlobí!
             throw new Exception("Neplatná JSON odpověď (Metoda '{$method}'). HTTP: {$httpCode}. Tělo: " . substr($response, 0, 200));
         }
 
