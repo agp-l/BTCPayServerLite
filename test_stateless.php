@@ -1,14 +1,12 @@
 <?php
 // test_stateless.php
-// Testovací stránka pro ověření generování URL faktur na dálku bez databáze
+// Simulace externího systému - NEZNÁ config.php!
 declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-$config = require __DIR__ . '/config.php';
-
+// URL tvého API (předpokládáme, že běží na stejném serveru pro účely testu, ale v reálu to bude plná adresa)
 $apiUrl = 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/api_stateless.php';
-$apiKey = $config['admin_api_key']; // Automaticky natáhne klíč z config.php
 
 $response = null;
 $error = null;
@@ -16,20 +14,20 @@ $httpCode = null;
 
 // Pokud uživatel odeslal formulář, provedeme cURL požadavek
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $apiKey = trim($_POST['api_key'] ?? '');
     $amount = $_POST['amount'] ?? '0.001';
     $description = $_POST['description'] ?? 'Testovací platba';
     $orderId = $_POST['order_id'] ?? 'ORD-' . rand(100, 999);
-    $wallet = $_POST['wallet'] ?? '';
+    $expiration = (int)($_POST['expiration_minutes'] ?? 15); // NOVÉ
 
+    // Přidáno odesílání do API
     $payloadData = [
         'amount' => (float)$amount,
         'description' => $description,
-        'order_id' => $orderId
+        'order_id' => $orderId,
+        'expiration_minutes' => $expiration // NOVÉ
     ];
-
-    if (!empty($wallet)) {
-        $payloadData['wallet'] = $wallet;
-    }
+  
 
     $payload = json_encode($payloadData);
 
@@ -39,17 +37,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $apiKey
+        'Authorization: Bearer ' . $apiKey // Klíč vložený z formuláře
     ]);
 
-    $responseRaw = curl_exec($ch);
+   $responseRaw = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
     curl_close($ch);
 
-    if ($responseRaw) {
+    if ($responseRaw !== false) {
         $response = json_decode($responseRaw, true);
+        if ($response === null) {
+            // Pokud to není JSON (např. HTML výpis chyby z PHP), vypíšeme to surově
+            $error = "Server nevrátil JSON. Surová odpověď: " . $responseRaw;
+        }
     } else {
-        $error = "Nepodařilo se navázat spojení s cURL API.";
+        $error = "cURL chyba sítě: " . $curlErr;
     }
 }
 ?>
@@ -85,10 +88,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="container">
     <div class="card">
-        <h1><i class="fa-solid fa-code" style="color: #2fd35a;"></i> Test vzdáleného API (Stateless)</h1>
-        <p style="color: #748078; font-size: 13px; margin-bottom: 25px;">Tento formulář simuluje cizí systém, který posílá požadavek na <code style="background:#f0f4f1; padding:2px 6px; border-radius:4px;">api_stateless.php</code> pomocí tajného Bearer klíče.</p>
+        <h1><i class="fa-solid fa-code" style="color: #2fd35a;"></i> Test externího klienta</h1>
+        <p style="color: #748078; font-size: 13px; margin-bottom: 25px;">Tento formulář je 100% nezávislý a simuluje cizí systém. Nečte žádný config. Odesílá pouze to, co vyplníš níže, na endpoint <code style="background:#f0f4f1; padding:2px 6px; border-radius:4px;">api_stateless.php</code>.</p>
 
         <form method="POST">
+            <div class="field">
+                <label>Váš klientský API klíč</label>
+                <div class="input-wrap">
+                    <input type="text" name="api_key" placeholder="Např. MujVelmiTajnySifrovaciKlic_2026_Brno" value="<?php echo htmlspecialchars($_POST['api_key'] ?? ''); ?>" required>
+                </div>
+            </div>
             <div class="field">
                 <label>Částka (BTC)</label>
                 <div class="input-wrap"><input type="text" name="amount" value="0.001" required></div>
@@ -100,6 +109,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="field">
                 <label>Interní ID objednávky</label>
                 <div class="input-wrap"><input type="text" name="order_id" value="ORD-9988"></div>
+            </div>
+            <div class="field">
+                <label>Platnost faktury (Expirace)</label>
+                <div class="input-wrap">
+                    <select name="expiration_minutes">
+                        <option value="15">15 minut (Standard pro E-shopy)</option>
+                        <option value="60">1 hodina</option>
+                        <option value="1440">1 den (24 hodin)</option>
+                        <option value="10080">1 týden (7 dní)</option>
+                        <option value="43200">1 měsíc (30 dní)</option>
+                    </select>
+                </div>
             </div>
             <button type="submit" class="primary"><i class="fa-solid fa-paper-plane"></i> Odeslat požadavek do API</button>
         </form>
@@ -113,8 +134,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <?php if ($response && isset($response['status']) && $response['status'] === 'success'): ?>
                     <div style="color: #13aa3d; font-weight: 600; margin-bottom: 8px;"><i class="fa-solid fa-circle-check"></i> Faktura úspěšně vytvořena!</div>
+                    
+                    <div style="font-size: 12px; color: #748078; padding: 10px; background: #fff; border-radius: 8px; border: 1px solid #e5eae7; margin-bottom: 10px;">
+                        <strong>🔒 Ochrana serveru:</strong> Server ti automaticky přiřadil peněženku: <code><?php echo htmlspecialchars($response['data']['wallet']); ?></code>
+                    </div>
+
                     <div style="font-size: 12px; color: #748078; margin-bottom: 4px;">Vygenerovaný odkaz pro zákazníka:</div>
                     <div class="url-display"><?php echo htmlspecialchars($response['data']['url']); ?></div>
+                    
                     <div style="margin-top: 15px;">
                         <a href="<?php echo htmlspecialchars($response['data']['url']); ?>" target="_blank" class="primary" style="text-decoration:none; max-width: 220px;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Otevřít platební bránu</a>
                     </div>

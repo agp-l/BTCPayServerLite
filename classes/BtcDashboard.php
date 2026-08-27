@@ -1,4 +1,5 @@
 <?php
+// BTCPayLite/classes/BtcDashboard.php
 declare(strict_types=1);
 
 namespace BtcPayLite;

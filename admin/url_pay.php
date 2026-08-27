@@ -151,7 +151,6 @@ try {
         <p style="color:#748078; font-size:13px; margin:0;">Platba byla úspěšně přijata.</p>
     </div>
 </div>
-
 <script>
   let secondsRemaining = <?php echo (int)$secondsRemaining; ?>;
   const token = "<?php echo htmlspecialchars($token); ?>";
@@ -174,9 +173,31 @@ try {
       const countdown = setInterval(() => {
           if (secondsRemaining > 0) {
               secondsRemaining--;
-              let m = Math.floor(secondsRemaining / 60);
+              
+              // VÝPOČET TÝDNŮ, DNŮ, HODIN, MINUT A SEKUND
+              let w = Math.floor(secondsRemaining / 604800);
+              let d = Math.floor((secondsRemaining % 604800) / 86400);
+              let h = Math.floor((secondsRemaining % 86400) / 3600);
+              let m = Math.floor((secondsRemaining % 3600) / 60);
               let s = secondsRemaining % 60;
-              timerEl.innerHTML = `<i class="fa-regular fa-clock"></i> Zbývající čas: ${m}:${s < 10 ? '0' : ''}${s}`;
+              
+              // Správné české skloňování
+              let wText = w === 1 ? 'týden' : (w >= 2 && w <= 4 ? 'týdny' : 'týdnů');
+              let dText = d === 1 ? 'den' : (d >= 2 && d <= 4 ? 'dny' : 'dní');
+              
+              let timeString = '';
+              
+              // Sestavení finálního textu
+              if (w > 0) timeString += `${w} ${wText} `;
+              if (d > 0) timeString += `${d} ${dText} `;
+              
+              if (h > 0 || d > 0 || w > 0) {
+                  timeString += `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+              } else {
+                  timeString += `${m}:${s < 10 ? '0' : ''}${s}`;
+              }
+              
+              timerEl.innerHTML = `<i class="fa-regular fa-clock"></i> Zbývající čas: ${timeString}`;
           } else {
               clearInterval(countdown);
               timerEl.textContent = "Čas pro platbu vypršel";

@@ -1,11 +1,10 @@
 <?php
 // api_stateless.php
-// Tajné API pro vzdálené generování bezstavových URL faktur
+// Čistý koncový bod pro vzdálené API (Využívá Service Layer a File Locking)
 declare(strict_types=1);
-ini_set('display_errors', '0');
+ini_set('display_errors', '0'); // Na produkci skrýváme interní chyby PHP
 error_reporting(E_ALL);
 
-// Vždy odpovídáme jako čistý JSON
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/vendor/autoload.php';
@@ -13,91 +12,72 @@ $config = require __DIR__ . '/config.php';
 
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcDashboard;
 use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\BtcStatelessService;
 
-// 1. Zabezpečení pomocí tajného API klíče
-$headers = getallheaders();
-$authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-$expectedToken = 'Bearer ' . $config['admin_api_key']; // Zákazník musí poslat tento klíč
+// 1. Ochrana proti souběhu (Concurrency File Lock) bez databáze
+$lockFile = sys_get_temp_dir() . '/btcpay_electrum_stateless.lock';
+$fp = fopen($lockFile, 'c');
 
-if ($authHeader !== $expectedToken) {
-    http_response_code(401);
-    echo json_encode(['status' => 'error', 'message' => 'Odmítnuto: Neplatný nebo chybějící API klíč.']);
+if (!$fp || !flock($fp, LOCK_EX)) {
+    http_response_code(503);
+    echo json_encode(['status' => 'error', 'message' => 'Server je momentálně přetížen, zkuste to prosím za vteřinu.']);
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['status' => 'error', 'message' => 'Odmítnuto: Tento endpoint přijímá pouze POST požadavky.']);
-    exit;
-}
-
-ob_start();
 try {
-    // 2. Načtení dat od vzdáleného systému (podporuje JSON payload i běžné POST proměnné)
-    $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
-    
-    $amount = (float)str_replace(',', '.', (string)($input['amount'] ?? '0'));
-    $desc = trim($input['description'] ?? '');
-    $orderId = trim($input['order_id'] ?? '');
-    
-    // Zvolená peněženka, nebo fallback na výchozí
-    $requestedWallet = trim($input['wallet'] ?? basename($config['wallet_path']));
-
-    if ($amount <= 0 || empty($desc)) {
-        throw new \Exception("Parametry 'amount' a 'description' jsou povinné a částka musí být platná.");
-    }
-
-    // 3. Inicializace našeho Bitcoinového motoru[cite: 1]
+    // 2. Inicializace závislostí a naší Service vrstvy
     $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
     $wallet = new ElectrumWallet($rpc);
+    
+    // Pro stateless režim předáváme null místo databáze
+    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], null); 
+    
+    $service = new BtcStatelessService($config, $wallet, $invoiceManager);
+    
+    // 3. Univerzální načtení Authorization hlavičky napříč různými servery
+    $authHeader = '';
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $authHeader = trim($_SERVER['HTTP_AUTHORIZATION']);
+    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $authHeader = trim($_SERVER['REDIRECT_HTTP_AUTHORIZATION']);
+    } else {
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        if (isset($headers['Authorization'])) {
+            $authHeader = trim($headers['Authorization']);
+        } elseif (isset($headers['authorization'])) {
+            $authHeader = trim($headers['authorization']);
+        }
+    }
+    
+    $apiKey = trim(str_replace('Bearer ', '', $authHeader));
 
-    // 4. Bezpečné zacílení a načtení správné peněženky
-    $walletsDirectory = dirname($config['wallet_path']);
-    $walletPath = $walletsDirectory . '/' . basename($requestedWallet);
-    $wallet->loadWallet($walletPath);
+    // 4. Přijetí vstupních dat
+    $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+    
+    // 5. Předání veškeré těžké práce naší Service vrstvě
+    $result = $service->createInvoiceFromApi($input, $apiKey);
 
-    // 5. Inicializace bezstavového manažera (null místo DB)[cite: 1]
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], null);
-
-    // Custom data, která chceme do tokenu zašifrovat
-    $customData = [
-        'order_id' => $orderId,
-        'wallet' => $requestedWallet
-    ];
-
-    // 6. Vygenerování tokenu s 15min expirací[cite: 1]
-    $res = $invoiceManager->createStatelessInvoice($amount, $desc, $customData, 15);
-
-    // 7. Sestavení plné URL adresy na platební bránu (url_pay.php ve složce admin)
+    // 6. Sestavení finální URL a odeslání výsledku
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'];
     $baseDir = dirname($_SERVER['SCRIPT_NAME']);
     if ($baseDir === '/' || $baseDir === '\\') $baseDir = '';
     
-    // Tuto URL adresu posíláme zpět externímu systému
-    $checkoutLink = $protocol . $host . rtrim($baseDir, '/\\') . '/admin/url_pay.php?inv=' . $res['token'];
+    $result['url'] = $protocol . $host . rtrim($baseDir, '/\\') . '/admin/url_pay.php?inv=' . $result['token'];
 
-    ob_end_clean();
     http_response_code(200);
-    echo json_encode([
-        'status' => 'success',
-        'data' => [
-            'url' => $checkoutLink,
-            'token' => $res['token'],
-            'amount' => number_format($amount, 8, '.', ''),
-            'description' => $desc,
-            'order_id' => $orderId,
-            'wallet' => $requestedWallet,
-            'expires_in_minutes' => 15
-        ]
-    ]);
-    exit;
+    echo json_encode(['status' => 'success', 'data' => $result]);
 
-} catch (\Throwable $e) {
-    ob_end_clean();
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'PHP Chyba: ' . $e->getMessage()]);
-    exit;
+} catch (\Exception $e) {
+    // Chytřejší HTTP kódy podle typu výjimky (400, 401, nebo 500)
+    $code = $e->getCode();
+    $httpCode = ($code >= 400 && $code < 600) ? $code : 500;
+    
+    http_response_code($httpCode);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+} finally {
+    // 7. BEZPEČNOSTNÍ POJISTKA: Uvolnění zámku i v případě havárie
+    flock($fp, LOCK_UN);
+    fclose($fp);
 }

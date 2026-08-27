@@ -1,4 +1,5 @@
 <?php
+// BTCPayLite/classes/ElectrumWallet.php
 declare(strict_types=1);
 namespace BtcPayLite;
 
