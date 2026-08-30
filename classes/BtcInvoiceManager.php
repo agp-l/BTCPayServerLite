@@ -1,243 +1,750 @@
 <?php
-// BTCPayLite/classes/BtcInvoiceManager.php
+
 declare(strict_types=1);
+
 namespace BtcPayLite;
 
-use Exception;
+use Closure;
+use InvalidArgumentException;
+use JsonException;
+use LogicException;
+use Throwable;
+
 /**
- * VRSTVA 3: Obojživelný systém pro kryptoměnové faktury.
- * Podporuje profi databázový režim (BTCPay API) i lehký bezstavový režim (URL HMAC).
+ * Creates and evaluates database-backed and signed stateless Bitcoin invoices.
+ *
+ * All monetary comparisons are performed in integer satoshis. New invoices
+ * reserve their address through an Electrum payment request; legacy invoices
+ * without a request ID remain readable through the address-balance fallback.
  */
 class BtcInvoiceManager
 {
-    private ElectrumWallet $wallet;
-    private string $secretKey;
-    private ?Database $db;
+    private const MAX_EXPIRATION_MINUTES = 43_200;
+    private const MAX_METADATA_BYTES = 16_384;
+    private const MAX_STATELESS_JSON_BYTES = 1_024;
+    private const MAX_DESCRIPTION_BYTES = 255;
+    private const INTERNAL_REQUEST_ID_KEY = '_btcpaylite_electrum_request_id';
 
-    public function __construct(ElectrumWallet $wallet, string $secretKey, ?Database $db = null)
-    {
-        if (empty($secretKey) || strlen($secretKey) < 16) {
-            throw new Exception("Kritická chyba: Pro faktury je vyžadován silný secretKey (min. 16 znaků).");
-        }
+    private const ELECTRUM_STATUS_EXPIRED = 1;
+    private const ELECTRUM_STATUS_PAID = 3;
+    private const ELECTRUM_STATUS_UNCONFIRMED = 7;
+
+    private ElectrumWallet $wallet;
+    private BtcStatelessTokenCodec $tokenCodec;
+    private ?Database $db;
+    private Closure $clock;
+
+    public function __construct(
+        ElectrumWallet $wallet,
+        string $secretKey,
+        ?Database $db = null,
+        ?callable $clock = null
+    ) {
         $this->wallet = $wallet;
-        $this->secretKey = $secretKey;
+        $this->tokenCodec = new BtcStatelessTokenCodec($secretKey);
         $this->db = $db;
+        $this->clock = $clock === null
+            ? static fn (): int => time()
+            : Closure::fromCallable($clock);
     }
 
-    // ==============================================================================
-    // ČÁST A: STANDARDNÍ BTCPAY DATABÁZOVÝ REŽIM (PROFI SAAS)
-    // ==============================================================================
+    /**
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    public function createDatabaseInvoice(
+        string $storeId,
+        int|float|string $amountBtc,
+        array $metadata = [],
+        int $expirationMinutes = 15
+    ): array {
+        $database = $this->requireDatabase();
+        $storeId = $this->validateIdentifier($storeId, 'Store ID', 50);
+        $amount = $this->requirePositiveAmount($amountBtc);
+        $expirationSeconds = $this->expirationSeconds($expirationMinutes);
+        $invoiceId = 'inv_' . bin2hex(random_bytes(16));
+        $now = $this->now();
+        $expiresAt = $now + $expirationSeconds;
 
-    public function createDatabaseInvoice(string $storeId, float $amountBtc, array $metadata = [], int $expirationMinutes = 15): array
-    {
-        if ($this->db === null) throw new Exception("Databáze není inicializována.");
-        if ($amountBtc <= 0) throw new Exception("Částka musí být větší než nula.");
+        $this->encodeJson($metadata, 'invoice metadata', self::MAX_METADATA_BYTES);
 
-        $address = $this->wallet->getNewAddress();
-        $safeAmount = number_format($amountBtc, 8, '.', '');
-        $invoiceId = 'inv_' . substr(bin2hex(random_bytes(16)), 0, 12);
-        
-        $timeNow = time();
-        $expiresAt = $timeNow + ($expirationMinutes * 60);
+        $request = $this->reservePaymentRequest(
+            $amount,
+            'Faktura ' . $invoiceId,
+            $expirationSeconds
+        );
 
-        // Bezpečnostní kontrola JSON dat
-        $jsonMetadata = json_encode($metadata, JSON_UNESCAPED_UNICODE);
-        if ($jsonMetadata === false) {
-            throw new Exception("Metadata obsahují nepovolené znaky a nelze je uložit.");
+        $storedMetadata = $metadata;
+        $storedMetadata[self::INTERNAL_REQUEST_ID_KEY] = $request['request_id'];
+        $jsonMetadata = $this->encodeJson(
+            $storedMetadata,
+            'invoice metadata',
+            self::MAX_METADATA_BYTES
+        );
+
+        try {
+            $statement = $database->getPdo()->prepare(
+                "INSERT INTO invoices
+                    (id, store_id, btc_address, amount, status, metadata, created_at, expires_at)
+                 VALUES (?, ?, ?, ?, 'New', ?, ?, ?)"
+            );
+            $statement->execute([
+                $invoiceId,
+                $storeId,
+                $request['address'],
+                $amount->toBtcString(),
+                $jsonMetadata,
+                $now,
+                $expiresAt,
+            ]);
+        } catch (Throwable $exception) {
+            $this->removePaymentRequestQuietly($request['request_id']);
+
+            throw new BtcInvoiceManagerException(
+                'Database invoice could not be stored.',
+                'create_database_invoice',
+                previous: $exception
+            );
         }
-
-        $stmt = $this->db->getPdo()->prepare("
-            INSERT INTO invoices (id, store_id, btc_address, amount, status, metadata, created_at, expires_at) 
-            VALUES (?, ?, ?, ?, 'New', ?, ?, ?)
-        ");
-        
-        $stmt->execute([
-            $invoiceId, $storeId, $address, $safeAmount, $jsonMetadata, $timeNow, $expiresAt
-        ]);
 
         return [
             'id' => $invoiceId,
-            'address' => $address,
-            'amount' => $safeAmount,
+            'address' => $request['address'],
+            'amount' => $amount->toBtcString(),
             'status' => 'New',
-            'created_at' => $timeNow,
+            'created_at' => $now,
             'expires_at' => $expiresAt,
-            'bip21_uri' => $this->generateBip21Uri($address, $safeAmount, 'Faktura ' . $invoiceId)
+            'bip21_uri' => $this->generateBip21Uri(
+                $request['address'],
+                $amount->toBtcString(),
+                'Faktura ' . $invoiceId
+            ),
         ];
     }
 
     /**
-     * Rychlé načtení faktury z DB (pro vykreslení stránky, nezatěžuje Electrum daemon).
+     * Loads an invoice without contacting Electrum.
+     *
+     * @return array<string, mixed>
      */
     public function getDatabaseInvoice(string $invoiceId): array
     {
-        if ($this->db === null) throw new Exception("Databáze není inicializována.");
+        $invoice = $this->loadDatabaseInvoice($invoiceId);
+        unset($invoice['electrum_request_id']);
 
-        $stmt = $this->db->getPdo()->prepare("SELECT * FROM invoices WHERE id = ?");
-        $stmt->execute([$invoiceId]);
-        $invoice = $stmt->fetch();
-
-        if (!$invoice) {
-            throw new Exception("Faktura nenalezena v databázi.");
-        }
-
-        $invoice['metadata'] = json_decode($invoice['metadata'] ?? '{}', true);
-        $invoice['bip21_uri'] = $this->generateBip21Uri($invoice['btc_address'], number_format((float)$invoice['amount'], 8, '.', ''), 'Faktura ' . $invoiceId);
-        
         return $invoice;
     }
 
     /**
-     * Zkontroluje stav v blockchainu a updatuje MySQL. Zátěžová metoda (zavolá Electrum).
+     * @return array<string, mixed>
+     */
+    private function loadDatabaseInvoice(string $invoiceId): array
+    {
+        $database = $this->requireDatabase();
+        $invoiceId = $this->validateIdentifier($invoiceId, 'Invoice ID', 50);
+
+        $statement = $database->getPdo()->prepare('SELECT * FROM invoices WHERE id = ?');
+        $statement->execute([$invoiceId]);
+        $invoice = $statement->fetch();
+
+        if (!is_array($invoice)) {
+            throw new BtcInvoiceManagerException(
+                'Invoice was not found.',
+                'get_database_invoice',
+                404
+            );
+        }
+
+        $metadata = $this->decodeDatabaseMetadata($invoice['metadata'] ?? null);
+        $requestId = $metadata[self::INTERNAL_REQUEST_ID_KEY] ?? null;
+        unset($metadata[self::INTERNAL_REQUEST_ID_KEY]);
+
+        $address = $this->validateStoredString(
+            (string) ($invoice['btc_address'] ?? ''),
+            'Invoice address',
+            100
+        );
+        $amount = $this->decodeStoredAmount($invoice['amount'] ?? null);
+
+        $invoice['id'] = $invoiceId;
+        $invoice['btc_address'] = $address;
+        $invoice['amount'] = $amount->toBtcString();
+        $invoice['metadata'] = $metadata;
+        if ($requestId !== null && !is_string($requestId)) {
+            throw new BtcInvoiceManagerException(
+                'Stored Electrum payment request ID is invalid.',
+                'get_database_invoice'
+            );
+        }
+        $invoice['electrum_request_id'] = $requestId === null || $requestId === ''
+            ? null
+            : $this->validateStoredString($requestId, 'Electrum payment request ID', 128);
+        $invoice['created_at'] = $this->decodeStoredTimestamp(
+            $invoice['created_at'] ?? null,
+            'invoice creation time'
+        );
+        $invoice['expires_at'] = $this->decodeStoredTimestamp(
+            $invoice['expires_at'] ?? null,
+            'invoice expiration time'
+        );
+        if ($invoice['expires_at'] <= $invoice['created_at']) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice expiration time is invalid.',
+                'get_database_invoice'
+            );
+        }
+        $invoice['bip21_uri'] = $this->generateBip21Uri(
+            $address,
+            $amount->toBtcString(),
+            'Faktura ' . $invoiceId
+        );
+
+        return $invoice;
+    }
+
+    /**
+     * Checks Electrum and updates the persisted invoice status.
+     *
+     * @return array<string, mixed>
      */
     public function checkDatabasePaymentStatus(string $invoiceId): array
     {
-        $invoice = $this->getDatabaseInvoice($invoiceId); // Využijeme čtecí metodu zapsanou výše
+        $database = $this->requireDatabase();
+        $invoice = $this->loadDatabaseInvoice($invoiceId);
+        $expected = $this->requirePositiveAmount((string) $invoice['amount']);
+        $currentStatus = (string) ($invoice['status'] ?? 'New');
 
-        $address = $invoice['btc_address'];
-        $expectedAmount = (float)$invoice['amount'];
-        $expirationTime = (int)$invoice['expires_at'];
-        $currentDbStatus = $invoice['status'];
-        
-        $isExpired = time() > $expirationTime;
-
-        // Dotaz do uzlu
-        $balance = $this->wallet->getAddressBalance($address);
-        $confirmed = (float)($balance['confirmed']);
-        $totalReceived = $confirmed + (float)($balance['unconfirmed']);
-
-        $newStatus = 'New';
-        if ($totalReceived >= $expectedAmount) {
-            $newStatus = ($confirmed >= $expectedAmount) ? 'Settled' : 'Processing';
-        } elseif ($totalReceived > 0) {
-            // Bylo zasláno málo. BTCPay používá 'New' a v additionalStatus by dalo 'PaidPartial'
-            $newStatus = 'New'; 
-        } else {
-            $newStatus = $isExpired ? 'Expired' : 'New';
+        // A confirmed invoice is terminal in the local state machine. This also
+        // prevents a later wallet spend from making it look unpaid again.
+        if ($currentStatus === 'Settled') {
+            return $this->databaseStatusResult(
+                $invoice,
+                'Settled',
+                $expected,
+                $expected,
+                'None'
+            );
         }
 
-        if ($newStatus !== $currentDbStatus) {
-            $updateStmt = $this->db->getPdo()->prepare("UPDATE invoices SET status = ? WHERE id = ?");
-            $updateStmt->execute([$newStatus, $invoiceId]);
+        $now = $this->now();
+        $observation = $this->observePayment(
+            (string) $invoice['btc_address'],
+            $invoice['electrum_request_id'],
+            $expected
+        );
+        $isExpired = $now >= (int) $invoice['expires_at'];
+        $newStatus = $this->databaseStatus(
+            $observation['electrum_status'],
+            $observation['confirmed'],
+            $observation['received'],
+            $expected,
+            $isExpired
+        );
+        $additionalStatus = $observation['received']->isPositive()
+            && $observation['received']->compare($expected) < 0
+                ? 'PaidPartial'
+                : 'None';
+
+        // Retry a conditional write if another checker updated the same invoice
+        // between our read and write. Settled is terminal and always wins.
+        for ($attempt = 0; $attempt < 3 && $newStatus !== $currentStatus; ++$attempt) {
+            $statement = $database->getPdo()->prepare(
+                'UPDATE invoices SET status = ? WHERE id = ? AND status = ?'
+            );
+            $statement->execute([$newStatus, $invoiceId, $currentStatus]);
+
+            if ($statement->rowCount() === 1) {
+                $invoice['status'] = $newStatus;
+                $currentStatus = $newStatus;
+                break;
+            }
+
+            $invoice = $this->loadDatabaseInvoice($invoiceId);
+            $currentStatus = (string) $invoice['status'];
+            if ($currentStatus === 'Settled') {
+                $newStatus = 'Settled';
+            }
         }
 
-        return [
-            'id' => $invoiceId,
-            'status' => $newStatus,
-            'invoice' => $invoice,
-            'payment' => [
-                'total_received'  => number_format($totalReceived, 8, '.', ''),
-                'missing_amount'  => number_format(max(0, $expectedAmount - $totalReceived), 8, '.', '')
-            ]
-        ];
+        if ($newStatus !== $currentStatus) {
+            $newStatus = $currentStatus;
+        }
+        if ($newStatus === 'Settled') {
+            $observation['received'] = BitcoinAmount::max($observation['received'], $expected);
+            $additionalStatus = 'None';
+        }
+
+        return $this->databaseStatusResult(
+            $invoice,
+            $newStatus,
+            $expected,
+            $observation['received'],
+            $additionalStatus
+        );
     }
 
-    // ==============================================================================
-    // ČÁST B: STATELESS LITE REŽIM (URL TOKENY BEZ DATABÁZE)
-    // ==============================================================================
+    /**
+     * @param array<string, mixed> $customData
+     * @return array{token: string, bip21_uri: string}
+     */
+    public function createStatelessInvoice(
+        int|float|string $amountBtc,
+        string $description,
+        array $customData = [],
+        int $expirationMinutes = 15
+    ): array {
+        $amount = $this->requirePositiveAmount($amountBtc);
+        $description = $this->validateNonEmptyString(
+            $description,
+            'Invoice description',
+            self::MAX_DESCRIPTION_BYTES
+        );
+        $expirationSeconds = $this->expirationSeconds($expirationMinutes);
+        $now = $this->now();
 
-    public function createStatelessInvoice(float $amountBtc, string $description, array $customData = [], int $expirationMinutes = 15): array
-    {
-        if ($amountBtc <= 0) throw new Exception("Částka faktury musí být větší než nula.");
+        // Validate caller-controlled data before mutating the Electrum wallet.
+        $this->encodeJson($customData, 'custom invoice data', self::MAX_STATELESS_JSON_BYTES);
 
-        $address = $this->wallet->getNewAddress();
-        $safeAmount = number_format($amountBtc, 8, '.', '');
-        $timeNow = time();
-
+        $request = $this->reservePaymentRequest($amount, $description, $expirationSeconds);
         $payload = [
-            'a' => $address,
-            'v' => $safeAmount,
+            'ver' => 2,
+            'a' => $request['address'],
+            'r' => $request['request_id'],
+            'v' => $amount->toBtcString(),
             'd' => $description,
             'p' => $customData,
-            't' => $timeNow,
-            'e' => $timeNow + ($expirationMinutes * 60)
+            't' => $now,
+            'e' => $now + $expirationSeconds,
         ];
 
-        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
-        if ($json === false) throw new Exception("Chyba při kódování dat faktury.");
-        if (strlen($json) > 1024) throw new Exception("Custom data jsou příliš velká (Limit URL).");
-        
-        $base64 = strtr(base64_encode($json), '+/', '-_');
-        $signature = hash_hmac('sha256', $base64, $this->secretKey);
-        
+        try {
+            $token = $this->tokenCodec->encode($payload);
+        } catch (Throwable $exception) {
+            $this->removePaymentRequestQuietly($request['request_id']);
+            throw $exception;
+        }
+
         return [
-            'token' => $base64 . '.' . $signature,
-            'bip21_uri' => $this->generateBip21Uri($address, $safeAmount, $description)
+            'token' => $token,
+            'bip21_uri' => $this->generateBip21Uri(
+                $request['address'],
+                $amount->toBtcString(),
+                $description
+            ),
         ];
     }
 
     /**
-     * Rychlé načtení z Tokenu (bez volání Electra).
+     * Verifies and decodes both current and legacy stateless tokens.
+     *
+     * @return array<string, mixed>
      */
     public function decodeStatelessToken(string $token): array
     {
-        $parts = explode('.', $token);
-        if (count($parts) !== 2) throw new Exception("Neplatný formát faktury.");
-
-        list($base64, $signature) = $parts;
-        $expectedSignature = hash_hmac('sha256', $base64, $this->secretKey);
-        
-        if (!hash_equals($expectedSignature, $signature)) {
-            throw new Exception("Bezpečnostní chyba: Pečeť faktury byla porušena.");
-        }
-
-        $json = base64_decode(strtr($base64, '-_', '+/'));
-        $data = json_decode($json, true);
-        
-        if (!is_array($data) || empty($data['a']) || empty($data['v']) || empty($data['e'])) {
-            throw new Exception("Faktura obsahuje poškozená data.");
-        }
-
-        return $data;
+        return $this->tokenCodec->decode($token);
     }
 
     /**
-     * Zkontroluje stav v blockchainu (Zátěžová metoda).
+     * @return array<string, mixed>
      */
     public function checkStatelessPaymentStatus(string $token): array
     {
         $data = $this->decodeStatelessToken($token);
+        $expected = $this->requirePositiveAmount((string) $data['v']);
+        $now = $this->now();
+        $isExpired = $now >= (int) $data['e'];
+        $observation = $this->observePayment(
+            (string) $data['a'],
+            isset($data['r']) ? (string) $data['r'] : null,
+            $expected
+        );
 
-        $address = $data['a'];
-        $expectedAmount = (float)$data['v'];
-        $expirationTime = (int)$data['e'];
-        $isExpired = time() > $expirationTime;
-
-        $balance = $this->wallet->getAddressBalance($address);
-        $confirmed = (float)($balance['confirmed']);
-        $totalReceived = $confirmed + (float)($balance['unconfirmed']);
-
-        // U Lite režimu si držíme naše podrobné stavové kódy pro jednoduchý frontend
-        if ($totalReceived >= $expectedAmount) {
-            $status = ($confirmed >= $expectedAmount) ? 'paid' : 'pending_mempool';
-        } elseif ($totalReceived > 0) {
-            $status = 'underpaid';
-        } else {
-            $status = $isExpired ? 'expired' : 'unpaid';
-        }
+        $status = $this->statelessStatus(
+            $observation['electrum_status'],
+            $observation['confirmed'],
+            $observation['received'],
+            $expected,
+            $isExpired
+        );
+        $missing = BitcoinAmount::max(
+            BitcoinAmount::fromSatoshis(0),
+            $expected->subtract($observation['received'])
+        );
 
         return [
             'status' => $status,
             'is_expired' => $isExpired,
-            'seconds_remaining' => $isExpired ? 0 : ($expirationTime - time()),
+            'seconds_remaining' => $isExpired ? 0 : ((int) $data['e'] - $now),
             'invoice' => $data,
             'payment' => [
-                'total_received'  => number_format($totalReceived, 8, '.', '')
+                'received_total' => $observation['received']->toBtcString(),
+                // Backwards-compatible alias used by existing clients.
+                'total_received' => $observation['received']->toBtcString(),
+                'missing_amount' => $missing->toBtcString(),
             ],
-            'bip21_uri' => $this->generateBip21Uri($address, number_format($expectedAmount, 8, '.', ''), $data['d'] ?? '')
+            'bip21_uri' => $this->generateBip21Uri(
+                (string) $data['a'],
+                $expected->toBtcString(),
+                (string) $data['d']
+            ),
         ];
     }
 
-    // ==============================================================================
-    // POMOCNÉ METODY
-    // ==============================================================================
+    /**
+     * @return array{address: string, request_id: string}
+     */
+    private function reservePaymentRequest(
+        BitcoinAmount $amount,
+        string $memo,
+        int $expirationSeconds
+    ): array {
+        $request = $this->wallet->createPaymentRequest(
+            $amount->toBtcString(),
+            $memo,
+            $expirationSeconds
+        );
+        $address = $this->validateNonEmptyString(
+            (string) ($request['address'] ?? ''),
+            'Electrum payment request address',
+            100
+        );
+        $requestId = $this->validateNonEmptyString(
+            (string) ($request['request_id'] ?? ''),
+            'Electrum payment request ID',
+            128
+        );
 
-    private function generateBip21Uri(string $address, string $amount, string $label): string
-    {
-        $uri = "bitcoin:{$address}?amount={$amount}";
-        if (!empty($label)) {
-            $uri .= "&message=" . rawurlencode($label);
+        return ['address' => $address, 'request_id' => $requestId];
+    }
+
+    /**
+     * @return array{
+     *   electrum_status: int|null,
+     *   confirmed: BitcoinAmount,
+     *   received: BitcoinAmount
+     * }
+     */
+    private function observePayment(
+        string $address,
+        ?string $requestId,
+        BitcoinAmount $expected
+    ): array {
+        $electrumStatus = null;
+        if ($requestId !== null && $requestId !== '') {
+            $request = $this->wallet->getPaymentRequest($requestId);
+            $rawStatus = $request['status'] ?? null;
+            if (is_int($rawStatus)) {
+                $electrumStatus = $rawStatus;
+            } elseif (is_string($rawStatus) && ctype_digit($rawStatus)) {
+                $electrumStatus = (int) $rawStatus;
+            } else {
+                throw new BtcInvoiceManagerException(
+                    'Electrum payment request returned an invalid status.',
+                    'observe_payment'
+                );
+            }
         }
-        return $uri;
+
+        $balance = $this->wallet->getAddressBalanceExact($address);
+
+        try {
+            $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
+            $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed'] ?? '0');
+        } catch (InvalidArgumentException $exception) {
+            throw new BtcInvoiceManagerException(
+                'Electrum returned an invalid address balance.',
+                'observe_payment',
+                previous: $exception
+            );
+        }
+        $zero = BitcoinAmount::fromSatoshis(0);
+        $confirmed = BitcoinAmount::max($zero, $confirmed);
+        $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
+
+        if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
+            $confirmed = BitcoinAmount::max($confirmed, $expected);
+            $received = BitcoinAmount::max($received, $expected);
+        } elseif ($electrumStatus === self::ELECTRUM_STATUS_UNCONFIRMED) {
+            $received = BitcoinAmount::max($received, $expected);
+        }
+
+        return [
+            'electrum_status' => $electrumStatus,
+            'confirmed' => $confirmed,
+            'received' => $received,
+        ];
+    }
+
+    private function databaseStatus(
+        ?int $electrumStatus,
+        BitcoinAmount $confirmed,
+        BitcoinAmount $received,
+        BitcoinAmount $expected,
+        bool $isExpired
+    ): string {
+        if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
+            return 'Settled';
+        }
+        if ($electrumStatus === self::ELECTRUM_STATUS_UNCONFIRMED) {
+            return 'Processing';
+        }
+        if ($confirmed->compare($expected) >= 0) {
+            return 'Settled';
+        }
+        if ($received->compare($expected) >= 0) {
+            return 'Processing';
+        }
+
+        return $isExpired || $electrumStatus === self::ELECTRUM_STATUS_EXPIRED
+            ? 'Expired'
+            : 'New';
+    }
+
+    private function statelessStatus(
+        ?int $electrumStatus,
+        BitcoinAmount $confirmed,
+        BitcoinAmount $received,
+        BitcoinAmount $expected,
+        bool $isExpired
+    ): string {
+        if ($electrumStatus === self::ELECTRUM_STATUS_PAID || $confirmed->compare($expected) >= 0) {
+            return 'paid';
+        }
+        if ($electrumStatus === self::ELECTRUM_STATUS_UNCONFIRMED || $received->compare($expected) >= 0) {
+            return 'pending_mempool';
+        }
+        if ($received->isPositive()) {
+            return 'underpaid';
+        }
+
+        return $isExpired || $electrumStatus === self::ELECTRUM_STATUS_EXPIRED
+            ? 'expired'
+            : 'unpaid';
+    }
+
+    /**
+     * @param array<string, mixed> $invoice
+     * @return array<string, mixed>
+     */
+    private function databaseStatusResult(
+        array $invoice,
+        string $status,
+        BitcoinAmount $expected,
+        BitcoinAmount $received,
+        string $additionalStatus
+    ): array {
+        $missing = BitcoinAmount::max(
+            BitcoinAmount::fromSatoshis(0),
+            $expected->subtract($received)
+        );
+        $invoice['status'] = $status;
+        unset($invoice['electrum_request_id']);
+
+        return [
+            'id' => (string) $invoice['id'],
+            'status' => $status,
+            'additional_status' => $additionalStatus,
+            'invoice' => $invoice,
+            'payment' => [
+                'total_received' => $received->toBtcString(),
+                'missing_amount' => $missing->toBtcString(),
+            ],
+        ];
+    }
+
+    private function removePaymentRequestQuietly(string $requestId): void
+    {
+        try {
+            $this->wallet->deletePaymentRequest($requestId);
+        } catch (Throwable) {
+            // Preserve the original failure. The orphaned request is harmless
+            // and can be removed by a maintenance task later.
+        }
+    }
+
+    private function requirePositiveAmount(int|float|string $amount): BitcoinAmount
+    {
+        $bitcoinAmount = BitcoinAmount::fromBtc($amount);
+        if (!$bitcoinAmount->isPositive()) {
+            throw new InvalidArgumentException('Invoice amount must be greater than zero.');
+        }
+
+        return $bitcoinAmount;
+    }
+
+    private function decodeStoredAmount(mixed $amount): BitcoinAmount
+    {
+        if (!is_int($amount) && !is_float($amount) && !is_string($amount)) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice amount is invalid.',
+                'get_database_invoice'
+            );
+        }
+
+        try {
+            return $this->requirePositiveAmount($amount);
+        } catch (InvalidArgumentException $exception) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice amount is invalid.',
+                'get_database_invoice',
+                previous: $exception
+            );
+        }
+    }
+
+    private function expirationSeconds(int $expirationMinutes): int
+    {
+        if ($expirationMinutes < 1 || $expirationMinutes > self::MAX_EXPIRATION_MINUTES) {
+            throw new InvalidArgumentException('Invoice expiration must be between 1 minute and 30 days.');
+        }
+
+        return $expirationMinutes * 60;
+    }
+
+    private function requireDatabase(): Database
+    {
+        if ($this->db === null) {
+            throw new LogicException('Database mode is not configured for this invoice manager.');
+        }
+
+        return $this->db;
+    }
+
+    private function now(): int
+    {
+        $now = ($this->clock)();
+        if (!is_int($now) || $now < 1) {
+            throw new LogicException('Invoice clock must return a positive Unix timestamp.');
+        }
+
+        return $now;
+    }
+
+    private function validateIdentifier(string $value, string $field, int $maxBytes): string
+    {
+        return $this->validateNonEmptyString($value, $field, $maxBytes);
+    }
+
+    private function validateNonEmptyString(string $value, string $field, int $maxBytes): string
+    {
+        $value = trim($value);
+        if ($value === '' || str_contains($value, "\0") || strlen($value) > $maxBytes) {
+            throw new InvalidArgumentException("{$field} is invalid.");
+        }
+
+        return $value;
+    }
+
+    private function validateStoredString(string $value, string $field, int $maxBytes): string
+    {
+        try {
+            return $this->validateNonEmptyString($value, $field, $maxBytes);
+        } catch (InvalidArgumentException $exception) {
+            throw new BtcInvoiceManagerException(
+                "Stored {$field} is invalid.",
+                'get_database_invoice',
+                previous: $exception
+            );
+        }
+    }
+
+    private function decodeStoredTimestamp(mixed $value, string $field): int
+    {
+        if (is_int($value)) {
+            $timestamp = $value;
+        } elseif (is_string($value) && preg_match('/\A[1-9][0-9]*\z/D', $value)) {
+            $timestamp = filter_var($value, FILTER_VALIDATE_INT);
+            if ($timestamp === false) {
+                $timestamp = 0;
+            }
+        } else {
+            $timestamp = 0;
+        }
+
+        if ($timestamp < 1) {
+            throw new BtcInvoiceManagerException(
+                "Stored {$field} is invalid.",
+                'get_database_invoice'
+            );
+        }
+
+        return $timestamp;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeDatabaseMetadata(mixed $metadata): array
+    {
+        if ($metadata === null || $metadata === '') {
+            return [];
+        }
+        if (!is_string($metadata)) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice metadata is invalid.',
+                'decode_database_metadata'
+            );
+        }
+
+        try {
+            $decoded = json_decode($metadata, true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice metadata is invalid.',
+                'decode_database_metadata',
+                previous: $exception
+            );
+        }
+
+        if (!is_array($decoded)) {
+            throw new BtcInvoiceManagerException(
+                'Stored invoice metadata must be a JSON object.',
+                'decode_database_metadata'
+            );
+        }
+
+        return $decoded;
+    }
+
+    private function encodeJson(mixed $value, string $field, int $maxBytes): string
+    {
+        try {
+            $json = json_encode(
+                $value,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException $exception) {
+            throw new BtcInvoiceManagerException(
+                "Unable to encode {$field}.",
+                'encode_json',
+                400,
+                $exception
+            );
+        }
+
+        if (strlen($json) > $maxBytes) {
+            throw new BtcInvoiceManagerException(
+                ucfirst($field) . ' is too large.',
+                'encode_json',
+                400
+            );
+        }
+
+        return $json;
+    }
+
+    private function generateBip21Uri(string $address, string $amount, string $message): string
+    {
+        $query = ['amount' => $amount];
+        if ($message !== '') {
+            $query['message'] = $message;
+        }
+
+        return 'bitcoin:' . $address . '?' . http_build_query(
+            $query,
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
     }
 }
