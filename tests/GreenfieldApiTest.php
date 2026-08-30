@@ -264,6 +264,25 @@ $tests['allows the configured administrator key'] = static function () use ($wal
     greenfieldAssertSame('store_test', $store['id'], 'The administrator could not access the store.');
 };
 
+$tests['rejects a checkout base URL containing credentials'] = static function () use ($walletPath): void {
+    [, $repository, $database, $wallet, $manager] = newGreenfieldTestService($walletPath);
+
+    $exception = greenfieldAssertThrows(
+        GreenfieldApiException::class,
+        static fn () => new GreenfieldApiService(
+            $repository,
+            $database,
+            $wallet,
+            $manager,
+            'admin-api-key',
+            'https://user:password@example.com'
+        ),
+        'A checkout URL containing credentials was accepted.'
+    );
+
+    greenfieldAssertSame(500, $exception->getHttpStatus(), 'Invalid server configuration was exposed as client input.');
+};
+
 $tests['keeps invoices scoped to their authenticated store'] = static function () use ($walletPath): void {
     [$service, , , , $manager] = newGreenfieldTestService($walletPath);
     $manager->storedInvoice = [
