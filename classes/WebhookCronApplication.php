@@ -127,4 +127,3 @@ class WebhookCronApplication
         return $value;
     }
 }
-braces 13 13
