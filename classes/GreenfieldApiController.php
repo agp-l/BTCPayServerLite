@@ -21,6 +21,50 @@ class GreenfieldApiController
     }
 
     /**
+     * Adapts Apache/PHP server variables to the testable request boundary.
+     *
+     * @param array<string, mixed> $server
+     * @return array{status_code: int, body: array<string, mixed>}
+     */
+    public function handleServerRequest(array $server, string $rawBody): array
+    {
+        $method = $server['REQUEST_METHOD'] ?? null;
+        $requestUri = $server['REQUEST_URI'] ?? null;
+        $scriptName = $server['SCRIPT_NAME'] ?? '';
+        if (!is_string($method) || !is_string($requestUri) || !is_string($scriptName)) {
+            throw new GreenfieldApiException('HTTP request data is invalid.', 'adapt_request', 400);
+        }
+
+        $requestPath = parse_url($requestUri, PHP_URL_PATH);
+        if (!is_string($requestPath)) {
+            throw new GreenfieldApiException('HTTP request path is invalid.', 'adapt_request', 400);
+        }
+
+        $scriptPath = str_replace('\\', '/', $scriptName);
+        if (
+            $scriptPath !== ''
+            && ($requestPath === $scriptPath || str_starts_with($requestPath, $scriptPath . '/'))
+        ) {
+            $requestPath = substr($requestPath, strlen($scriptPath));
+        } else {
+            // Supports an Apache rewrite that maps /api/v1/* to api.php.
+            $apiPathOffset = strpos($requestPath, '/api/v1/');
+            if ($apiPathOffset !== false) {
+                $requestPath = substr($requestPath, $apiPathOffset);
+            }
+        }
+
+        $authorization = $server['HTTP_AUTHORIZATION']
+            ?? $server['REDIRECT_HTTP_AUTHORIZATION']
+            ?? '';
+        if (!is_string($authorization)) {
+            throw new GreenfieldApiException('Authorization header is invalid.', 'authenticate', 401);
+        }
+
+        return $this->handleRequest($method, $requestPath, $rawBody, $authorization);
+    }
+
+    /**
      * @return array{status_code: int, body: array<string, mixed>}
      */
     public function handleRequest(
