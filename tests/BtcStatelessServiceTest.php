@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\BtcStatelessApiController;
 use BtcPayLite\BtcStatelessAjaxController;
 use BtcPayLite\BtcStatelessService;
 use BtcPayLite\BtcStatelessServiceException;
@@ -75,12 +76,24 @@ final class StatelessControllerTestService extends BtcStatelessService
     /** @var array<string, mixed> */
     public array $createResult = [];
 
+    /** @var array<string, mixed>|null */
+    public ?array $apiInput = null;
+    public ?string $apiKey = null;
+
     public function __construct()
     {
     }
 
     public function createInvoiceAsAdmin(array $input, string $walletName): array
     {
+        return $this->createResult;
+    }
+
+    public function createInvoiceFromApi(array $input, string $apiKeyProvided): array
+    {
+        $this->apiInput = $input;
+        $this->apiKey = $apiKeyProvided;
+
         return $this->createResult;
     }
 
@@ -285,6 +298,62 @@ $tests['rejects non-string AJAX boundary values'] = static function (): void {
         static fn () => $controller->handleRequest(['api_action' => 'check_status', 'token' => []]),
         'A non-string token was accepted.'
     );
+};
+
+$tests['validates and maps the public stateless API request'] = static function (): void {
+    $service = new StatelessControllerTestService();
+    $service->createResult = [
+        'token' => 'token+with/slash',
+        'amount' => '0.00000001',
+    ];
+    $controller = new BtcStatelessApiController(
+        $service,
+        'https://payments.example/admin/url_pay.php'
+    );
+
+    $result = $controller->handleRequest(
+        'POST',
+        '{"amount":"0.00000001","description":"One satoshi"}',
+        [],
+        'bearer api-key'
+    );
+
+    statelessAssertSame('api-key', $service->apiKey, 'The Bearer token was parsed incorrectly.');
+    statelessAssertSame('0.00000001', $service->apiInput['amount'] ?? null, 'The JSON amount changed.');
+    statelessAssertSame(
+        'https://payments.example/admin/url_pay.php?inv=token%2Bwith%2Fslash',
+        $result['data']['url'],
+        'The public payment URL is invalid.'
+    );
+};
+
+$tests['rejects malformed public API requests'] = static function (): void {
+    $service = new StatelessControllerTestService();
+    $controller = new BtcStatelessApiController(
+        $service,
+        'https://payments.example/admin/url_pay.php'
+    );
+
+    $invalidJson = statelessAssertThrows(
+        BtcStatelessServiceException::class,
+        static fn () => $controller->handleRequest('POST', '{invalid', [], 'Bearer api-key'),
+        'Malformed JSON was accepted.'
+    );
+    statelessAssertSame(400, $invalidJson->getCode(), 'Malformed JSON returned the wrong code.');
+
+    $invalidAuth = statelessAssertThrows(
+        BtcStatelessServiceException::class,
+        static fn () => $controller->handleRequest('POST', '{}', [], 'api-key'),
+        'An authorization header without Bearer was accepted.'
+    );
+    statelessAssertSame(401, $invalidAuth->getCode(), 'Invalid authorization returned the wrong code.');
+
+    $invalidMethod = statelessAssertThrows(
+        BtcStatelessServiceException::class,
+        static fn () => $controller->handleRequest('GET', '{}', [], 'Bearer api-key'),
+        'A GET request was accepted.'
+    );
+    statelessAssertSame(405, $invalidMethod->getCode(), 'Invalid HTTP method returned the wrong code.');
 };
 
 $passed = 0;
