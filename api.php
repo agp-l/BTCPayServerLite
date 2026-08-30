@@ -1,229 +1,125 @@
 <?php
-// api.php - BTCPay Lite API (Greenfield v1 kompatibilní pro WooCommerce)
+
 declare(strict_types=1);
-ini_set('display_errors', '1');
-header('Content-Type: application/json; charset=utf-8');
 
-require __DIR__ . '/vendor/autoload.php';
-$config = require __DIR__ . '/config.php';
-
+use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\GreenfieldApiController;
+use BtcPayLite\GreenfieldApiException;
+use BtcPayLite\GreenfieldApiRepository;
+use BtcPayLite\GreenfieldApiService;
+use BtcPayLite\UrlManager;
+
+ini_set('display_errors', '0');
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+
+require __DIR__ . '/vendor/autoload.php';
+
+$statusCode = 500;
+$responseBody = ['message' => 'Internal server error.'];
 
 try {
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
-} catch (\Exception $e) {
-    http_response_code(500);
-    die(json_encode(['error' => 'Chyba pripojeni k databazi']));
-}
-
-$requestUri = $_SERVER['REQUEST_URI'];
-$method = $_SERVER['REQUEST_METHOD'];
-
-$path = str_replace($_SERVER['SCRIPT_NAME'], '', $requestUri);
-$path = strtok($path, '?');
-
-// ==============================================================================
-// 1. ENDPOINT: Info o obchodu (GET)
-// ==============================================================================
-if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)$/', $path, $matches)) {
-    $storeId = $matches[1];
-    
-    $stmt = $db->getPdo()->prepare("SELECT id, name FROM stores WHERE id = ?");
-    $stmt->execute([$storeId]);
-    $store = $stmt->fetch();
-    
-    if ($store) {
-        http_response_code(200);
-        echo json_encode([
-            "id" => $store['id'],
-            "name" => $store['name'],
-            "website" => null,
-            "defaultPaymentMethod" => "BTC"
-        ]);
-    } else {
-        http_response_code(404);
-        echo json_encode(["message" => "Obchod nenalezen"]);
-    }
-    exit;
-}
-
-// ==============================================================================
-// 1.5 ENDPOINT: Detail faktury (GET)
-// ==============================================================================
-if ($method === 'GET' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invoices\/([a-zA-Z0-9_-]+)$/', $path, $matches)) {
-    $storeId = $matches[1];
-    $invoiceId = $matches[2];
-    
-    $stmt = $db->getPdo()->prepare("SELECT * FROM invoices WHERE id = ? AND store_id = ?");
-    $stmt->execute([$invoiceId, $storeId]);
-    $inv = $stmt->fetch();
-    
-    if ($inv) {
-        $createdTime = is_numeric($inv['created_at']) ? (int)$inv['created_at'] : strtotime((string)$inv['created_at']);
-        
-        http_response_code(200);
-        echo json_encode([
-            "id" => $inv['id'],
-            "storeId" => $inv['store_id'],
-            "amount" => (float)$inv['amount'],
-            "currency" => "BTC",
-            "type" => "Standard",
-            "status" => $inv['status'],
-            "additionalStatus" => "None",
-            "createdTime" => $createdTime,
-            "expirationTime" => (int)$inv['expires_at'],
-            "metadata" => json_decode($inv['metadata'] ?? '{}', true)
-        ]);
-    } else {
-        http_response_code(404);
-        echo json_encode(["message" => "Faktura nenalezena"]);
-    }
-    exit;
-}
-
-// ==============================================================================
-// 2. ENDPOINT: Vytvoření faktury (POST)
-// ==============================================================================
-if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/invoices$/', $path, $matches)) {
-    $storeId = $matches[1];
-    
-    $stmt = $db->getPdo()->prepare("SELECT * FROM stores WHERE id = ?");
-    $stmt->execute([$storeId]);
-    $store = $stmt->fetch();
-    
-    if (!$store) {
-        http_response_code(404);
-        die(json_encode(["message" => "Obchod nenalezen"]));
+    $config = require __DIR__ . '/config.php';
+    if (!is_array($config)) {
+        throw new GreenfieldApiException('Application configuration is invalid.', 'configure_api');
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
-    $amount = (float)($input['amount'] ?? 0);
-    
-    if ($amount <= 0) {
-        http_response_code(400);
-        die(json_encode(["message" => "Neplatna castka"]));
+    $databasePort = $config['db_port'] ?? 3306;
+    if (is_string($databasePort) && ctype_digit($databasePort)) {
+        $databasePort = (int) $databasePort;
+    }
+    if (!is_int($databasePort)) {
+        throw new GreenfieldApiException('Database port configuration is invalid.', 'configure_api');
     }
 
-    // Získání exkluzivního zámku s vyčištěním bufferu
-    $db->getPdo()->query("SELECT GET_LOCK('electrum_rpc', 10)")->fetchColumn();
+    $database = new Database(
+        $config['db_host'] ?? '',
+        $config['db_name'] ?? '',
+        $config['db_user'] ?? '',
+        $config['db_pass'] ?? '',
+        $databasePort
+    );
+    $rpc = new ElectrumRPC(
+        $config['rpc_host'] ?? '',
+        $config['rpc_port'] ?? 0,
+        $config['rpc_user'] ?? null,
+        $config['rpc_pass'] ?? null
+    );
+    $wallet = new ElectrumWallet($rpc);
+    $invoiceManager = new BtcInvoiceManager(
+        $wallet,
+        $config['secret_key'] ?? '',
+        $database
+    );
+    $repository = new GreenfieldApiRepository($database);
 
+    $configuredBaseUrl = $config['app_url'] ?? null;
+    $checkoutBaseUrl = is_string($configuredBaseUrl) && trim($configuredBaseUrl) !== ''
+        ? $configuredBaseUrl
+        : (new UrlManager())->getBaseUrl();
+
+    $service = new GreenfieldApiService(
+        $repository,
+        $database,
+        $wallet,
+        $invoiceManager,
+        is_string($config['admin_api_key'] ?? null) ? $config['admin_api_key'] : '',
+        $checkoutBaseUrl
+    );
+    $controller = new GreenfieldApiController($service);
+
+    $inputStream = fopen('php://input', 'rb');
+    if ($inputStream === false) {
+        throw new GreenfieldApiException('Request body could not be read.', 'read_request', 400);
+    }
     try {
-        // PŘIDÁNO: Hard Fail bezpečnostní pojistka
-        if (!file_exists($store['wallet_path'])) {
-            throw new \Exception("Kritická chyba: Soubor peněženky obchodu fyzicky neexistuje.");
-        }
-
-        $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-        $wallet = new ElectrumWallet($rpc);
-        $wallet->loadWallet($store['wallet_path']);
-        $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
-
-        $metadata = $input['metadata'] ?? [];
-        $inv = $invoiceManager->createDatabaseInvoice($storeId, $amount, $metadata, 15);
-
-        $notificationUrl = $input['checkout']['redirectURL'] ?? ($input['notificationUrl'] ?? null);
-        if ($notificationUrl) {
-            $whStmt = $db->getPdo()->prepare("SELECT id FROM webhooks WHERE store_id = ? AND url = ?");
-            $whStmt->execute([$storeId, $notificationUrl]);
-            if (!$whStmt->fetch()) {
-                $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
-                $whSecret = bin2hex(random_bytes(16));
-                $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)")
-                           ->execute([$whId, $storeId, $notificationUrl, $whSecret]);
-            }
-        }
-
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-        $baseDir = dirname($_SERVER['SCRIPT_NAME']);
-        if ($baseDir === '/' || $baseDir === '\\') $baseDir = '';
-        
-        $checkoutLink = $protocol . $_SERVER['HTTP_HOST'] . rtrim($baseDir, '/\\') . '/checkout/pay.php?id=' . $inv['id'];
-
-        // Uvolnění zámku a vyčištění bufferu
-        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
-
-        http_response_code(200);
-        echo json_encode([
-            "id" => $inv['id'],
-            "storeId" => $storeId,
-            "amount" => (float)$inv['amount'],
-            "currency" => "BTC",
-            "type" => "Standard",
-            "checkoutLink" => $checkoutLink,
-            "createdTime" => $inv['created_at'],
-            "expirationTime" => $inv['expires_at'],
-            "monitoringTime" => $inv['expires_at'],
-            "status" => "New",
-            "additionalStatus" => "None",
-            "metadata" => $metadata
-        ]);
-        exit;
-    } catch (\Exception $e) {
-        // Záchranné uvolnění zámku
-        $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
-        
-        http_response_code(500);
-        echo json_encode(["message" => "Chyba pri generovani faktury: " . $e->getMessage()]);
-        exit;
+        $rawBody = stream_get_contents($inputStream, 65_537);
+    } finally {
+        fclose($inputStream);
     }
+    if (!is_string($rawBody)) {
+        throw new GreenfieldApiException('Request body could not be read.', 'read_request', 400);
+    }
+
+    $response = $controller->handleServerRequest($_SERVER, $rawBody);
+    $statusCode = $response['status_code'];
+    $responseBody = $response['body'];
+} catch (GreenfieldApiException $exception) {
+    $statusCode = $exception->getHttpStatus();
+    $responseBody = ['message' => $exception->getMessage()];
+
+    if ($statusCode >= 500) {
+        error_log(sprintf(
+            'Greenfield API operation "%s" failed: %s',
+            $exception->getOperation(),
+            $exception->getMessage()
+        ));
+    }
+} catch (Throwable $exception) {
+    error_log('Unhandled Greenfield API failure: ' . $exception->getMessage());
 }
 
-// ==============================================================================
-// 3. ENDPOINT: Vytvoření webhooku (POST)
-// ==============================================================================
-if ($method === 'POST' && preg_match('/^\/api\/v1\/stores\/([a-zA-Z0-9_-]+)\/webhooks$/', $path, $matches)) {
-    $storeId = $matches[1];
-    
-    $stmt = $db->getPdo()->prepare("SELECT id FROM stores WHERE id = ?");
-    $stmt->execute([$storeId]);
-    if (!$stmt->fetch()) {
-        http_response_code(404);
-        die(json_encode(["message" => "Obchod nenalezen"]));
-    }
-
-    $input = json_decode(file_get_contents('php://input'), true);
-    $url = trim($input['url'] ?? '');
-    
-    if (empty($url)) {
-        http_response_code(400);
-        die(json_encode(["message" => "Chybi URL adresa pro webhook"]));
-    }
-
-    $stmt = $db->getPdo()->prepare("SELECT * FROM webhooks WHERE store_id = ? AND url = ?");
-    $stmt->execute([$storeId, $url]);
-    $existingWh = $stmt->fetch();
-
-    if ($existingWh) {
-        http_response_code(200);
-        echo json_encode([
-            "id" => $existingWh['id'],
-            "enabled" => true,
-            "automaticRedelivery" => true,
-            "url" => $existingWh['url'],
-            "secret" => $existingWh['secret']
-        ]);
-        exit;
-    }
-
-    $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
-    $whSecret = bin2hex(random_bytes(16));
-
-    $stmt = $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$whId, $storeId, $url, $whSecret]);
-
-    http_response_code(200);
-    echo json_encode([
-        "id" => $whId,
-        "enabled" => true,
-        "automaticRedelivery" => true,
-        "url" => $url,
-        "secret" => $whSecret
-    ]);
-    exit;
+if ($statusCode === 401) {
+    header('WWW-Authenticate: Bearer');
+} elseif ($statusCode === 503) {
+    header('Retry-After: 2');
 }
 
-http_response_code(404);
-echo json_encode(["message" => "Endpoint nenalezen"]);
+try {
+    $json = json_encode(
+        $responseBody,
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+    );
+} catch (Throwable $exception) {
+    $statusCode = 500;
+    $json = '{"message":"Internal server error."}';
+    error_log('Greenfield API response encoding failed: ' . $exception->getMessage());
+}
+
+http_response_code($statusCode);
+echo $json;
