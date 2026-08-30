@@ -197,8 +197,17 @@ class BtcStatelessService
             throw new BtcStatelessServiceException('Wallet name is invalid.', 'resolve_wallet', 400);
         }
 
-        $walletPath = $this->walletDirectory() . DIRECTORY_SEPARATOR . $safeWalletName;
-        if (!is_file($walletPath)) {
+        $walletDirectory = realpath($this->walletDirectory());
+        if ($walletDirectory === false || !is_dir($walletDirectory)) {
+            throw new BtcStatelessServiceException('Configured wallet directory does not exist.', 'resolve_wallet');
+        }
+
+        $walletPath = realpath($walletDirectory . DIRECTORY_SEPARATOR . $safeWalletName);
+        if (
+            $walletPath === false
+            || !is_file($walletPath)
+            || dirname($walletPath) !== $walletDirectory
+        ) {
             throw new BtcStatelessServiceException('Selected wallet does not exist.', 'resolve_wallet', 404);
         }
 
