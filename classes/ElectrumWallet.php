@@ -370,7 +370,12 @@ class ElectrumWallet
                 throw new InvalidArgumentException('Bitcoin amount must be a finite positive number.');
             }
 
-            $amount = rtrim(rtrim(number_format($amount, 8, '.', ''), '0'), '.');
+            $formattedAmount = number_format($amount, 8, '.', '');
+            if ((float) $formattedAmount !== $amount) {
+                throw new InvalidArgumentException('Bitcoin amount must not contain sub-satoshi precision.');
+            }
+
+            $amount = rtrim(rtrim($formattedAmount, '0'), '.');
         } else {
             $amount = trim($amount);
         }
