@@ -77,9 +77,25 @@ class ElectrumWallet
      */
     public function getAddressBalance(string $address): array
     {
+        $balance = $this->getAddressBalanceExact($address);
+
+        return [
+            'confirmed' => (float) $balance['confirmed'],
+            'unconfirmed' => (float) $balance['unconfirmed'],
+        ];
+    }
+
+    /**
+     * Returns canonical decimal strings so payment code never has to recover
+     * satoshis from a floating-point value.
+     *
+     * @return array{confirmed: string, unconfirmed: string}
+     */
+    public function getAddressBalanceExact(string $address): array
+    {
         $address = $this->validateNonEmptyString($address, 'Bitcoin address');
 
-        return $this->normalizeBalance(
+        return $this->normalizeExactBalance(
             $this->rpc->call('getaddressbalance', ['address' => $address]),
             'getaddressbalance'
         );
@@ -283,6 +299,26 @@ class ElectrumWallet
         return $result;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPaymentRequest(string $requestId): array
+    {
+        $requestId = $this->validateNonEmptyString($requestId, 'Payment request ID');
+        $result = $this->callForActiveWallet('get_request', ['request_id' => $requestId]);
+        if (!is_array($result)) {
+            throw $this->invalidResponse('get_request');
+        }
+
+        return $result;
+    }
+
+    public function deletePaymentRequest(string $requestId): void
+    {
+        $requestId = $this->validateNonEmptyString($requestId, 'Payment request ID');
+        $this->callForActiveWallet('delete_request', ['request_id' => $requestId]);
+    }
+
     public function getMasterPublicKey(): string
     {
         return $this->requireNonEmptyStringResult(
@@ -441,20 +477,44 @@ class ElectrumWallet
      */
     private function normalizeBalance(mixed $balance, string $operation): array
     {
+        $balance = $this->normalizeExactBalance($balance, $operation);
+
+        return [
+            'confirmed' => (float) $balance['confirmed'],
+            'unconfirmed' => (float) $balance['unconfirmed'],
+        ];
+    }
+
+    /**
+     * @return array{confirmed: string, unconfirmed: string}
+     */
+    private function normalizeExactBalance(mixed $balance, string $operation): array
+    {
         if (!is_array($balance)) {
             throw $this->invalidResponse($operation);
         }
 
         $confirmed = $balance['confirmed'] ?? 0;
         $unconfirmed = $balance['unconfirmed'] ?? 0;
-        if (!is_numeric($confirmed) || !is_numeric($unconfirmed)) {
+        if (
+            (!is_int($confirmed) && !is_float($confirmed) && !is_string($confirmed))
+            || (!is_int($unconfirmed) && !is_float($unconfirmed) && !is_string($unconfirmed))
+        ) {
             throw $this->invalidResponse($operation);
         }
 
-        return [
-            'confirmed' => (float) $confirmed,
-            'unconfirmed' => (float) $unconfirmed,
-        ];
+        try {
+            return [
+                'confirmed' => BitcoinAmount::fromBtc($confirmed)->toBtcString(),
+                'unconfirmed' => BitcoinAmount::fromBtc($unconfirmed)->toBtcString(),
+            ];
+        } catch (InvalidArgumentException $exception) {
+            throw new ElectrumWalletException(
+                "Electrum returned an invalid balance for '{$operation}'.",
+                $operation,
+                $exception
+            );
+        }
     }
 
     private function requireNonEmptyStringResult(mixed $result, string $operation): string
