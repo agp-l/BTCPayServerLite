@@ -1,5 +1,7 @@
 RewriteEngine On
-RewriteBase /
 
-# Všechny požadavky začínající na /api/ pošli tiše do api.php
-RewriteRule ^api/(.*)$ api.php [QSA,L]
+# Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
+RewriteCond %{REQUEST_FILENAME} !-f
+
+# Všechno ostatní (včetně existujících složek jako /admin/) pošli do index.php
+RewriteRule ^(.*)$ index.php [QSA,L]

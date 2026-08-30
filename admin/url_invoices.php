@@ -1,7 +1,7 @@
 <?php
 // admin/url_invoices.php
 declare(strict_types=1);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -13,6 +13,10 @@ use BtcPayLite\BtcDashboard;
 use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\BtcStatelessService;
 use BtcPayLite\BtcStatelessAjaxController;
+use BtcPayLite\AuthManager;
+
+// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
+AuthManager::requireRole('admin', '../client/login.php');
 
 // 1. Dependency Injection / Inicializace
 $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);

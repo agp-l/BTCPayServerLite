@@ -1,8 +1,8 @@
 <?php
 // admin/wallet.php
 declare(strict_types=1);
-session_start();
-ini_set('display_errors', '0'); // Ve výchozím stavu na produkci skrýváme chyby
+
+ini_set('display_errors', '1'); // Ve výchozím stavu na produkci skrýváme chyby
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -11,6 +11,10 @@ $config = require __DIR__ . '/../config.php';
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\BtcDashboard;
+use BtcPayLite\AuthManager;
+
+// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
+AuthManager::requireRole('admin', '../client/login.php');
 
 $walletDir = dirname($config['wallet_path']);
 $currentWalletName = $_GET['w'] ?? basename($config['wallet_path']);

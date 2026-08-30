@@ -12,18 +12,15 @@ declare(strict_types=1);
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * { box-sizing: border-box; }
+    
+    /* Čisté pozadí bez mřížky */
     body { 
         font-family: 'Inter', sans-serif; 
         display: flex; justify-content: center; align-items: center; 
         min-height: 100vh; margin: 0; color: #17201a; 
         background-color: #fafcfa; 
-        background-image: 
-            radial-gradient(circle at 50% 0%, rgba(47, 211, 90, 0.12) 0%, transparent 60%),
-            linear-gradient(to right, rgba(229, 234, 231, 0.7) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(229, 234, 231, 0.7) 1px, transparent 1px);
-        background-size: 100% 100%, 24px 24px, 24px 24px;
-        background-attachment: fixed;
     }
+    
     .login-box { background: #fff; padding: 40px; border-radius: 18px; box-shadow: 0 8px 30px rgba(20,45,28,.06); width: 100%; max-width: 400px; text-align: center; border: 1px solid #e5eae7; }
     .logo-icon { font-size: 32px; color: #2fd35a; margin-bottom: 15px; }
     h1 { margin: 0 0 25px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
@@ -54,16 +51,16 @@ declare(strict_types=1);
 
         <?php if (!empty($successMsg)): ?>
             <div class="success"><i class="fa-solid fa-circle-check"></i> <?php echo htmlspecialchars($successMsg); ?></div>
-            <a href="client/login.php" class="primary" style="text-decoration:none; display:block; margin-top:15px; padding:12px; background:#2fd35a; color:#fff; border-radius:10px; font-weight:700;">Přihlásit se do účtu</a>
+            <a href="login.php" class="primary" style="text-decoration:none; display:block; margin-top:15px; padding:12px; background:#2fd35a; color:#fff; border-radius:10px; font-weight:700;">Přihlásit se do účtu</a>
         <?php else: ?>
             <form method="POST" action="registrace.php">
                 <div class="input-wrap">
                     <i class="fa-solid fa-envelope"></i>
-                    <input type="email" name="email" placeholder="E-mailová adresa" required>
+                    <input type="email" name="email" placeholder="E-mailová adresa" value="<?php echo htmlspecialchars($email); ?>" required>
                 </div>
                 <div class="input-wrap">
                     <i class="fa-solid fa-lock"></i>
-                    <input type="password" name="password" placeholder="Heslo (min. 6 znaků)" required>
+                    <input type="password" name="password" placeholder="Heslo" required>
                 </div>
                 <div class="input-wrap">
                     <i class="fa-solid fa-lock"></i>
@@ -72,7 +69,7 @@ declare(strict_types=1);
                 <button type="submit"><i class="fa-solid fa-check"></i> Dokončit registraci</button>
             </form>
             
-            <a href="client/login.php" class="footer-link">Už máte účet? Přihlaste se</a>
+            <a href="login.php" class="footer-link">Už máte účet? Přihlaste se</a>
         <?php endif; ?>
     </div>
 </body>

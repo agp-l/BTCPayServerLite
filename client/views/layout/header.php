@@ -76,9 +76,9 @@ $pageTitle = $pageTitle ?? 'Klientský panel';
             <span style="font-size: 12px; font-weight: 600; color: #748078; display: block; padding: 0 12px; margin-bottom: 10px;">
                 <i class="fa-solid fa-user" style="margin-right: 5px;"></i> <?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>
             </span>
-            <a href="../login.php?logout=1" class="nav-item" style="color: #ef4d4d;">
-                <i class="fa-solid fa-right-from-bracket" style="color: #ef4d4d;"></i> Odhlásit se
-            </a>
+            <a href="login.php?logout=1" class="nav-item" style="color: #ef4d4d;">
+    <i class="fa-solid fa-right-from-bracket" style="color: #ef4d4d;"></i> Odhlásit se
+</a>
         </div>
     </aside>
     <main class="main-content">

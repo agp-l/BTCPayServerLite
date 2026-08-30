@@ -12,6 +12,10 @@ use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\BtcDashboard;
+use BtcPayLite\AuthManager;
+
+// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
+AuthManager::requireRole('admin', '../client/login');
 
 $token = $_GET['inv'] ?? '';
 

@@ -1,7 +1,7 @@
 <?php
 // admin/invoices.php
 declare(strict_types=1);
-session_start();
+
 ini_set('display_errors', '0'); // Na produkci skrýváme chyby
 error_reporting(E_ALL);
 
@@ -12,6 +12,10 @@ use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\AuthManager;
+
+// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
+AuthManager::requireRole('admin', '../client/login.php');
 
 $toastMsg = '';
 $newInvoiceUrl = '';

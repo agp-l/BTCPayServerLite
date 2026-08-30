@@ -12,18 +12,15 @@ declare(strict_types=1);
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * { box-sizing: border-box; }
+    
+    /* Čisté pozadí bez mřížky */
     body { 
         font-family: 'Inter', sans-serif; 
         display: flex; justify-content: center; align-items: center; 
         min-height: 100vh; margin: 0; color: #17201a; 
         background-color: #fafcfa; 
-        background-image: 
-            radial-gradient(circle at 50% 0%, rgba(47, 211, 90, 0.12) 0%, transparent 60%),
-            linear-gradient(to right, rgba(229, 234, 231, 0.7) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(229, 234, 231, 0.7) 1px, transparent 1px);
-        background-size: 100% 100%, 24px 24px, 24px 24px;
-        background-attachment: fixed;
     }
+    
     .login-box { background: #fff; padding: 40px; border-radius: 18px; box-shadow: 0 8px 30px rgba(20,45,28,.06); width: 100%; max-width: 380px; text-align: center; border: 1px solid #e5eae7; }
     .logo-icon { font-size: 32px; color: #2fd35a; margin-bottom: 15px; }
     h1 { margin: 0 0 25px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
@@ -63,7 +60,7 @@ declare(strict_types=1);
             <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Vstoupit</button>
         </form>
         
-       <a href="../registrace.php" class="footer-link">Nemáte účet? Zaregistrujte se</a>
+       <a href="registrace.php" class="footer-link">Nemáte účet? Zaregistrujte se</a>
     </div>
 </body>
 </html>

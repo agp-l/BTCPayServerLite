@@ -1,7 +1,7 @@
 <?php
 // admin/stores.php
 declare(strict_types=1);
-session_start();
+
 ini_set('display_errors', '0'); // Na produkci skryto
 error_reporting(E_ALL);
 
@@ -9,6 +9,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
 
 use BtcPayLite\Database;
+use BtcPayLite\AuthManager;
+
+// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
+AuthManager::requireRole('admin', '../client/login.php');
 
 $toastMsg = '';
 $stores = [];

@@ -2,13 +2,18 @@
 // admin/views/layout/header.php
 declare(strict_types=1);
 
-$pageTitle = $pageTitle ?? 'BTCPay Lite';
-$activeMenu = $activeMenu ?? '';
+use BtcPayLite\UrlManager;
 
-// Detekce složky pro správné relativní cesty odkazů
-$inAdmin = strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false;
-$adminPrefix = $inAdmin ? '' : 'admin/';
-$rootPrefix  = $inAdmin ? '../' : '';
+$pageTitle = $pageTitle ?? 'BTCPay Lite';
+$adminPrefix = $adminPrefix ?? '';
+$rootPrefix = $rootPrefix ?? '../';
+
+// NEPRŮSTŘELNÉ ŘEŠENÍ: Hlavička se nespoléhá na globální scope.
+// Zjistí si aktivní menu sama, pokud k ní proměnná nedoputovala.
+if (!isset($activeMenu)) {
+    $urlHelper = new UrlManager();
+    $activeMenu = $urlHelper->getActiveMenu();
+}
 ?>
 <!doctype html>
 <html lang="cs">
@@ -25,7 +30,7 @@ $rootPrefix  = $inAdmin ? '../' : '';
       margin: 0; 
       color: #17201a; 
       font-family: Inter, sans-serif; 
-      background-color: #ffffff; /* Čistě bílé pozadí */
+      background-color: #ffffff;
       min-height: 100vh; 
     }
 
@@ -33,13 +38,13 @@ $rootPrefix  = $inAdmin ? '../' : '';
     .admin-wrapper {
       display: flex;
       min-height: 100vh;
-      max-width: 1150px; /* Omezení maximální šířky celé aplikace */
-      margin: 0 auto; /* Dokonalé vycentrování na velkých monitorech */
+      max-width: 1150px;
+      margin: 0 auto;
     }
 
     /* Levý postranní panel (Sidebar) */
     .sidebar {
-      width: 240px; /* Lehce zúžené menu */
+      width: 240px;
       background: #ffffff;
       border-right: 1px solid #e5eae7;
       display: flex;
@@ -128,7 +133,7 @@ $rootPrefix  = $inAdmin ? '../' : '';
       flex: 1;
       padding: 40px 50px;
       background: #ffffff;
-      max-width: 850px; /* Užší a čitelnější obsah */
+      max-width: 850px;
       width: 100%;
     }
 
@@ -147,23 +152,8 @@ $rootPrefix  = $inAdmin ? '../' : '';
     }
 
     /* Karty a UI prvky */
-    .card { 
-      background: #ffffff; 
-      border: 1px solid #e5eae7; 
-      border-radius: 16px; 
-      padding: 28px; 
-      margin-bottom: 24px; 
-    }
-
-    .card-title { 
-      font-size: 16px; 
-      font-weight: 700; 
-      margin: 0 0 20px 0; 
-      display: flex; 
-      align-items: center; 
-      justify-content: space-between; 
-    }
-
+    .card { background: #ffffff; border: 1px solid #e5eae7; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
+    .card-title { font-size: 16px; font-weight: 700; margin: 0 0 20px 0; display: flex; align-items: center; justify-content: space-between; }
     .field { margin-bottom: 18px; }
     label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 7px; color: #748078; text-transform: uppercase; }
     
@@ -173,38 +163,10 @@ $rootPrefix  = $inAdmin ? '../' : '';
     select { cursor: pointer; color: #17201a; font-weight: 600; }
     .unit { padding: 12px 15px; font-weight: 700; color: #748078; border-left: 1px solid #e5eae7; background: #fafcfa; }
 
-    .primary { 
-      border: 0; 
-      background: #2fd35a; 
-      color: #ffffff; 
-      border-radius: 10px; 
-      padding: 12px 18px; 
-      font-weight: 700; 
-      cursor: pointer; 
-      font-size: 13px; 
-      display: inline-flex; 
-      align-items: center; 
-      justify-content: center; 
-      gap: 8px; 
-      transition: background 0.2s; 
-    }
+    .primary { border: 0; background: #2fd35a; color: #ffffff; border-radius: 10px; padding: 12px 18px; font-weight: 700; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
     .primary:hover { background: #20b948; }
 
-    .ghost-btn { 
-      border: 1px solid #e5eae7; 
-      background: #ffffff; 
-      border-radius: 9px; 
-      padding: 8px 14px; 
-      color: #17201a; 
-      text-decoration: none; 
-      font-weight: 600; 
-      font-size: 12px; 
-      display: inline-flex; 
-      align-items: center; 
-      gap: 6px; 
-      cursor: pointer; 
-      transition: border-color 0.2s, background 0.2s; 
-    }
+    .ghost-btn { border: 1px solid #e5eae7; background: #ffffff; border-radius: 9px; padding: 8px 14px; color: #17201a; text-decoration: none; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
     .ghost-btn:hover { border-color: #17201a; background: #fafcfa; }
 
     .invoice-item { padding: 16px; border: 1px solid #e5eae7; border-radius: 12px; margin-bottom: 14px; background: #fafcfa; }
@@ -234,60 +196,60 @@ $rootPrefix  = $inAdmin ? '../' : '';
 <body>
 <div class="admin-wrapper">
 
-    <!-- LEVÉ MENU -->
+<!-- LEVÉ MENU -->
     <aside class="sidebar">
-        <a href="<?php echo $adminPrefix; ?>index.php" class="sidebar-brand">
+        <a href="<?php echo $adminPrefix; ?>dashboard" class="sidebar-brand">
             <i class="fa-solid fa-bolt"></i>
             <span>BTCPay Lite</span>
         </a>
 
         <div class="sidebar-section-title">Správa a Obchody</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>index.php" class="nav-item <?php echo $activeMenu === 'dashboard' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>dashboard" class="nav-item <?php echo $activeMenu === 'dashboard' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-chart-pie"></i> Přehled
             </a>
-            <a href="<?php echo $adminPrefix; ?>wallet.php" class="nav-item <?php echo $activeMenu === 'wallet' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>wallet" class="nav-item <?php echo $activeMenu === 'wallet' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-wallet"></i> Peněženka
             </a>
-            <a href="<?php echo $adminPrefix; ?>stores.php" class="nav-item <?php echo $activeMenu === 'stores' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>stores" class="nav-item <?php echo $activeMenu === 'stores' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-shop"></i> E-shopy
             </a>
-            <a href="<?php echo $adminPrefix; ?>invoices.php" class="nav-item <?php echo $activeMenu === 'invoices' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>invoices" class="nav-item <?php echo $activeMenu === 'invoices' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-database"></i> DB Faktury
             </a>
-            <a href="<?php echo $adminPrefix; ?>webhooks.php" class="nav-item <?php echo $activeMenu === 'webhooks' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>webhooks" class="nav-item <?php echo $activeMenu === 'webhooks' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-satellite-dish"></i> Webhooky
             </a>
         </nav>
 
         <div class="sidebar-section-title" style="margin-top: 16px;">Bezstavový systém</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>url_invoices.php" class="nav-item <?php echo $activeMenu === 'url_invoices' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>url_invoices" class="nav-item <?php echo $activeMenu === 'url_invoices' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-link"></i> URL Faktury
             </a>
         </nav>
 
         <div class="sidebar-section-title" style="margin-top: 16px;">Testy & Diagnostika</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>test_shop.php" class="nav-item <?php echo $activeMenu === 'test_shop' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>test_shop" class="nav-item <?php echo $activeMenu === 'test_shop' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-store"></i> Test Obchodu
             </a>
-            <a href="<?php echo $adminPrefix; ?>test_api_webhook.php" class="nav-item <?php echo $activeMenu === 'test_webhook' ? 'active' : ''; ?>">
+            <a href="<?php echo $adminPrefix; ?>test_api_webhook" class="nav-item <?php echo $activeMenu === 'test_api_webhook' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-vial"></i> Test Webhooku
             </a>
-            <a href="<?php echo $rootPrefix; ?>debugger.php" class="nav-item <?php echo $activeMenu === 'debugger' ? 'active' : ''; ?>">
+            <a href="<?php echo $rootPrefix; ?>debugger.php" class="nav-item <?php echo $activeMenu === 'debugger.php' || $activeMenu === 'debugger' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-bug"></i> Master Debugger
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_stateless.php" class="nav-item <?php echo $activeMenu === 'test_stateless' ? 'active' : ''; ?>">
+            <a href="<?php echo $rootPrefix; ?>test_stateless" class="nav-item <?php echo $activeMenu === 'test_stateless' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-code"></i> Test Stateless API
             </a>
-            <a href="<?php echo $rootPrefix; ?>eshop_simulator.php" class="nav-item <?php echo $activeMenu === 'eshop_simulator' ? 'active' : ''; ?>">
+            <a href="<?php echo $rootPrefix; ?>eshop_simulator" class="nav-item <?php echo $activeMenu === 'eshop_simulator' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-cart-shopping"></i> E-shop Simulátor
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_direct.php" class="nav-item <?php echo $activeMenu === 'test_direct' ? 'active' : ''; ?>">
+            <a href="<?php echo $rootPrefix; ?>test_direct" class="nav-item <?php echo $activeMenu === 'test_direct' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-bolt-lightning"></i> Test Direct
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_create_wallet.php" class="nav-item <?php echo $activeMenu === 'test_create_wallet' ? 'active' : ''; ?>">
+            <a href="<?php echo $rootPrefix; ?>test_create_wallet" class="nav-item <?php echo $activeMenu === 'test_create_wallet' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-folder-plus"></i> Test Peněženky
             </a>
         </nav>

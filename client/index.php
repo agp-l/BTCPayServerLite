@@ -1,15 +1,16 @@
 <?php
 // client/index.php - Klientský dashboard (Kontroler)
 declare(strict_types=1);
-session_start();
+
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
 // Ochrana - pustíme sem jen přihlášené uživatele
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../login.php");
+    header("Location: login.php");
     exit;
 }
+
 
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
