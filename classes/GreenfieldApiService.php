@@ -21,6 +21,7 @@ class GreenfieldApiService
     private BtcInvoiceManager $invoiceManager;
     private string $adminApiKey;
     private string $checkoutBaseUrl;
+    private WebhookEndpointPolicy $webhookEndpointPolicy;
 
     public function __construct(
         GreenfieldApiRepository $repository,
@@ -28,7 +29,8 @@ class GreenfieldApiService
         ElectrumWallet $wallet,
         BtcInvoiceManager $invoiceManager,
         string $adminApiKey,
-        string $checkoutBaseUrl
+        string $checkoutBaseUrl,
+        ?WebhookEndpointPolicy $webhookEndpointPolicy = null
     ) {
         $checkoutBaseUrl = rtrim(trim($checkoutBaseUrl), '/');
         $checkoutParts = parse_url($checkoutBaseUrl);
@@ -54,6 +56,7 @@ class GreenfieldApiService
         $this->invoiceManager = $invoiceManager;
         $this->adminApiKey = trim($adminApiKey);
         $this->checkoutBaseUrl = $checkoutBaseUrl;
+        $this->webhookEndpointPolicy = $webhookEndpointPolicy ?? new WebhookEndpointPolicy();
     }
 
     /** @return array<string, mixed> */
@@ -283,47 +286,18 @@ class GreenfieldApiService
             throw new GreenfieldApiException('Webhook URL is required.', 'create_webhook', 400);
         }
 
-        $url = trim($value);
-        if ($url === '' || strlen($url) > 2_048 || filter_var($url, FILTER_VALIDATE_URL) === false) {
-            throw new GreenfieldApiException('Webhook URL is invalid.', 'create_webhook', 400);
-        }
-
-        $parts = parse_url($url);
-        if (
-            !is_array($parts)
-            || !is_string($parts['scheme'] ?? null)
-            || !is_string($parts['host'] ?? null)
-            || isset($parts['user'])
-            || isset($parts['pass'])
-            || isset($parts['fragment'])
-        ) {
-            throw new GreenfieldApiException('Webhook URL is invalid.', 'create_webhook', 400);
-        }
-
-        $scheme = strtolower($parts['scheme']);
-        $host = trim(strtolower(rtrim($parts['host'], '.')), '[]');
-        $loopbackHosts = ['localhost', '127.0.0.1', '::1'];
-        if ($scheme !== 'https' && !($scheme === 'http' && in_array($host, $loopbackHosts, true))) {
+        try {
+            $endpoint = $this->webhookEndpointPolicy->inspect($value);
+        } catch (WebhookDeliveryException $exception) {
             throw new GreenfieldApiException(
-                'Webhook URL must use HTTPS (HTTP is allowed only for localhost).',
+                $exception->getMessage(),
                 'create_webhook',
-                400
+                400,
+                $exception
             );
         }
 
-        if (
-            filter_var($host, FILTER_VALIDATE_IP) !== false
-            && !in_array($host, $loopbackHosts, true)
-            && filter_var(
-                $host,
-                FILTER_VALIDATE_IP,
-                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-            ) === false
-        ) {
-            throw new GreenfieldApiException('Private-network webhook URLs are not allowed.', 'create_webhook', 400);
-        }
-
-        return $url;
+        return $endpoint['url'];
     }
 
     /** @param array<mixed> $value */
