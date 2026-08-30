@@ -10,6 +10,7 @@ use BtcPayLite\GreenfieldApiController;
 use BtcPayLite\GreenfieldApiException;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\GreenfieldApiService;
+use BtcPayLite\WebhookEndpointPolicy;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -220,7 +221,8 @@ function newGreenfieldTestService(string $walletPath): array
         $wallet,
         $manager,
         'admin-api-key',
-        'http://localhost/BTCPayLite'
+        'http://localhost/BTCPayLite',
+        new WebhookEndpointPolicy(static fn (): array => ['8.8.8.8'], true)
     );
 
     return [$service, $repository, $database, $wallet, $manager];
@@ -376,6 +378,29 @@ $tests['validates webhook destinations before storing them'] = static function (
     );
     greenfieldAssertSame('wh_test', $webhook['id'], 'The webhook response changed.');
     greenfieldAssertSame(1, count($repository->webhookCalls), 'The valid webhook was not stored once.');
+};
+
+$tests['requires an explicit opt-in for localhost webhooks'] = static function () use ($walletPath): void {
+    [, $repository, $database, $wallet, $manager] = newGreenfieldTestService($walletPath);
+    $service = new GreenfieldApiService(
+        $repository,
+        $database,
+        $wallet,
+        $manager,
+        'admin-api-key',
+        'http://localhost/BTCPayLite'
+    );
+
+    greenfieldAssertThrows(
+        GreenfieldApiException::class,
+        static fn () => $service->createWebhook(
+            'store_test',
+            ['url' => 'http://localhost/test-webhook'],
+            'store-api-key'
+        ),
+        'A localhost webhook was accepted without an explicit opt-in.'
+    );
+    greenfieldAssertSame([], $repository->webhookCalls, 'Rejected localhost webhook reached storage.');
 };
 
 $tests['routes an exact JSON invoice request'] = static function (): void {
