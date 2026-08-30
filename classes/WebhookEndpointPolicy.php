@@ -17,12 +17,14 @@ class WebhookEndpointPolicy
     private const MAX_URL_BYTES = 2_048;
 
     private Closure $resolver;
+    private bool $allowLoopback;
 
-    public function __construct(?callable $resolver = null)
+    public function __construct(?callable $resolver = null, bool $allowLoopback = false)
     {
         $this->resolver = $resolver === null
             ? Closure::fromCallable([$this, 'resolveHost'])
             : Closure::fromCallable($resolver);
+        $this->allowLoopback = $allowLoopback;
     }
 
     /**
@@ -59,7 +61,13 @@ class WebhookEndpointPolicy
         }
 
         $isLoopbackHost = $this->isLoopback($host);
-        if ($scheme !== 'https' && !($scheme === 'http' && $isLoopbackHost)) {
+        if ($isLoopbackHost && !$this->allowLoopback) {
+            throw $this->invalidEndpoint('Loopback webhook destinations are not enabled.');
+        }
+        if (
+            $scheme !== 'https'
+            && !($scheme === 'http' && $isLoopbackHost && $this->allowLoopback)
+        ) {
             throw $this->invalidEndpoint(
                 'Webhook URL must use HTTPS (HTTP is allowed only for localhost).'
             );
@@ -95,7 +103,7 @@ class WebhookEndpointPolicy
         }
 
         foreach ($addresses as $address) {
-            if ($isLoopbackHost && $this->isLoopback($address)) {
+            if ($isLoopbackHost && $this->allowLoopback && $this->isLoopback($address)) {
                 continue;
             }
             if (!$this->isPublicIp($address)) {
