@@ -154,6 +154,25 @@ $tests['accepts the boolean validateaddress response'] = static function (): voi
     assertSameValue('daemon', $rpc->calls[0]['scope'], 'validateaddress is a daemon-wide command.');
 };
 
+$tests['preserves exact satoshis in address balances'] = static function (): void {
+    $rpc = new RecordingElectrumRPC([
+        'getaddressbalance' => [[
+            'confirmed' => '0.10000001',
+            'unconfirmed' => '-0.00000001',
+        ]],
+    ]);
+    $wallet = new ElectrumWallet($rpc);
+
+    $balance = $wallet->getAddressBalanceExact('bc1qexample');
+
+    assertSameValue(
+        ['confirmed' => '0.10000001', 'unconfirmed' => '-0.00000001'],
+        $balance,
+        'The exact balance lost satoshi precision.'
+    );
+    assertSameValue('daemon', $rpc->calls[0]['scope'], 'getaddressbalance must be daemon-wide.');
+};
+
 $tests['uses the Electrum expiry parameter for payment requests'] = static function (): void {
     $rpc = new RecordingElectrumRPC([
         'list_wallets' => [[['path' => '/wallets/store']]],
@@ -170,6 +189,27 @@ $tests['uses the Electrum expiry parameter for payment requests'] = static funct
         'add_request parameters do not match Electrum.'
     );
     assertSameValue('wallet', $rpc->calls[1]['scope'], 'add_request must be wallet-scoped.');
+};
+
+$tests['gets and deletes payment requests in the active wallet'] = static function (): void {
+    $rpc = new RecordingElectrumRPC([
+        'list_wallets' => [[['path' => '/wallets/store']]],
+        'get_request' => [['request_id' => 'a1b2c3d4e5', 'status' => 0]],
+        'delete_request' => [null],
+    ]);
+    $wallet = new ElectrumWallet($rpc);
+    $wallet->loadWallet('/wallets/store');
+
+    $request = $wallet->getPaymentRequest('a1b2c3d4e5');
+    $wallet->deletePaymentRequest('a1b2c3d4e5');
+
+    assertSameValue('a1b2c3d4e5', $request['request_id'], 'get_request returned the wrong request.');
+    assertSameValue('wallet', $rpc->calls[1]['scope'], 'get_request must be wallet-scoped.');
+    assertSameValue(
+        ['request_id' => 'a1b2c3d4e5'],
+        $rpc->calls[2]['params'],
+        'delete_request received the wrong request ID.'
+    );
 };
 
 $tests['falls back to history only for method-not-found'] = static function (): void {
