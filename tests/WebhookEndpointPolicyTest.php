@@ -41,8 +41,17 @@ $tests['accepts and resolves a public HTTPS endpoint'] = static function (): voi
     webhookPolicyAssertSame(['8.8.8.8'], $endpoint['addresses'], 'The resolved address changed.');
 };
 
-$tests['allows explicit localhost HTTP for development'] = static function (): void {
+$tests['rejects localhost unless development access is explicit'] = static function (): void {
     $policy = new WebhookEndpointPolicy(static fn (): array => []);
+
+    webhookPolicyAssertThrows(
+        static fn () => $policy->inspect('http://localhost/webhook'),
+        'Localhost was accepted without an explicit development opt-in.'
+    );
+};
+
+$tests['allows explicit localhost HTTP for development'] = static function (): void {
+    $policy = new WebhookEndpointPolicy(static fn (): array => [], true);
     $endpoint = $policy->inspect('http://localhost/webhook');
 
     webhookPolicyAssertSame(['127.0.0.1'], $endpoint['addresses'], 'Localhost was not pinned to loopback.');
