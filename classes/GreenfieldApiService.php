@@ -31,7 +31,20 @@ class GreenfieldApiService
         string $checkoutBaseUrl
     ) {
         $checkoutBaseUrl = rtrim(trim($checkoutBaseUrl), '/');
-        if ($checkoutBaseUrl === '' || preg_match('/[\x00-\x1F\x7F]/', $checkoutBaseUrl)) {
+        $checkoutParts = parse_url($checkoutBaseUrl);
+        if (
+            $checkoutBaseUrl === ''
+            || strlen($checkoutBaseUrl) > 2_048
+            || preg_match('/[\x00-\x1F\x7F]/', $checkoutBaseUrl)
+            || filter_var($checkoutBaseUrl, FILTER_VALIDATE_URL) === false
+            || !is_array($checkoutParts)
+            || !in_array(strtolower((string) ($checkoutParts['scheme'] ?? '')), ['http', 'https'], true)
+            || !is_string($checkoutParts['host'] ?? null)
+            || isset($checkoutParts['user'])
+            || isset($checkoutParts['pass'])
+            || isset($checkoutParts['query'])
+            || isset($checkoutParts['fragment'])
+        ) {
             throw new GreenfieldApiException('Checkout base URL is invalid.', 'configure_api');
         }
 
