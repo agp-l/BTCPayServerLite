@@ -1,83 +1,123 @@
 <?php
-// api_stateless.php
-// Čistý koncový bod pro vzdálené API (Využívá Service Layer a File Locking)
-declare(strict_types=1);
-ini_set('display_errors', '0'); // Na produkci skrýváme interní chyby PHP
-error_reporting(E_ALL);
 
+declare(strict_types=1);
+
+use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\BtcStatelessApiController;
+use BtcPayLite\BtcStatelessService;
+use BtcPayLite\BtcStatelessServiceException;
+use BtcPayLite\ElectrumRPC;
+use BtcPayLite\ElectrumWallet;
+use BtcPayLite\UrlManager;
+
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 
 require_once __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
 
-use BtcPayLite\ElectrumRPC;
-use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcInvoiceManager;
-use BtcPayLite\BtcStatelessService;
-
-// 1. Ochrana proti souběhu (Concurrency File Lock) bez databáze
-$lockFile = sys_get_temp_dir() . '/btcpay_electrum_stateless.lock';
-$fp = fopen($lockFile, 'c');
-
-if (!$fp || !flock($fp, LOCK_EX)) {
-    http_response_code(503);
-    echo json_encode(['status' => 'error', 'message' => 'Server je momentálně přetížen, zkuste to prosím za vteřinu.']);
-    exit;
-}
+$lockHandle = null;
 
 try {
-    // 2. Inicializace závislostí a naší Service vrstvy
-    $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-    $wallet = new ElectrumWallet($rpc);
-    
-    // Pro stateless režim předáváme null místo databáze
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], null); 
-    
-    $service = new BtcStatelessService($config, $wallet, $invoiceManager);
-    
-    // 3. Univerzální načtení Authorization hlavičky napříč různými servery
-    $authHeader = '';
-    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        $authHeader = trim($_SERVER['HTTP_AUTHORIZATION']);
-    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-        $authHeader = trim($_SERVER['REDIRECT_HTTP_AUTHORIZATION']);
-    } else {
-        $headers = function_exists('getallheaders') ? getallheaders() : [];
-        if (isset($headers['Authorization'])) {
-            $authHeader = trim($headers['Authorization']);
-        } elseif (isset($headers['authorization'])) {
-            $authHeader = trim($headers['authorization']);
+    $requestMethod = is_string($_SERVER['REQUEST_METHOD'] ?? null)
+        ? $_SERVER['REQUEST_METHOD']
+        : '';
+    $rawBody = file_get_contents('php://input', false, null, 0, 65_537);
+    if ($rawBody === false) {
+        throw new BtcStatelessServiceException('Request body could not be read.', 'read_api_request', 400);
+    }
+
+    $authorizationHeader = '';
+    foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $serverKey) {
+        if (is_string($_SERVER[$serverKey] ?? null) && trim($_SERVER[$serverKey]) !== '') {
+            $authorizationHeader = $_SERVER[$serverKey];
+            break;
         }
     }
-    
-    $apiKey = trim(str_replace('Bearer ', '', $authHeader));
 
-    // 4. Přijetí vstupních dat
-    $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
-    
-    // 5. Předání veškeré těžké práce naší Service vrstvě
-    $result = $service->createInvoiceFromApi($input, $apiKey);
+    if ($authorizationHeader === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (is_array($headers)) {
+            foreach ($headers as $name => $value) {
+                if (is_string($name) && strtolower($name) === 'authorization' && is_string($value)) {
+                    $authorizationHeader = $value;
+                    break;
+                }
+            }
+        }
+    }
 
-    // 6. Sestavení finální URL a odeslání výsledku
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-    $host = $_SERVER['HTTP_HOST'];
-    $baseDir = dirname($_SERVER['SCRIPT_NAME']);
-    if ($baseDir === '/' || $baseDir === '\\') $baseDir = '';
-    
-    $result['url'] = $protocol . $host . rtrim($baseDir, '/\\') . '/admin/url_pay.php?inv=' . $result['token'];
+    $lockPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'btcpay_electrum_stateless.lock';
+    $lockHandle = fopen($lockPath, 'c');
+    if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
+        throw new BtcStatelessServiceException(
+            'Server is busy. Please retry shortly.',
+            'acquire_invoice_lock',
+            503
+        );
+    }
+
+    $rpc = new ElectrumRPC(
+        $config['rpc_host'],
+        $config['rpc_port'],
+        $config['rpc_user'],
+        $config['rpc_pass']
+    );
+    $wallet = new ElectrumWallet($rpc);
+    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key']);
+    $service = new BtcStatelessService($config, $wallet, $invoiceManager);
+
+    $urlManager = new UrlManager();
+    $controller = new BtcStatelessApiController(
+        $service,
+        $urlManager->getBaseUrl() . '/admin/url_pay.php'
+    );
+    $response = $controller->handleRequest(
+        $requestMethod,
+        $rawBody,
+        is_array($_POST) ? $_POST : [],
+        $authorizationHeader
+    );
 
     http_response_code(200);
-    echo json_encode(['status' => 'success', 'data' => $result]);
+    echo json_encode(
+        $response,
+        JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    );
+} catch (BtcStatelessServiceException $exception) {
+    $code = $exception->getCode();
+    $httpCode = $code >= 400 && $code < 600 ? $code : 500;
+    if ($httpCode === 405) {
+        header('Allow: POST');
+    }
 
-} catch (\Exception $e) {
-    // Chytřejší HTTP kódy podle typu výjimky (400, 401, nebo 500)
-    $code = $e->getCode();
-    $httpCode = ($code >= 400 && $code < 600) ? $code : 500;
-    
+    $message = $exception->getMessage();
+    if ($httpCode >= 500) {
+        error_log(sprintf(
+            'Stateless API %s failed: %s',
+            $exception->getOperation(),
+            $exception->getMessage()
+        ));
+        $message = 'Internal server error.';
+    }
+
     http_response_code($httpCode);
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(
+        ['status' => 'error', 'message' => $message],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    );
+} catch (Throwable $exception) {
+    error_log('Unexpected stateless API failure: ' . $exception->getMessage());
+    http_response_code(500);
+    echo json_encode(
+        ['status' => 'error', 'message' => 'Internal server error.'],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    );
 } finally {
-    // 7. BEZPEČNOSTNÍ POJISTKA: Uvolnění zámku i v případě havárie
-    flock($fp, LOCK_UN);
-    fclose($fp);
+    if (is_resource($lockHandle)) {
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
 }
