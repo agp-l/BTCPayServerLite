@@ -1,5 +1,11 @@
 RewriteEngine On
 
+# Apache may consume the Authorization header before PHP populates $_SERVER.
+# Preserve it for API Bearer authentication (PHP may expose the value as
+# HTTP_AUTHORIZATION or REDIRECT_HTTP_AUTHORIZATION after an internal rewrite).
+RewriteCond %{HTTP:Authorization} ^(.+)$
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%1]
+
 # Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
 RewriteCond %{REQUEST_FILENAME} !-f
 
