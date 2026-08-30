@@ -75,17 +75,47 @@ class Database
 
         try {
             $this->pdo->beginTransaction();
-            $result = $callback($this->pdo);
-            $this->pdo->commit();
+        } catch (PDOException $exception) {
+            throw new DatabaseException(
+                'Database transaction could not be started.',
+                'begin_transaction',
+                previous: $exception
+            );
+        }
 
-            return $result;
+        try {
+            $result = $callback($this->pdo);
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
+                try {
+                    $this->pdo->rollBack();
+                } catch (Throwable $rollbackFailure) {
+                    error_log('Database rollback failed: ' . $rollbackFailure->getMessage());
+                }
             }
 
             throw $exception;
         }
+
+        try {
+            $this->pdo->commit();
+        } catch (PDOException $exception) {
+            if ($this->pdo->inTransaction()) {
+                try {
+                    $this->pdo->rollBack();
+                } catch (Throwable $rollbackFailure) {
+                    error_log('Database rollback after commit failure failed: ' . $rollbackFailure->getMessage());
+                }
+            }
+
+            throw new DatabaseException(
+                'Database transaction could not be committed.',
+                'commit_transaction',
+                previous: $exception
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -109,7 +139,7 @@ class Database
             $statement = $this->pdo->prepare('SELECT GET_LOCK(?, ?)');
             $statement->execute([$lockName, $timeoutSeconds]);
             $acquired = (string) $statement->fetchColumn() === '1';
-        } catch (PDOException $exception) {
+        } catch (Throwable $exception) {
             throw new DatabaseException(
                 'Database lock could not be acquired.',
                 'acquire_lock',
