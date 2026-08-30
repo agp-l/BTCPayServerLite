@@ -228,7 +228,12 @@ $tests['rejects an amount with sub-satoshi precision'] = static function (): voi
     assertThrows(
         InvalidArgumentException::class,
         static fn () => $wallet->createTransaction('bc1qdestination', '0.000000001'),
-        'A sub-satoshi amount must be rejected.'
+        'A string amount with sub-satoshi precision must be rejected.'
+    );
+    assertThrows(
+        InvalidArgumentException::class,
+        static fn () => $wallet->createTransaction('bc1qdestination', 0.000000009),
+        'A float amount with sub-satoshi precision must not be silently rounded.'
     );
 };
 
