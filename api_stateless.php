@@ -91,10 +91,14 @@ try {
     $httpCode = $code >= 400 && $code < 600 ? $code : 500;
     if ($httpCode === 405) {
         header('Allow: POST');
+    } elseif ($httpCode === 401) {
+        header('WWW-Authenticate: Bearer');
+    } elseif ($httpCode === 503) {
+        header('Retry-After: 1');
     }
 
     $message = $exception->getMessage();
-    if ($httpCode >= 500) {
+    if ($httpCode === 500) {
         error_log(sprintf(
             'Stateless API %s failed: %s',
             $exception->getOperation(),
