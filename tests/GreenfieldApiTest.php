@@ -375,6 +375,22 @@ $tests['routes an exact JSON invoice request'] = static function (): void {
     greenfieldAssertSame('store-api-key', $service->calls[0]['api_key'], 'The Bearer token changed.');
 };
 
+$tests['adapts an Apache PATH_INFO request without its query string'] = static function (): void {
+    $service = new GreenfieldControllerTestService();
+    $controller = new GreenfieldApiController($service);
+
+    $response = $controller->handleServerRequest([
+        'REQUEST_METHOD' => 'GET',
+        'REQUEST_URI' => '/BTCPayLite/api.php/api/v1/stores/store_test?ignored=1',
+        'SCRIPT_NAME' => '/BTCPayLite/api.php',
+        'REDIRECT_HTTP_AUTHORIZATION' => 'Bearer store-api-key',
+    ], '');
+
+    greenfieldAssertSame(200, $response['status_code'], 'The Apache request returned the wrong status.');
+    greenfieldAssertSame('getStore', $service->calls[0]['method'], 'The Apache path was routed incorrectly.');
+    greenfieldAssertSame('store-api-key', $service->calls[0]['api_key'], 'The redirected Bearer token changed.');
+};
+
 $tests['rejects malformed JSON and wrong HTTP methods'] = static function (): void {
     $service = new GreenfieldControllerTestService();
     $controller = new GreenfieldApiController($service);
