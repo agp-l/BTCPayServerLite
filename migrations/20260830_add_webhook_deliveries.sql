@@ -1,6 +1,16 @@
 -- Persistent webhook outbox for MariaDB 10.4+.
--- Run once after taking a database backup. This migration does not alter or
--- delete existing invoice, store, or webhook rows.
+-- Run once after taking a database backup. Existing webhook registrations use
+-- created_at = 0 so they continue to cover active invoices created before this
+-- migration. New registrations apply only to invoices created afterwards.
+
+ALTER TABLE webhooks
+    ADD COLUMN created_at BIGINT UNSIGNED DEFAULT NULL AFTER secret;
+
+UPDATE webhooks SET created_at = 0 WHERE created_at IS NULL;
+
+ALTER TABLE webhooks
+    MODIFY created_at BIGINT UNSIGNED NOT NULL,
+    ADD KEY idx_webhook_store_created (store_id, created_at);
 
 CREATE TABLE webhook_deliveries (
     id VARCHAR(50) NOT NULL,
@@ -34,3 +44,52 @@ CREATE TABLE webhook_deliveries (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+-- Do not replay historical terminal invoices during the first processor run.
+-- Their actual delivery history is unknowable, so the safe migration policy
+-- is to begin durable tracking from this migration forward.
+INSERT INTO webhook_deliveries (
+    id,
+    webhook_id,
+    invoice_id,
+    event_type,
+    payload,
+    status,
+    attempts,
+    next_attempt_at,
+    created_at,
+    delivered_at
+)
+SELECT
+    CONCAT(
+        'wd_m_',
+        MD5(CONCAT(webhook.id, '|', invoice.id, '|', invoice.status))
+    ),
+    webhook.id,
+    invoice.id,
+    CASE invoice.status
+        WHEN 'Settled' THEN 'InvoiceSettled'
+        ELSE 'InvoiceExpired'
+    END,
+    JSON_OBJECT(
+        'deliveryId', CONCAT(
+            'wd_m_',
+            MD5(CONCAT(webhook.id, '|', invoice.id, '|', invoice.status))
+        ),
+        'storeId', invoice.store_id,
+        'invoiceId', invoice.id,
+        'type', CASE invoice.status
+            WHEN 'Settled' THEN 'InvoiceSettled'
+            ELSE 'InvoiceExpired'
+        END,
+        'timestamp', invoice.expires_at
+    ),
+    'Delivered',
+    0,
+    UNIX_TIMESTAMP(),
+    UNIX_TIMESTAMP(),
+    UNIX_TIMESTAMP()
+FROM invoices AS invoice
+JOIN webhooks AS webhook ON webhook.store_id = invoice.store_id
+WHERE invoice.status IN ('Settled', 'Expired')
+  AND webhook.created_at <= invoice.created_at;
