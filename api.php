@@ -86,7 +86,28 @@ try {
         throw new GreenfieldApiException('Request body could not be read.', 'read_request', 400);
     }
 
-    $response = $controller->handleServerRequest($_SERVER, $rawBody);
+    $requestServer = $_SERVER;
+    if (
+        !isset($requestServer['HTTP_AUTHORIZATION'])
+        && !isset($requestServer['REDIRECT_HTTP_AUTHORIZATION'])
+        && function_exists('getallheaders')
+    ) {
+        $requestHeaders = getallheaders();
+        if (is_array($requestHeaders)) {
+            foreach ($requestHeaders as $headerName => $headerValue) {
+                if (
+                    is_string($headerName)
+                    && strcasecmp($headerName, 'Authorization') === 0
+                    && is_string($headerValue)
+                ) {
+                    $requestServer['HTTP_AUTHORIZATION'] = $headerValue;
+                    break;
+                }
+            }
+        }
+    }
+
+    $response = $controller->handleServerRequest($requestServer, $rawBody);
     $statusCode = $response['status_code'];
     $responseBody = $response['body'];
 } catch (GreenfieldApiException $exception) {
