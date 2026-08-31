@@ -61,6 +61,9 @@ final class ClientRegistrationService
 
                 return $userId;
             });
+            if (!is_int($userId) || $userId < 1) {
+                throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
+            }
         } catch (Throwable $exception) {
             if ($walletPath !== '') {
                 try {
@@ -77,10 +80,6 @@ final class ClientRegistrationService
                 0,
                 $exception
             );
-        }
-
-        if (!is_int($userId) || $userId < 1) {
-            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
         }
 
         return ['user_id' => $userId, 'store_id' => $storeId];
