@@ -112,6 +112,11 @@ class PdoAuthUserRepository implements AuthUserRepository
     public function recordLoginFailure(string $identityHash, int $attemptedAt): void
     {
         try {
+            $cleanup = $this->pdo->prepare(
+                'DELETE FROM auth_login_attempts WHERE attempted_at < ?'
+            );
+            $cleanup->execute([$attemptedAt - 86400]);
+
             $statement = $this->pdo->prepare(
                 'INSERT INTO auth_login_attempts (identity_hash, attempted_at) '
                 . 'VALUES (UNHEX(?), ?)'
