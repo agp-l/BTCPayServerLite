@@ -9,6 +9,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
 
 use BtcPayLite\Database;
+use BtcPayLite\GreenfieldApiRepository;
+use BtcPayLite\WebhookEndpointPolicy;
 
 $toastMsg = '';
 $stores = [];
@@ -16,6 +18,11 @@ $webhooks = [];
 
 try {
     $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
+    $webhookRepository = new GreenfieldApiRepository($db);
+    $webhookPolicy = new WebhookEndpointPolicy(
+        null,
+        ($config['allow_local_webhooks'] ?? false) === true
+    );
     
     // Zpracování formulářů (Přidání a Smazání webhooku)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -27,11 +34,8 @@ try {
                 throw new \Exception("Vyber obchod a zadej URL webhooku.");
             }
 
-            $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
-            $whSecret = bin2hex(random_bytes(16));
-
-            $stmt = $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$whId, $storeId, $url, $whSecret]);
+            $endpoint = $webhookPolicy->inspect($url);
+            $webhookRepository->findOrCreateWebhook($storeId, $endpoint['url']);
             $toastMsg = "Webhook byl úspěšně přidán!";
         } elseif ($_POST['action'] === 'delete') {
             $whId = trim($_POST['webhook_id'] ?? '');

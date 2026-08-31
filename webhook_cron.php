@@ -1,110 +1,93 @@
 <?php
+
 declare(strict_types=1);
-ini_set('display_errors', '1');
+
+use BtcPayLite\WebhookCronApplication;
+use BtcPayLite\WebhookCronController;
+use BtcPayLite\WebhookDeliveryException;
+
+ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require __DIR__ . '/vendor/autoload.php';
-$config = require __DIR__ . '/config.php';
 
-// Ochrana
-if (php_sapi_name() !== 'cli' && ($_GET['key'] ?? '') !== $config['cron_key']) {
-    die("Přístup odepřen.");
-}
-
-use BtcPayLite\Database;
-use BtcPayLite\ElectrumRPC;
-use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcInvoiceManager;
-
-echo "Začínám kontrolu faktur...\n<br>";
+$isCli = PHP_SAPI === 'cli';
+$statusCode = 500;
+$responseBody = ['message' => 'Webhook processing failed.'];
 
 try {
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
-    $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-    $wallet = new ElectrumWallet($rpc);
-    
-    // Nyní už nepotřebujeme api_key, stačí nám cesty a stavy
-    $stmt = $db->getPdo()->query("
-        SELECT i.id, i.store_id, i.status, s.wallet_path 
-        FROM invoices i
-        JOIN stores s ON i.store_id = s.id
-        WHERE i.status IN ('New', 'Processing')
-    ");
-    $activeInvoices = $stmt->fetchAll();
-
-    if (!$activeInvoices) {
-        die("Žádné nezaplacené faktury ke kontrole.\n");
+    $config = require __DIR__ . '/config.php';
+    if (!is_array($config)) {
+        throw new WebhookDeliveryException(
+            'Webhook cron configuration is invalid.',
+            'configure_cron'
+        );
     }
 
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
-
-    foreach ($activeInvoices as $inv) {
-        echo "Faktura {$inv['id']}... ";
-        
-        // ZÍSKÁNÍ ZÁMKU PRO ELECTRUM DÉMONA
-        $db->getPdo()->query("SELECT GET_LOCK('electrum_rpc', 10)")->fetchColumn();
-        
-        try {
-            $wallet->loadWallet($inv['wallet_path']);
-            $statusData = $invoiceManager->checkDatabasePaymentStatus($inv['id']);
-            
-            // DŮLEŽITÉ: Uvolnění zámku PŘED odesíláním webhooků, aby se neblokoval démon!
-            $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
-        } catch (Exception $e) {
-            // Záchranné uvolnění zámku při chybě
-            $db->getPdo()->query("SELECT RELEASE_LOCK('electrum_rpc')")->fetchColumn();
-            echo "Chyba RPC: " . $e->getMessage() . ". ";
-            continue; // Přeskočíme na další fakturu
-        }
-
-        $newStatus = $statusData['status'];
-
-        if ($newStatus !== $inv['status']) {
-            echo "STAV ZMĚNĚN na {$newStatus}! ";
-            
-            $eventType = null;
-            if ($newStatus === 'Processing') $eventType = 'InvoiceProcessing';
-            elseif ($newStatus === 'Settled') $eventType = 'InvoiceSettled';
-            elseif ($newStatus === 'Expired') $eventType = 'InvoiceExpired';
-            
-            if ($eventType) {
-                // OPRAVA: Vybereme URL i SECRET pro všechny webhooky daného obchodu
-                $whStmt = $db->getPdo()->prepare("SELECT url, secret FROM webhooks WHERE store_id = ?");
-                $whStmt->execute([$inv['store_id']]);
-                
-                foreach ($whStmt->fetchAll() as $wh) {
-                    $payload = json_encode([
-                        'storeId' => $inv['store_id'],
-                        'invoiceId' => $inv['id'],
-                        'type' => $eventType,
-                        'timestamp' => time()
-                    ]);
-                    
-                    // OPRAVA: Bezpečnostní podpis pomocí správného webhook secretu
-                    $signature = 'sha256=' . hash_hmac('sha256', $payload, $wh['secret']);
-                    
-                    $ch = curl_init($wh['url']);
-                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 10); 
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                        'Content-Type: application/json',
-                        'Content-Length: ' . strlen($payload),
-                        'Btcpay-Sig: ' . $signature // Správná hlavička
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
-                    
-                    echo "Webhook odeslán. ";
+    $requestServer = $_SERVER;
+    if (
+        !$isCli
+        && !isset($requestServer['HTTP_AUTHORIZATION'])
+        && !isset($requestServer['REDIRECT_HTTP_AUTHORIZATION'])
+        && function_exists('getallheaders')
+    ) {
+        $requestHeaders = getallheaders();
+        if (is_array($requestHeaders)) {
+            foreach ($requestHeaders as $name => $value) {
+                if (
+                    is_string($name)
+                    && strcasecmp($name, 'Authorization') === 0
+                    && is_string($value)
+                ) {
+                    $requestServer['HTTP_AUTHORIZATION'] = $value;
+                    break;
                 }
             }
-        } else {
-            echo "beze změny. ";
         }
-        echo "\n<br>";
     }
-    echo "Hotovo.\n";
-} catch (Exception $e) {
-    die("Kritická chyba: " . $e->getMessage());
+
+    $application = new WebhookCronApplication($config);
+    $controller = new WebhookCronController(
+        $application->getCronKey(),
+        [$application, 'run']
+    );
+    $response = $controller->handleServerRequest($requestServer, $isCli);
+    $statusCode = $response['status_code'];
+    $responseBody = $response['body'];
+} catch (Throwable $exception) {
+    $logMessage = $exception instanceof WebhookDeliveryException
+        ? $exception->getMessage()
+        : 'Unexpected ' . get_class($exception);
+    error_log('Webhook cron bootstrap failed: ' . $logMessage);
 }
+
+if (!$isCli) {
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+    header('Vary: Authorization');
+    if ($statusCode === 401) {
+        header('WWW-Authenticate: Bearer');
+    } elseif ($statusCode === 405) {
+        header('Allow: POST');
+    }
+}
+
+try {
+    $json = json_encode(
+        $responseBody,
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR
+    );
+} catch (JsonException $exception) {
+    error_log('Webhook cron response encoding failed.');
+    $statusCode = 500;
+    $json = '{"message":"Webhook processing failed."}';
+    if (!$isCli) {
+        http_response_code($statusCode);
+    }
+}
+
+echo $json . PHP_EOL;
+exit($statusCode === 200 ? 0 : 1);

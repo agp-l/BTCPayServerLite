@@ -86,13 +86,14 @@ class GreenfieldApiRepository
                     'secret' => bin2hex(random_bytes(32)),
                 ];
                 $statement = $pdo->prepare(
-                    'INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)'
+                    'INSERT INTO webhooks (id, store_id, url, secret, created_at) VALUES (?, ?, ?, ?, ?)'
                 );
                 $statement->execute([
                     $webhook['id'],
                     $storeId,
                     $webhook['url'],
                     $webhook['secret'],
+                    time(),
                 ]);
 
                 return $webhook;

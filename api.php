@@ -11,6 +11,7 @@ use BtcPayLite\GreenfieldApiException;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\GreenfieldApiService;
 use BtcPayLite\UrlManager;
+use BtcPayLite\WebhookEndpointPolicy;
 
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
@@ -69,7 +70,11 @@ try {
         $wallet,
         $invoiceManager,
         is_string($config['admin_api_key'] ?? null) ? $config['admin_api_key'] : '',
-        $checkoutBaseUrl
+        $checkoutBaseUrl,
+        new WebhookEndpointPolicy(
+            null,
+            ($config['allow_local_webhooks'] ?? false) === true
+        )
     );
     $controller = new GreenfieldApiController($service);
 
