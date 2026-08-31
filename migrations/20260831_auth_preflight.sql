@@ -1,4 +1,4 @@
--- Read-only checks before 20260831_add_auth_login_attempts.sql.
+-- Read-only checks before 20260831_add_auth_attempts.sql.
 SELECT 'users_table_missing' AS check_name,
        IF(EXISTS(
            SELECT 1
