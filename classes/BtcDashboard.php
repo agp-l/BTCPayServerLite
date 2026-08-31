@@ -1,225 +1,372 @@
 <?php
-// BTCPayLite/classes/BtcDashboard.php
+
 declare(strict_types=1);
 
 namespace BtcPayLite;
 
-use Exception;
+use InvalidArgumentException;
+use RuntimeException;
+use Throwable;
 
 /**
- * VRSTVA 3: Aplikační třída pro vizuální správu peněženky.
+ * Read/write application service used by the wallet administration screen.
+ *
+ * Electrum data remains machine-readable here. HTML escaping, localized labels
+ * and layout decisions belong to the controller/view boundary.
  */
-class BtcDashboard
+final class BtcDashboard
 {
+    private const DEFAULT_FEES = ['economy' => 1, 'standard' => 1, 'priority' => 1];
+
     private ElectrumWallet $wallet;
     private string $walletsDirectory;
+    private BitcoinMarketDataProvider $marketData;
 
-    public function __construct(ElectrumWallet $wallet, string $walletsDirectory)
-    {
+    public function __construct(
+        ElectrumWallet $wallet,
+        string $walletsDirectory,
+        ?BitcoinMarketDataProvider $marketData = null
+    ) {
+        $walletsDirectory = rtrim(trim($walletsDirectory), DIRECTORY_SEPARATOR);
+        if ($walletsDirectory === '' || str_contains($walletsDirectory, "\0")) {
+            throw new InvalidArgumentException('Wallet directory is invalid.');
+        }
+
         $this->wallet = $wallet;
         $this->walletsDirectory = $walletsDirectory;
+        $this->marketData = $marketData ?? new HttpBitcoinMarketDataProvider();
     }
 
-    public function getAvailableWallets(): array
+    /** @return list<string> */
+    public function listWallets(): array
     {
-        $available = [];
-        if (is_dir($this->walletsDirectory)) {
-            $files = scandir($this->walletsDirectory);
-            foreach ($files as $f) {
-                if ($f !== '.' && $f !== '..' && !is_dir($this->walletsDirectory . '/' . $f)) {
-                    $available[] = $f;
-                }
-            }
+        $directory = realpath($this->walletsDirectory);
+        if ($directory === false || !is_dir($directory) || !is_readable($directory)) {
+            throw new RuntimeException('The Electrum wallet directory is unavailable.');
         }
-        return $available;
-    }
 
-    public function getBalanceInfo(): array
-    {
-        try {
-            $bal = $this->wallet->getWalletBalance();
-            $confirmed = (float)($bal['confirmed'] ?? 0);
-            return [
-                'status' => 'ok',
-                'confirmed_num' => $confirmed,
-                'confirmed_formatted' => number_format($confirmed, 8, '.', ''),
-                'unconfirmed_num' => (float)($bal['unconfirmed'] ?? 0)
-            ];
-        } catch (Exception $e) {
-            return [
-                'status' => 'error', 'message' => $e->getMessage(),
-                'confirmed_num' => 0, 'confirmed_formatted' => '0.00000000', 'unconfirmed_num' => 0
-            ];
+        $entries = scandir($directory);
+        if (!is_array($entries)) {
+            throw new RuntimeException('The Electrum wallet directory could not be read.');
         }
-    }
 
-    public function getAddressesData(bool $hideEmpty = false): array
-    {
-        try {
-            $receiving = $this->wallet->listAddresses(true, false);
-            $change = $this->wallet->listAddresses(false, true);
-            $unspent = $this->wallet->listUnspent();
-
-            $balances = [];
-            foreach ($unspent as $u) {
-                $addr = $u['address'] ?? null;
-                if ($addr) {
-                    $val = $u['value'] ?? ($u['value_sats'] ? $u['value_sats'] / 100000000 : 0);
-                    $balances[$addr] = ($balances[$addr] ?? 0) + (float)$val;
-                }
+        $wallets = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
             }
 
-            $allAddresses = [];
-            foreach (array_merge($receiving, $change) as $addr) {
-                $confirmed = $balances[$addr] ?? 0;
-                $isChange = in_array($addr, $change);
-                $hasFunds = $confirmed > 0;
+            $path = $directory . DIRECTORY_SEPARATOR . $entry;
+            if (is_file($path) && !is_link($path)) {
+                $wallets[] = $entry;
+            }
+        }
 
-                if ($hideEmpty && !$hasFunds) continue;
+        natcasesort($wallets);
 
-                $allAddresses[] = [
-                    'address' => $addr, 'confirmed' => $confirmed,
-                    'valStr' => number_format($confirmed, 8, '.', ''),
-                    'hasFunds' => $hasFunds, 'type' => $isChange ? 'change' : 'receiving',
+        return array_values($wallets);
+    }
+
+    /** @return array{confirmed_btc:string,unconfirmed_btc:string,confirmed_sats:int,unconfirmed_sats:int} */
+    public function balance(): array
+    {
+        $balance = $this->wallet->getWalletBalance();
+        $confirmed = BitcoinAmount::fromBtc($balance['confirmed']);
+        $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed']);
+
+        return [
+            'confirmed_btc' => $confirmed->toBtcString(),
+            'unconfirmed_btc' => $unconfirmed->toBtcString(),
+            'confirmed_sats' => $confirmed->satoshis(),
+            'unconfirmed_sats' => $unconfirmed->satoshis(),
+        ];
+    }
+
+    /**
+     * @return array{
+     *   items:list<array{address:string,balance_btc:string,balance_sats:int,has_funds:bool,type:string}>,
+     *   recommended_receive:?string
+     * }
+     */
+    public function addresses(bool $hideEmpty = false): array
+    {
+        $receiving = $this->uniqueAddresses($this->wallet->listAddresses(true, false));
+        $change = $this->uniqueAddresses($this->wallet->listAddresses(false, true));
+        $receivingSet = array_fill_keys($receiving, true);
+        $changeSet = array_fill_keys($change, true);
+
+        /** @var array<string, BitcoinAmount> $balances */
+        $balances = [];
+        foreach ($this->wallet->listUnspent() as $unspent) {
+            $address = $unspent['address'] ?? null;
+            if (!is_string($address) || $address === '') {
+                continue;
+            }
+
+            $amount = $this->unspentAmount($unspent);
+            $balances[$address] = isset($balances[$address])
+                ? $balances[$address]->add($amount)
+                : $amount;
+        }
+
+        $items = [];
+        $recommended = null;
+        foreach (array_values(array_unique(array_merge($receiving, $change))) as $address) {
+            $amount = $balances[$address] ?? BitcoinAmount::fromSatoshis(0);
+            $type = isset($changeSet[$address]) && !isset($receivingSet[$address]) ? 'change' : 'receiving';
+            $hasFunds = $amount->isPositive();
+
+            if ($recommended === null && $type === 'receiving' && !$hasFunds) {
+                $recommended = $address;
+            }
+            if ($hideEmpty && !$hasFunds) {
+                continue;
+            }
+
+            $items[] = [
+                'address' => $address,
+                'balance_btc' => $amount->toBtcString(),
+                'balance_sats' => $amount->satoshis(),
+                'has_funds' => $hasFunds,
+                'type' => $type,
+            ];
+        }
+
+        usort(
+            $items,
+            static fn (array $left, array $right): int =>
+                ($right['balance_sats'] <=> $left['balance_sats']) ?: strcmp($left['address'], $right['address'])
+        );
+
+        return ['items' => $items, 'recommended_receive' => $recommended];
+    }
+
+    /**
+     * @return list<array{
+     *   txid:string,direction:string,amount_btc:string,amount_sats:int,
+     *   confirmations:int,timestamp:?int,
+     *   outputs:list<array{address:string,amount_btc:string,amount_sats:int,ownership:string}>
+     * }>
+     */
+    public function transactions(): array
+    {
+        $receiving = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(true, false)), true);
+        $change = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(false, true)), true);
+        $transactions = [];
+
+        foreach ($this->wallet->listTransactions() as $transaction) {
+            $txid = $transaction['txid'] ?? $transaction['tx_hash'] ?? null;
+            if (!is_string($txid) || !preg_match('/\A[0-9a-fA-F]{64}\z/D', $txid)) {
+                continue;
+            }
+            $txid = strtolower($txid);
+
+            $rawAmount = $transaction['bc_value'] ?? $transaction['value'] ?? 0;
+            $signedAmount = BitcoinAmount::fromBtc($this->numericAmount($rawAmount));
+            $incoming = isset($transaction['incoming'])
+                ? (bool) $transaction['incoming']
+                : $signedAmount->satoshis() > 0;
+            $amount = BitcoinAmount::fromSatoshis(abs($signedAmount->satoshis()));
+
+            $transactions[] = [
+                'txid' => $txid,
+                'direction' => $incoming ? 'incoming' : 'outgoing',
+                'amount_btc' => $amount->toBtcString(),
+                'amount_sats' => $amount->satoshis(),
+                'confirmations' => $this->nonNegativeInt($transaction['confirmations'] ?? 0),
+                'timestamp' => $this->timestamp($transaction['timestamp'] ?? null),
+                'outputs' => $this->transactionOutputs($txid, $incoming, $receiving, $change),
+            ];
+        }
+
+        usort($transactions, static function (array $left, array $right): int {
+            $leftTime = $left['timestamp'] ?? 0;
+            $rightTime = $right['timestamp'] ?? 0;
+
+            return ($rightTime <=> $leftTime) ?: strcmp($right['txid'], $left['txid']);
+        });
+
+        return $transactions;
+    }
+
+    /** @return array{fees:array{economy:int,standard:int,priority:int},fiat_price:?float,fiat_currency:string} */
+    public function marketSnapshot(string $currency = 'CZK'): array
+    {
+        $currency = strtoupper(trim($currency));
+        $fees = self::DEFAULT_FEES;
+        $price = null;
+
+        try {
+            $fees = $this->marketData->getRecommendedFees();
+        } catch (Throwable $exception) {
+            $this->logFailure('recommended fees', $exception);
+        }
+
+        try {
+            $price = $this->marketData->getFiatPrice($currency);
+        } catch (Throwable $exception) {
+            $this->logFailure('fiat price', $exception);
+        }
+
+        return ['fees' => $fees, 'fiat_price' => $price, 'fiat_currency' => $currency];
+    }
+
+    public function sendPayment(string $destination, int|float|string $amount, ?string $password, ?int $feeRate): string
+    {
+        $destination = trim($destination);
+        if ($destination === '' || !$this->wallet->validateAddress($destination)) {
+            throw new InvalidArgumentException('Destination Bitcoin address is invalid.');
+        }
+
+        return $this->wallet->sendPayment($destination, $amount, $password, $feeRate);
+    }
+
+    public function newAddress(): string
+    {
+        return $this->wallet->getNewAddress();
+    }
+
+    /** @return array{seed:string,master_private_key:?string} */
+    public function privateKeys(string $password): array
+    {
+        $seed = $this->wallet->getSeed($password);
+        $masterPrivateKey = null;
+
+        try {
+            $masterPrivateKey = $this->wallet->getMasterPrivateKey($password);
+        } catch (Throwable $exception) {
+            $this->logFailure('master private key export', $exception);
+        }
+
+        return ['seed' => $seed, 'master_private_key' => $masterPrivateKey];
+    }
+
+    public function masterPublicKey(): string
+    {
+        return $this->wallet->getMasterPublicKey();
+    }
+
+    /** @param list<string> $addresses @return list<string> */
+    private function uniqueAddresses(array $addresses): array
+    {
+        $unique = [];
+        foreach ($addresses as $address) {
+            $address = trim($address);
+            if ($address !== '') {
+                $unique[$address] = true;
+            }
+        }
+
+        return array_keys($unique);
+    }
+
+    /** @param array<string,mixed> $unspent */
+    private function unspentAmount(array $unspent): BitcoinAmount
+    {
+        if (array_key_exists('value_sats', $unspent)) {
+            return BitcoinAmount::fromSatoshis($this->nonNegativeInt($unspent['value_sats']));
+        }
+
+        return BitcoinAmount::fromBtc($this->numericAmount($unspent['value'] ?? 0));
+    }
+
+    /**
+     * @param array<string,bool> $receiving
+     * @param array<string,bool> $change
+     * @return list<array{address:string,amount_btc:string,amount_sats:int,ownership:string}>
+     */
+    private function transactionOutputs(string $txid, bool $incoming, array $receiving, array $change): array
+    {
+        try {
+            $details = $this->wallet->getTransaction($txid);
+            $hex = is_array($details) ? ($details['hex'] ?? null) : $details;
+            if (!is_string($hex) || $hex === '') {
+                return [];
+            }
+
+            $decoded = $this->wallet->deserializeTransaction($hex);
+            $rawOutputs = $decoded['outputs'] ?? [];
+            if (!is_array($rawOutputs)) {
+                return [];
+            }
+
+            $outputs = [];
+            foreach ($rawOutputs as $output) {
+                if (!is_array($output)) {
+                    continue;
+                }
+                $address = $output['address'] ?? null;
+                if (!is_string($address) || $address === '') {
+                    continue;
+                }
+
+                $amount = array_key_exists('value_sats', $output)
+                    ? BitcoinAmount::fromSatoshis($this->nonNegativeInt($output['value_sats']))
+                    : BitcoinAmount::fromBtc($this->numericAmount($output['value'] ?? $output['amount'] ?? 0));
+                $ownership = isset($change[$address])
+                    ? 'change'
+                    : (isset($receiving[$address]) ? 'receiving' : ($incoming ? 'external' : 'recipient'));
+
+                $outputs[] = [
+                    'address' => $address,
+                    'amount_btc' => $amount->toBtcString(),
+                    'amount_sats' => $amount->satoshis(),
+                    'ownership' => $ownership,
                 ];
             }
 
-            $receiveAddress = 'Žádná adresa nenalezena';
-            $emptyReceiving = array_filter($allAddresses, fn($a) => $a['confirmed'] == 0 && $a['type'] === 'receiving');
-            if (!empty($emptyReceiving)) {
-                $newestEmpty = end($emptyReceiving);
-                $receiveAddress = $newestEmpty['address'];
-            }
-            
-            usort($allAddresses, fn($a, $b) => $b['confirmed'] <=> $a['confirmed']);
+            return $outputs;
+        } catch (Throwable $exception) {
+            $this->logFailure('transaction output decoding', $exception);
 
-            return ['status' => 'ok', 'list' => $allAddresses, 'recommended_receive' => $receiveAddress];
-        } catch (Exception $e) {
-            return ['status' => 'error', 'list' => [], 'recommended_receive' => 'Nedostupné'];
-        }
-    }
-
-    public function getTransactionsHistory(): array
-    {
-        try {
-            $receiving = array_flip($this->wallet->listAddresses(true, false));
-            $change = array_flip($this->wallet->listAddresses(false, true));
-            $rawTxs = $this->wallet->listTransactions();
-            
-            $finalTxs = [];
-
-            foreach ($rawTxs as $tx) {
-                if (!is_array($tx)) continue;
-
-                $txid = $tx['txid'] ?? $tx['tx_hash'] ?? '';
-                if (!$txid) continue;
-
-                $rawVal = $tx['bc_value'] ?? ($tx['value'] ?? 0);
-                $isInc = $tx['incoming'] ?? ((float)$rawVal > 0);
-                $valNum = abs((float)$rawVal);
-                $confs = $tx['confirmations'] ?? 0;
-                $timestamp = $tx['timestamp'] ?? null;
-                $timeStr = ($timestamp !== null && $timestamp > 0) ? date('j. n. Y H:i:s', (int)$timestamp) : 'Čas neznámý';
-
-                $cleanOutputs = [];
-                try {
-                    $txInfo = $this->wallet->getTransaction($txid);
-                    $hex = is_array($txInfo) ? ($txInfo['hex'] ?? '') : (is_string($txInfo) ? $txInfo : '');
-                    if ($hex) {
-                        $parsed = $this->wallet->deserializeTransaction($hex);
-                        if (isset($parsed['outputs']) && is_array($parsed['outputs'])) {
-                            foreach ($parsed['outputs'] as $out) {
-                                $addr = $out['address'] ?? null;
-                                if (!$addr) continue;
-                                $outVal = $out['value_sats'] ?? $out['value'] ?? $out['amount'] ?? 0;
-                                $valStr = number_format($outVal / 100000000, 8, '.', '');
-
-                                if ($isInc) {
-                                    if (isset($receiving[$addr]) || isset($change[$addr])) $cleanOutputs[] = ['address' => $addr, 'value' => $valStr, 'label' => 'Tvá přijímací adresa'];
-                                } else {
-                                    if (isset($change[$addr])) $cleanOutputs[] = ['address' => $addr, 'value' => $valStr, 'label' => 'Vrácené drobné zpět tobě'];
-                                    else $cleanOutputs[] = ['address' => $addr, 'value' => $valStr, 'label' => 'Příjemce platby'];
-                                }
-                            }
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Ignorujeme detaily, pokud selže dekódování jedné konkrétní transakce
-                }
-
-                $finalTxs[] = [
-                    'txid' => $txid, 'isInc' => $isInc,
-                    'valStr' => ($isInc ? '+' : '') . number_format($valNum, 8, '.', ''),
-                    'confText' => $confs > 0 ? "{$confs}× potvrzeno" : 'Čeká v síti',
-                    'timeStr' => $timeStr, 'outputs' => $cleanOutputs
-                ];
-            }
-            return array_reverse($finalTxs);
-        } catch (Exception $e) {
             return [];
         }
     }
 
-    public function getRecommendedFees(): array
+    private function numericAmount(mixed $value): int|float|string
     {
-        $default = ['low' => 1, 'med' => 1, 'high' => 1];
-        $ctx = stream_context_create(['http' => ['timeout' => 2]]); 
-        $mempool = @file_get_contents('https://mempool.space/api/v1/fees/recommended', false, $ctx);
-        if ($mempool && $fees = json_decode($mempool, true)) {
-            return [
-                'low'  => $fees['hourFee'] ?? 1,
-                'med'  => $fees['halfHourFee'] ?? 1,
-                'high' => $fees['fastestFee'] ?? 1
-            ];
+        if (!is_int($value) && !is_float($value) && !is_string($value)) {
+            throw new RuntimeException('Electrum returned an invalid Bitcoin amount.');
         }
-        return $default;
+
+        return $value;
     }
 
-    public function getFiatPrice(string $currency = 'CZK'): float
+    private function nonNegativeInt(mixed $value): int
     {
-        $ctx = stream_context_create(['http' => ['timeout' => 2]]);
-        $data = @file_get_contents('https://blockchain.info/ticker', false, $ctx);
-        if ($data && $prices = json_decode($data, true)) {
-            if (isset($prices[$currency])) return (float)$prices[$currency]['last'];
-            elseif (isset($prices['USD'])) return (float)$prices['USD']['last'];
+        if (is_int($value)) {
+            $number = $value;
+        } elseif (is_string($value) && ctype_digit($value)) {
+            $number = (int) $value;
+        } else {
+            throw new RuntimeException('Electrum returned an invalid integer value.');
         }
-        return 0.0;
+
+        if ($number < 0) {
+            throw new RuntimeException('Electrum returned a negative integer value.');
+        }
+
+        return $number;
     }
 
-    public function executePayment(string $to, int|float|string $amount, ?string $password = null, ?int $fee = null): array
+    private function timestamp(mixed $value): ?int
     {
-        try {
-            $txid = $this->wallet->sendPayment($to, $amount, $password, $fee);
-            return ['status' => 'success', 'txid' => $txid, 'message' => 'Odesláno'];
-        } catch (Exception $e) {
-            return ['status' => 'error', 'message' => $e->getMessage()];
+        if ($value === null || $value === 0 || $value === '0') {
+            return null;
         }
+
+        $timestamp = $this->nonNegativeInt($value);
+
+        return $timestamp > 0 ? $timestamp : null;
     }
 
-    public function generateNewAddress(): array
+    private function logFailure(string $operation, Throwable $exception): void
     {
-        try {
-            $addr = $this->wallet->getNewAddress();
-            return ['status' => 'success', 'address' => $addr];
-        } catch (Exception $e) {
-            return ['status' => 'error', 'message' => 'Nelze vygenerovat: ' . $e->getMessage()];
-        }
-    }
-
-    public function exportKeys(string $password): array
-    {
-        try {
-            $seed = $this->wallet->getSeed($password);
-            $xprv = '';
-            try { $xprv = $this->wallet->getMasterPrivateKey($password); } catch (Exception $e) {}
-            return ['status' => 'success', 'seed' => $seed, 'xprv' => $xprv];
-        } catch (Exception $e) {
-            return ['status' => 'error', 'message' => $e->getMessage()];
-        }
-    }
-    
-    public function getMasterPublicKey(): string
-    {
-        try { return $this->wallet->getMasterPublicKey(); } catch (Exception $e) { return ''; }
+        error_log(sprintf(
+            'BtcDashboard %s failed: %s (%s)',
+            $operation,
+            $exception->getMessage(),
+            $exception::class
+        ));
     }
 }
