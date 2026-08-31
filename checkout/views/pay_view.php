@@ -6,6 +6,7 @@ declare(strict_types=1);
 /** @var string $statusUrl */
 /** @var string $stylesheetUrl */
 /** @var string $scriptUrl */
+/** @var string|null $qrCodeDataUri */
 
 $statusLabels = [
     'New' => ['Čekáme na platbu', 'new'],
@@ -17,6 +18,7 @@ $statusLabels = [
 $isSettled = $checkout['status'] === 'Settled';
 $isExpired = $checkout['status'] === 'Expired';
 $isPartial = $checkout['additional_status'] === 'PaidPartial';
+$hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:image/');
 ?>
 <!doctype html>
 <html lang="cs">
@@ -37,82 +39,118 @@ $isPartial = $checkout['additional_status'] === 'PaidPartial';
       data-seconds-remaining="<?= htmlspecialchars((string) $checkout['seconds_remaining'], ENT_QUOTES, 'UTF-8') ?>">
     <section class="checkout-card" aria-labelledby="checkout-title">
         <header class="checkout-header">
-            <a class="checkout-brand" href="https://bitcoin.org/" rel="noopener noreferrer" target="_blank"
-               aria-label="Informace o Bitcoinu">
+            <div class="checkout-brand">
                 <span class="brand-mark" aria-hidden="true">₿</span>
                 <span>
-                    <strong>Bitcoin checkout</strong>
-                    <small>Bezpečná on-chain platba</small>
+                    <strong>BTCPay Lite</strong>
+                    <small>Bitcoin checkout</small>
                 </span>
-            </a>
-            <div class="network-pill"><span aria-hidden="true"></span> Bitcoin</div>
+            </div>
+            <div class="secure-pill">
+                <span class="secure-dot" aria-hidden="true"></span>
+                Lokální a soukromé
+            </div>
         </header>
 
         <div class="checkout-summary">
             <p class="eyebrow">Platební požadavek</p>
             <h1 id="checkout-title"><?= htmlspecialchars((string) $checkout['title'], ENT_QUOTES, 'UTF-8') ?></h1>
             <p class="invoice-id">ID <?= htmlspecialchars((string) $checkout['id'], ENT_QUOTES, 'UTF-8') ?></p>
-        </div>
 
-        <div id="status-badge"
-             class="status-badge status-<?= htmlspecialchars($statusTone, ENT_QUOTES, 'UTF-8') ?>"
-             role="status"
-             aria-live="polite">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span id="status-label"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span>
+            <div id="status-badge"
+                 class="status-badge status-<?= htmlspecialchars($statusTone, ENT_QUOTES, 'UTF-8') ?>"
+                 role="status"
+                 aria-live="polite">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="status-label"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
         </div>
 
         <section id="success-panel" class="success-panel<?= $isSettled ? ' is-visible' : '' ?>" aria-live="polite">
             <span class="success-symbol" aria-hidden="true">✓</span>
             <div>
+                <p class="eyebrow">Hotovo</p>
                 <h2>Děkujeme, platba je potvrzena</h2>
                 <p>Faktura byla bezpečně uhrazena v bitcoinové síti.</p>
             </div>
         </section>
 
         <section id="payment-panel" class="payment-panel<?= $isSettled ? ' is-hidden' : '' ?>">
-            <div class="amount-section">
-                <span>Částka k úhradě</span>
-                <strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?> <small>BTC</small></strong>
-                <button class="text-button" type="button" data-copy-value="<?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?>">
-                    Kopírovat částku
-                </button>
-            </div>
-
-            <div id="partial-notice" class="notice notice-warning<?= $isPartial ? ' is-visible' : '' ?>" role="alert">
-                Dorazila pouze část platby. Zbývá doplatit
-                <strong id="missing-amount"><?= htmlspecialchars((string) $checkout['missing_amount'], ENT_QUOTES, 'UTF-8') ?> BTC</strong>.
-            </div>
-
-            <div class="address-section">
-                <div class="section-heading">
-                    <span>Bitcoinová adresa</span>
-                    <button class="text-button" type="button" data-copy-target="payment-address">Kopírovat</button>
+            <div class="payment-grid">
+                <div class="qr-column">
+                    <p class="section-label">Naskenujte v peněžence</p>
+                    <?php if ($hasQrCode): ?>
+                        <a id="qr-payment-link"
+                           class="qr-payment-link<?= $isExpired ? ' is-disabled' : '' ?>"
+                           href="<?= $isExpired ? '#' : htmlspecialchars((string) $checkout['bip21_uri'], ENT_QUOTES, 'UTF-8') ?>"
+                           <?= $isExpired ? 'aria-disabled="true" tabindex="-1"' : '' ?>
+                           aria-label="Otevřít bitcoinovou platbu v peněžence">
+                            <span class="qr-frame">
+                                <img src="<?= htmlspecialchars((string) $qrCodeDataUri, ENT_QUOTES, 'UTF-8') ?>"
+                                     width="248"
+                                     height="248"
+                                     alt="QR kód bitcoinové platby">
+                                <span class="qr-center" aria-hidden="true">₿</span>
+                            </span>
+                        </a>
+                    <?php else: ?>
+                        <div class="qr-placeholder">
+                            <span aria-hidden="true">₿</span>
+                            <strong>QR kód není dostupný</strong>
+                            <small>Použijte tlačítko pro otevření peněženky.</small>
+                        </div>
+                    <?php endif; ?>
+                    <p class="qr-help">QR obsahuje adresu i přesnou částku.</p>
                 </div>
-                <code id="payment-address"><?= htmlspecialchars((string) $checkout['address'], ENT_QUOTES, 'UTF-8') ?></code>
+
+                <div class="payment-details">
+                    <div class="amount-section">
+                        <span>Částka k úhradě</span>
+                        <strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?></strong>
+                        <small>BTC</small>
+                        <button class="text-button" type="button" data-copy-value="<?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?>">
+                            Kopírovat částku
+                        </button>
+                    </div>
+
+                    <p id="checkout-timer" class="checkout-timer" aria-live="polite">
+                        <?= $isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' ?>
+                    </p>
+
+                    <div id="partial-notice" class="notice notice-warning<?= $isPartial ? ' is-visible' : '' ?>" role="alert">
+                        Dorazila pouze část platby. Zbývá doplatit
+                        <strong id="missing-amount"><?= htmlspecialchars((string) $checkout['missing_amount'], ENT_QUOTES, 'UTF-8') ?> BTC</strong>.
+                    </div>
+
+                    <div class="address-section">
+                        <div class="section-heading">
+                            <span>Bitcoinová adresa</span>
+                            <button class="text-button" type="button" data-copy-target="payment-address">Kopírovat</button>
+                        </div>
+                        <code id="payment-address"><?= htmlspecialchars((string) $checkout['address'], ENT_QUOTES, 'UTF-8') ?></code>
+                    </div>
+
+                    <a id="wallet-link"
+                       class="wallet-button<?= $isExpired ? ' is-disabled' : '' ?>"
+                       href="<?= $isExpired ? '#' : htmlspecialchars((string) $checkout['bip21_uri'], ENT_QUOTES, 'UTF-8') ?>"
+                       <?= $isExpired ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
+                        <span aria-hidden="true">₿</span>
+                        Otevřít Bitcoin peněženku
+                    </a>
+                </div>
             </div>
-
-            <a id="wallet-link"
-               class="wallet-button<?= $isExpired ? ' is-disabled' : '' ?>"
-               href="<?= $isExpired ? '#' : htmlspecialchars((string) $checkout['bip21_uri'], ENT_QUOTES, 'UTF-8') ?>"
-               <?= $isExpired ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
-                <span aria-hidden="true">₿</span>
-                Otevřít Bitcoin peněženku
-            </a>
-
-            <p id="checkout-timer" class="checkout-timer" aria-live="polite">
-                <?= $isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' ?>
-            </p>
         </section>
 
         <footer class="checkout-footer">
-            <p>
-                Odesílejte pouze BTC v bitcoinové síti. Stav se obnovuje automaticky;
-                stránku nemusíte ručně aktualizovat.
-            </p>
+            <div class="checkout-steps" aria-label="Postup platby">
+                <span><strong>1</strong> Naskenujte QR</span>
+                <span><strong>2</strong> Odešlete přesnou částku</span>
+                <span><strong>3</strong> Vyčkejte na potvrzení</span>
+            </div>
+            <p>Odesílejte pouze BTC v bitcoinové síti. Stav se obnovuje automaticky.</p>
             <div class="privacy-note">
                 <span aria-hidden="true">◆</span>
-                Platební údaje neposíláme externí službě pro generování QR kódu.
+                QR kód vzniká přímo na serveru. Platební údaje neopouštějí aplikaci.
             </div>
         </footer>
 
