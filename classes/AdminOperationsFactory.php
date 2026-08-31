@@ -23,9 +23,21 @@ final class AdminOperationsFactory
         return new AdminOperationsService(
             new PdoAdminOperationsRepository($database),
             new ElectrumCliWalletProvisioner(
-                self::stringOrDefault($config, 'electrum_cli_path', '/opt/electrum/run_electrum'),
-                self::stringOrDefault($config, 'electrum_data_dir', '/opt/electrum_config'),
-                self::stringOrDefault($config, 'store_wallets_dir', dirname($walletPath))
+                self::firstStringOrDefault(
+                    $config,
+                    ['electrum_cli_path', 'electrum_cli'],
+                    '/opt/electrum/run_electrum'
+                ),
+                self::firstStringOrDefault(
+                    $config,
+                    ['electrum_data_dir', 'electrum_data_directory'],
+                    '/opt/electrum_config'
+                ),
+                self::firstStringOrDefault(
+                    $config,
+                    ['store_wallets_dir', 'wallet_directory'],
+                    dirname($walletPath)
+                )
             ),
             new WebhookEndpointPolicy(
                 null,
@@ -57,13 +69,15 @@ final class AdminOperationsFactory
     }
 
     /** @param array<string,mixed> $config */
-    private static function stringOrDefault(array $config, string $key, string $default): string
+    private static function firstStringOrDefault(array $config, array $keys, string $default): string
     {
-        if (!array_key_exists($key, $config)) {
-            return $default;
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $config)) {
+                return self::requiredString($config, $key);
+            }
         }
 
-        return self::requiredString($config, $key);
+        return $default;
     }
 
     private static function positiveInt(mixed $value, string $key): int
