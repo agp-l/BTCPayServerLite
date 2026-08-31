@@ -262,7 +262,12 @@ final class DatabaseCheckoutService
 
     private function amount(mixed $value, string $field): string
     {
-        return $this->bitcoinAmount($value, $field)->toBtcString();
+        $amount = $this->bitcoinAmount($value, $field);
+        if ($amount->satoshis() < 0) {
+            throw $this->invalidResult('validate_' . str_replace(' ', '_', $field));
+        }
+
+        return $amount->toBtcString();
     }
 
     private function bitcoinAmount(mixed $value, string $field): BitcoinAmount
