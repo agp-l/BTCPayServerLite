@@ -4,14 +4,42 @@ CREATE DATABASE IF NOT EXISTS `btcpay_lite`
 
 USE `btcpay_lite`;
 
+CREATE TABLE `users` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `email` VARCHAR(254) NOT NULL,
+    `password_hash` VARCHAR(255) NOT NULL,
+    `role` ENUM('admin', 'client') NOT NULL DEFAULT 'client',
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_users_email` (`email`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `auth_login_attempts` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `identity_hash` BINARY(32) NOT NULL,
+    `attempted_at` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_auth_login_attempt_identity` (`identity_hash`, `attempted_at`),
+    KEY `idx_auth_login_attempt_cleanup` (`attempted_at`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `stores` (
     `id` VARCHAR(50) NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `api_key` VARCHAR(255)
         CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     `wallet_path` VARCHAR(255) NOT NULL,
+    `user_id` INT UNSIGNED DEFAULT NULL,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_stores_api_key` (`api_key`)
+    UNIQUE KEY `uq_stores_api_key` (`api_key`),
+    KEY `idx_stores_user` (`user_id`),
+    CONSTRAINT `fk_stores_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
