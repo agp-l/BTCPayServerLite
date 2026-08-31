@@ -96,6 +96,15 @@ $tests['rejects mixed public and private DNS answers'] = static function (): voi
     );
 };
 
+$tests['rejects private IPv4 addresses mapped into IPv6'] = static function (): void {
+    $policy = new WebhookEndpointPolicy(static fn (): array => ['::ffff:127.0.0.1']);
+
+    webhookPolicyAssertThrows(
+        static fn () => $policy->inspect('https://hooks.example.com/webhook'),
+        'An IPv4-mapped loopback address was accepted.'
+    );
+};
+
 $tests['marks DNS resolution failure as retryable'] = static function (): void {
     $policy = new WebhookEndpointPolicy(static fn (): array => []);
 
