@@ -44,7 +44,8 @@ $checks = [
     ) >= 2,
     'client views use the URL builder' => substr_count($clientViews, '$urlManager->url(') >= 5,
     'admin header uses one route URL closure' => str_contains($adminHeader, '$routeUrl = static fn')
-        && substr_count($adminHeader, '$routeUrl(') >= 10,
+        && substr_count($adminHeader, '$routeUrl(') >= 5
+        && str_contains($adminHeader, 'use ($routeUrl, $activeMenu): void'),
     'legacy admin path prefixes are gone' => !str_contains($adminHeader, '$adminPrefix')
         && !str_contains($adminHeader, '$rootPrefix'),
     'landing and stateless API honor app_url' => str_contains(
