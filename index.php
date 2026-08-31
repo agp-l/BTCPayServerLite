@@ -1,15 +1,14 @@
 <?php
 // index.php - Hlavní směrovač (Front Controller)
 declare(strict_types=1);
-session_start();
-ini_set('display_errors', '1'); // Při vývoji zapnuto
-error_reporting(E_ALL);
 
 require_once __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
 
 use BtcPayLite\UrlManager;
 use BtcPayLite\AuthManager;
+
+AuthManager::startSession();
 
 // Inicializace správce URL
 $urlManager = new UrlManager();

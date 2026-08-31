@@ -2,7 +2,13 @@
 // admin/dashboard.php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../vendor/autoload.php';
+$config = $config ?? require __DIR__ . '/../config.php';
+
 use BtcPayLite\Database;
+use BtcPayLite\AuthManager;
+
+AuthManager::requireRole('admin', '../login');
 
 try {
     $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);

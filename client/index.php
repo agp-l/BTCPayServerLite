@@ -2,20 +2,14 @@
 // client/index.php - Klientský dashboard (Kontroler)
 declare(strict_types=1);
 
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
-
-// Ochrana - pustíme sem jen přihlášené uživatele
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
-
-
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
+
+use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
 
+AuthManager::requireRole('client', 'login');
+$csrfToken = AuthManager::csrfToken();
 $userId = $_SESSION['user_id'];
 $stores = [];
 $invoices = [];
@@ -24,10 +18,17 @@ $toastMsg = '';
 $clientStats = ['total_stores' => 0, 'total_invoices' => 0, 'paid_invoices' => 0];
 
 try {
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
+    $db = new Database(
+        $config['db_host'],
+        $config['db_name'],
+        $config['db_user'],
+        $config['db_pass'],
+        (int) ($config['db_port'] ?? 3306)
+    );
     
     // Zpracování formulářů (Tvorba e-shopu, Webhooky)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+        AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         
         // 1. AKCE: Vytvoření nového e-shopu (a peněženky na pozadí)
         if ($_POST['action'] === 'create_store') {
@@ -135,7 +136,8 @@ try {
         $webhooks = $whStmt->fetchAll();
     }
 } catch (\Throwable $e) {
-    $toastMsg = "Chyba při načítání dat: " . $e->getMessage();
+    error_log('Unexpected client dashboard failure: ' . $e->getMessage());
+    $toastMsg = 'Operaci nyní nelze dokončit. Zkuste to prosím později.';
 }
 
 require __DIR__ . '/views/index_view.php';

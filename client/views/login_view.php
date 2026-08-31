@@ -45,10 +45,12 @@ declare(strict_types=1);
         <h1>Přihlášení do systému</h1>
         
         <?php if (!empty($error)): ?>
-            <div class="error"><i class="fa-solid fa-triangle-exclamation"></i> <?php echo $error; ?></div>
+            <div class="error"><i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></div>
         <?php endif; ?>
         
-        <form method="POST" action="login.php">
+        <form method="POST" action="">
+            <input type="hidden" name="action" value="login">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="input-wrap">
                 <i class="fa-solid fa-envelope"></i>
                 <input type="email" name="email" placeholder="E-mailová adresa" required>
@@ -60,7 +62,7 @@ declare(strict_types=1);
             <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Vstoupit</button>
         </form>
         
-       <a href="registrace.php" class="footer-link">Nemáte účet? Zaregistrujte se</a>
+       <a href="registrace" class="footer-link">Nemáte účet? Zaregistrujte se</a>
     </div>
 </body>
 </html>

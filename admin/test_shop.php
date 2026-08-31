@@ -2,6 +2,12 @@
 // test_shop.php - Simulace e-shopu
 declare(strict_types=1);
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use BtcPayLite\AuthManager;
+
+AuthManager::requireRole('admin', '../login');
+
 // ==========================================
 // 1. NASTAVENÍ (Vyplň své Store ID z databáze)
 // ==========================================

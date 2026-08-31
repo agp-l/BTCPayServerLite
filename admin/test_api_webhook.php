@@ -1,6 +1,12 @@
 <?php
 // test_api_webhook.php - Simulace e-shopu, který se snaží nastavit Webhook
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use BtcPayLite\AuthManager;
+
+AuthManager::requireRole('admin', '../login');
+
 // 1. ZDE DOPLŇ SVÉ STORE ID z administrace!
 $storeId = 'store_32159cbb40'; // Změň za své ID!
 $apiUrl = 'http://localhost/api/v1/stores/' . $storeId . '/webhooks';
