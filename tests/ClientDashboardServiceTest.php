@@ -14,44 +14,27 @@ final class ClientRepositoryFixture implements ClientDashboardRepository
     public ?array $createdStore = null;
     public ?array $createdWebhook = null;
     public ?string $deletedWebhook = null;
+    public bool $failStoreCreation = false;
 
-    public function fetchSummary(int $userId): array
-    {
-        return ['total_stores' => 1, 'total_invoices' => 2, 'paid_invoices' => 1];
-    }
-
-    public function fetchStores(int $userId): array
-    {
-        return [['id' => 'store_owned', 'name' => 'Store', 'api_key' => 'secret', 'wallet_path' => '/wallet']];
-    }
-
+    public function fetchSummary(int $userId): array { return ['total_stores' => 1, 'total_invoices' => 2, 'paid_invoices' => 1]; }
+    public function fetchStores(int $userId): array { return [['id' => 'store_owned', 'name' => 'Store', 'api_key' => 'secret', 'wallet_path' => '/wallet']]; }
     public function fetchInvoices(int $userId, int $limit): array
     {
         if ($limit !== 30) throw new RuntimeException('Unexpected invoice limit.');
         return [];
     }
-
-    public function fetchWebhooks(int $userId): array
-    {
-        return [];
-    }
-
+    public function fetchWebhooks(int $userId): array { return []; }
     public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
     {
+        if ($this->failStoreCreation) throw new RuntimeException('Simulated store persistence failure.');
         $this->createdStore = compact('userId', 'id', 'name', 'apiKey', 'walletPath');
     }
-
-    public function ownsStore(int $userId, string $storeId): bool
-    {
-        return $userId === 7 && $storeId === 'store_owned';
-    }
-
+    public function ownsStore(int $userId, string $storeId): bool { return $userId === 7 && $storeId === 'store_owned'; }
     public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array
     {
         $this->createdWebhook = compact('storeId', 'url', 'createdAt');
         return ['id' => 'wh_test', 'url' => $url, 'secret' => 'webhook-secret'];
     }
-
     public function deleteWebhook(int $userId, string $webhookId): bool
     {
         $this->deletedWebhook = $webhookId;
@@ -61,20 +44,16 @@ final class ClientRepositoryFixture implements ClientDashboardRepository
 
 final class WalletProvisionerFixture implements StoreWalletProvisioner
 {
-    public function provision(string $storeId): string
-    {
-        return '/wallets/' . $storeId . '_wallet';
-    }
-
-    public function discard(string $walletPath): void
-    {
-    }
+    public ?string $discarded = null;
+    public function provision(string $storeId): string { return '/wallets/' . $storeId . '_wallet'; }
+    public function discard(string $walletPath): void { $this->discarded = $walletPath; }
 }
 
 $repository = new ClientRepositoryFixture();
+$wallets = new WalletProvisionerFixture();
 $service = new ClientDashboardService(
     $repository,
-    new WalletProvisionerFixture(),
+    $wallets,
     new WebhookEndpointPolicy(static fn (string $host): array => ['93.184.216.34']),
     static fn (): int => 1788160000
 );
@@ -86,30 +65,31 @@ if ($data['summary']['paid_invoices'] !== 1 || count($data['stores']) !== 1) {
 echo "[PASS] composes client dashboard data through the repository\n";
 
 $store = $service->createStore(7, ' Profesionální obchod ');
-if (
-    $repository->createdStore === null
-    || $store['name'] !== 'Profesionální obchod'
-    || !str_starts_with($store['wallet_path'], '/wallets/store_')
-    || strlen($store['api_key']) !== 64
-) {
+if ($repository->createdStore === null || $store['name'] !== 'Profesionální obchod' || !str_starts_with($store['wallet_path'], '/wallets/store_') || strlen($store['api_key']) !== 64) {
     throw new RuntimeException('Store creation was not normalized.');
 }
 echo "[PASS] provisions a wallet before persisting a normalized store\n";
 
+$repository->failStoreCreation = true;
+try {
+    $service->createStore(7, 'Selhávající obchod');
+    throw new RuntimeException('Store persistence failure was accepted.');
+} catch (\BtcPayLite\ClientDashboardException $exception) {
+    if ($exception->getHttpStatus() !== 503 || $wallets->discarded === null || !str_contains($wallets->discarded, 'store_')) {
+        throw new RuntimeException('Unused client wallet was not safely discarded.');
+    }
+}
+$repository->failStoreCreation = false;
+echo "[PASS] discards an unused client wallet after persistence failure\n";
+
 $webhook = $service->createWebhook(7, 'store_owned', 'https://example.com/hook');
-if (
-    $webhook['id'] !== 'wh_test'
-    || $repository->createdWebhook === null
-    || $repository->createdWebhook['createdAt'] !== 1788160000
-) {
+if ($webhook['id'] !== 'wh_test' || $repository->createdWebhook === null || $repository->createdWebhook['createdAt'] !== 1788160000) {
     throw new RuntimeException('Webhook creation did not use the validated boundary.');
 }
 echo "[PASS] validates ownership and endpoint policy before storing a webhook\n";
 
 $service->deleteWebhook(7, 'wh_test');
-if ($repository->deletedWebhook !== 'wh_test') {
-    throw new RuntimeException('Webhook deletion was not scoped to the client.');
-}
+if ($repository->deletedWebhook !== 'wh_test') throw new RuntimeException('Webhook deletion was not scoped to the client.');
 echo "[PASS] deletes a webhook through the scoped repository\n";
 
-echo "4 client dashboard service tests passed.\n";
+echo "5 client dashboard service tests passed.\n";
