@@ -62,6 +62,10 @@
         }
 
         timer.hidden = false;
+        if (currentStatus === 'Processing') {
+            timer.textContent = 'Platba byla přijata; čekáme na potvrzení sítě.';
+            return;
+        }
         timer.textContent = currentStatus === 'Expired' || secondsRemaining <= 0
             ? 'Čas pro platbu vypršel.'
             : 'Zbývající čas: ' + formatTime(secondsRemaining);
