@@ -49,4 +49,23 @@ if (
 }
 echo "[PASS] uses canonical protected authentication forms\n";
 
-echo "5 client registration boundary tests passed.\n";
+if (
+    !str_contains($controller, "config['store_wallets_dir']")
+    || !str_contains($controller, "config['wallet_directory']")
+    || !str_contains($controller, 'Wallet directory configuration is missing.')
+) {
+    throw new RuntimeException('Registration can silently provision a wallet outside a configured directory.');
+}
+echo "[PASS] requires an explicit managed wallet directory\n";
+
+if (
+    !str_contains($controller, "config['electrum_cli_path']")
+    || !str_contains($controller, "config['electrum_cli']")
+    || !str_contains($controller, "config['electrum_data_dir']")
+    || !str_contains($controller, "config['electrum_data_directory']")
+) {
+    throw new RuntimeException('Registration dropped compatibility with installed Electrum configuration keys.');
+}
+echo "[PASS] keeps registration Electrum configuration backward compatible\n";
+
+echo "7 client registration boundary tests passed.\n";
