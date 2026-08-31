@@ -13,9 +13,9 @@ interface AuthUserRepository
 
     public function updatePasswordHash(int $userId, string $passwordHash): void;
 
-    public function countRecentLoginFailures(string $identityHash, int $since): int;
+    public function countRecentAttempts(string $identityHash, int $since): int;
 
-    public function recordLoginFailure(string $identityHash, int $attemptedAt): void;
+    public function recordAttempt(string $identityHash, int $attemptedAt): void;
 
-    public function clearLoginFailures(string $identityHash): void;
+    public function clearAttempts(string $identityHash): void;
 }
