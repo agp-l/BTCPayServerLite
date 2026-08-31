@@ -2,7 +2,7 @@
 
 Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
-> Stav dokumentace: větev `develop/admin-dashboard-ui` po refaktoru dashboardů a uživatelského rozhraní, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou a kontraktními testy; produkční nasazení stále vyžaduje smoke test proti skutečné databázi a Electrum daemonu.
+> Stav dokumentace: větev `main` po refaktoru dashboardů, checkoutu a administračního rozhraní, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou a kontraktními testy; produkční nasazení stále vyžaduje smoke test proti skutečné databázi a Electrum daemonu.
 
 ## Aktuální stav auditu
 
@@ -23,7 +23,7 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - `BtcDashboard`, přesné wallet výpočty a oddělený HTTP provider tržních dat,
 - administrační dashboard, peněženka, obchody, faktury a webhooky s repository/service vrstvou,
 - klientský dashboard a registrace s objektovým store scopingem, transakcemi a bezpečným provisioningem peněženek,
-- sdílený responzivní design systém pro administraci a klientský portál,
+- široký responzivní design systém administrace v grafitově černé a fialové paletě a samostatný design klientského portálu,
 - databázové preflighty a migrace pro auditované části.
 
 V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
@@ -40,8 +40,9 @@ V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a 
 | `checkout/pay.php`, `checkout/views/`, `assets/checkout.*` | Přepracováno a auditováno | Tenký veřejný controller pro databázové faktury, bezpečný JSON status endpoint, přesné částky, lokálně generovaný BIP21 QR kód, zelený responzivní design a žádné předávání platebních dat externí službě. |
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
-| `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém dashboardu, peněženky, obchodů, faktur a webhooků bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
-| `admin/url_invoices.php`, `admin/url_pay.php` | Zachovat a přepracovat | Alternativní stateless URL faktury bez databázových invoice záznamů; potřebují bezpečnou veřejnou platební stránku, oddělený controller/view a testy. |
+| `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený široký a responzivní dark design systém dashboardu, peněženky, obchodů, faktur, webhooků a URL faktur; primární akce používají fialový akcent a provozní stavy vlastní sémantické barvy. |
+| `admin/url_invoices.php`, `admin/views/url_invoices_view.php` | Částečně přepracováno | Admin část stateless URL faktur používá CSRF, skryté PHP chyby a bezpečné DOM vykreslování importované historie bez inline HTML handlerů. |
+| `admin/url_pay.php` | Zachovat a přepracovat | Veřejná platební stránka alternativních stateless URL faktur bez databázových invoice záznamů; potřebuje oddělený controller/view a samostatné kontraktní testy. |
 | `client/login.php`, `client/registrace.php` a session | Přepracováno a auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID, POST logout a transakční registrace se samostatnou peněženkou. |
 | `client/index.php`, klientský dashboard | Přepracováno a auditováno | Tenký controller, user-scoped repository, bezpečný wallet provisioner, CSRF a escapované responzivní views. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
