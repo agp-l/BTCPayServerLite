@@ -11,6 +11,9 @@ $config = require __DIR__ . '/../config.php';
 use BtcPayLite\Database;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\WebhookEndpointPolicy;
+use BtcPayLite\AuthManager;
+
+AuthManager::requireRole('admin', '../login');
 
 $toastMsg = '';
 $stores = [];
