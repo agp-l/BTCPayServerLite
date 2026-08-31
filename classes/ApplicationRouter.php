@@ -19,6 +19,7 @@ final class ApplicationRouter
             '/prezentace' => $this->redirect('/'),
             '/login' => $this->page(['GET', 'HEAD', 'POST'], 'client/login.php', 'login'),
             '/registrace' => $this->page(['GET', 'HEAD', 'POST'], 'client/registrace.php', 'registrace'),
+            '/registrace.php' => $this->redirect('/registrace'),
             '/client' => $this->page(['GET', 'HEAD', 'POST'], 'client/index.php', 'client', 'client'),
             '/dashboard' => $this->redirect('/client'),
             '/api' => $this->page(['POST'], 'api_stateless.php', 'api'),
@@ -41,12 +42,6 @@ final class ApplicationRouter
             ),
             '/admin/url_invoices' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/url_invoices.php', 'url_invoices', 'admin'
-            ),
-            '/admin/test_shop' => $this->page(
-                ['GET', 'HEAD', 'POST'], 'admin/test_shop.php', 'test_shop', 'admin'
-            ),
-            '/admin/test_api_webhook' => $this->page(
-                ['GET', 'HEAD', 'POST'], 'admin/test_api_webhook.php', 'test_api_webhook', 'admin'
             ),
         ];
     }
