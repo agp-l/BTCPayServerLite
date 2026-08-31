@@ -14,6 +14,7 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
     public ?array $createdStore = null;
     public ?array $createdWebhook = null;
     public ?string $deletedWebhook = null;
+    public bool $failStoreCreation = false;
 
     public function fetchStores(): array
     {
@@ -27,6 +28,9 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
 
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
     {
+        if ($this->failStoreCreation) {
+            throw new RuntimeException('Simulated store persistence failure.');
+        }
         $this->createdStore = compact('id', 'name', 'apiKey', 'walletPath');
     }
 
@@ -55,6 +59,8 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
 
 final class AdminWalletProvisionerFixture implements StoreWalletProvisioner
 {
+    public ?string $discarded = null;
+
     public function provision(string $storeId): string
     {
         return '/wallets/' . $storeId . '_wallet';
@@ -62,13 +68,15 @@ final class AdminWalletProvisionerFixture implements StoreWalletProvisioner
 
     public function discard(string $walletPath): void
     {
+        $this->discarded = $walletPath;
     }
 }
 
 $repository = new AdminOperationsRepositoryFixture();
+$wallets = new AdminWalletProvisionerFixture();
 $service = new AdminOperationsService(
     $repository,
-    new AdminWalletProvisionerFixture(),
+    $wallets,
     new WebhookEndpointPolicy(static fn (string $host): array => ['93.184.216.34']),
     static fn (): int => 1788160000
 );
@@ -88,6 +96,22 @@ if (
     throw new RuntimeException('Admin store creation was not normalized.');
 }
 echo "[PASS] provisions a wallet before persisting an admin store\n";
+
+$repository->failStoreCreation = true;
+try {
+    $service->createStore('Selhávající obchod');
+    throw new RuntimeException('Admin store persistence failure was accepted.');
+} catch (\BtcPayLite\AdminOperationsException $exception) {
+    if (
+        $exception->getHttpStatus() !== 503
+        || $wallets->discarded === null
+        || !str_contains($wallets->discarded, 'store_')
+    ) {
+        throw new RuntimeException('Unused admin wallet was not safely discarded.');
+    }
+}
+$repository->failStoreCreation = false;
+echo "[PASS] discards an unused admin wallet after persistence failure\n";
 
 $webhook = $service->createWebhook('store_owned', 'https://example.com/hook');
 if (
@@ -115,4 +139,4 @@ try {
 }
 echo "[PASS] rejects a webhook for an unknown store\n";
 
-echo "5 admin operations service tests passed.\n";
+echo "6 admin operations service tests passed.\n";
