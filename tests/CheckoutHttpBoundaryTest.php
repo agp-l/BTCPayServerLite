@@ -9,6 +9,8 @@ $errorView = file_get_contents($root . '/checkout/views/error_view.php');
 $script = file_get_contents($root . '/assets/checkout.js');
 $style = file_get_contents($root . '/assets/checkout.css');
 $router = file_get_contents($root . '/classes/ApplicationRouter.php');
+$qrGenerator = file_get_contents($root . '/classes/CheckoutQrCodeGenerator.php');
+$composer = file_get_contents($root . '/composer.json');
 
 foreach ([
     'checkout entry' => $entry,
@@ -17,6 +19,8 @@ foreach ([
     'checkout script' => $script,
     'checkout stylesheet' => $style,
     'application router' => $router,
+    'checkout QR generator' => $qrGenerator,
+    'Composer manifest' => $composer,
 ] as $name => $source) {
     if (!is_string($source) || $source === '') {
         throw new RuntimeException('Unable to read ' . $name . '.');
@@ -44,6 +48,14 @@ $checks = [
         => !str_contains($entry . $view . $script, 'api.qrserver.com')
             && !str_contains($entry . $view . $script, 'googleapis.com')
             && !str_contains($entry . $view . $script, 'cdnjs.cloudflare.com'),
+    'checkout pins a PHP 8.0 compatible QR library'
+        => str_contains($composer, '"endroid/qr-code": "4.7.0"')
+            && str_contains($composer, '"php": "^8.0"'),
+    'checkout generates its BIP21 QR locally as SVG'
+        => str_contains($qrGenerator, 'SvgWriter')
+            && str_contains($qrGenerator, 'generateDataUri')
+            && str_contains($view, 'QR kód bitcoinové platby')
+            && str_contains($entry, "img-src data:"),
     'view contains no inline executable script or style block'
         => !preg_match('/<style\b/i', $view)
             && !preg_match('/<script(?![^>]*\bsrc=)/i', $view),
