@@ -1,7 +1,7 @@
 <?php
 // admin/url_invoices.php
 declare(strict_types=1);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -30,8 +30,9 @@ $baseUri = $protocol . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']);
 
 // 2. Kontroler pro AJAX (Tvorba a ověřování faktur)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
-    ob_start(); 
+    ob_start();
     try {
+        AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         $controller = new BtcStatelessAjaxController($service, $defaultWalletName, $baseUri);
         $response = $controller->handleRequest($_POST);
         
