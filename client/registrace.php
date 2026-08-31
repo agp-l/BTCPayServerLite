@@ -46,6 +46,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             (int) ($config['db_port'] ?? 3306)
         );
         $walletPath = is_string($config['wallet_path'] ?? null) ? $config['wallet_path'] : '';
+        if (
+            trim($walletPath) === ''
+            && !is_string($config['store_wallets_dir'] ?? null)
+            && !is_string($config['wallet_directory'] ?? null)
+        ) {
+            throw new RuntimeException('Wallet directory configuration is missing.');
+        }
         $walletDirectory = is_string($config['store_wallets_dir'] ?? null)
             ? $config['store_wallets_dir']
             : (is_string($config['wallet_directory'] ?? null)
