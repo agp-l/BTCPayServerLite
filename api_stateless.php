@@ -69,7 +69,10 @@ try {
     $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key']);
     $service = new BtcStatelessService($config, $wallet, $invoiceManager);
 
-    $urlManager = new UrlManager(\n        $_SERVER,\n        is_string($config['app_url'] ?? null) ? $config['app_url'] : null\n    );
+    $urlManager = new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
     $controller = new BtcStatelessApiController(
         $service,
         $urlManager->getBaseUrl() . '/admin/url_pay.php'
