@@ -26,7 +26,7 @@ $statusClasses = [
       <i class="fa-solid fa-wallet" aria-hidden="true"></i> Otevřít peněženku
     </a>
     <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="primary">
-      <i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Všechny faktury
+      <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> Vystavit fakturu
     </a>
   </div>
 </section>
@@ -40,18 +40,14 @@ $statusClasses = [
 
 <section class="stats-grid" aria-label="Souhrnné statistiky">
   <article class="stat-card">
-    <div class="stat-card-head">
-      <span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
-    </div>
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span></div>
     <div class="stat-label">Aktivní obchody</div>
     <div class="stat-value"><?php echo number_format($summary['total_stores'], 0, ',', ' '); ?></div>
     <div class="stat-meta">Napojené projekty a e-shopy</div>
   </article>
 
   <article class="stat-card stat-card-blue">
-    <div class="stat-card-head">
-      <span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span>
-    </div>
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span></div>
     <div class="stat-label">Všechny faktury</div>
     <div class="stat-value"><?php echo number_format($summary['total_invoices'], 0, ',', ' '); ?></div>
     <div class="stat-meta">Celkový počet vytvořených faktur</div>
@@ -68,75 +64,101 @@ $statusClasses = [
   </article>
 
   <article class="stat-card stat-card-amber">
-    <div class="stat-card-head">
-      <span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
-    </div>
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span></div>
     <div class="stat-label">Přijatý objem</div>
     <div class="stat-value code"><?php echo htmlspecialchars($summary['total_btc_volume'], ENT_QUOTES, 'UTF-8'); ?> BTC</div>
     <div class="stat-meta">Pouze potvrzené faktury</div>
   </article>
 </section>
 
-<section class="card">
-  <div class="card-title">
-    <span class="card-title-group">
-      <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
-      Poslední faktury
-    </span>
-    <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="action-link">
-      Zobrazit vše <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-    </a>
-  </div>
-  <p class="card-subtitle">Dvacet nejnovějších databázových faktur napříč všemi obchody.</p>
+<div class="dashboard-grid">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        Poslední faktury
+      </span>
+      <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="action-link">
+        Zobrazit vše <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+      </a>
+    </div>
+    <p class="card-subtitle">Dvacet nejnovějších databázových faktur napříč všemi obchody.</p>
 
-  <?php if ($invoices === []): ?>
-    <div class="empty-state">
-      <div>
-        <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
-        <p>Zatím nebyla vytvořena žádná faktura.</p>
+    <?php if ($invoices === []): ?>
+      <div class="empty-state">
+        <div><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Zatím nebyla vytvořena žádná faktura.</p></div>
       </div>
+    <?php else: ?>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Faktura</th>
+              <th>Obchod</th>
+              <th>Částka</th>
+              <th>Stav</th>
+              <th>Vytvořeno</th>
+              <th><span class="visually-hidden">Akce</span></th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach ($invoices as $invoice): ?>
+            <?php
+            $status = $invoice['status'];
+            $statusClass = $statusClasses[$status] ?? 's-unknown';
+            $invoiceUrl = htmlspecialchars(
+                $urlManager->url('/pay', ['id' => $invoice['id']]),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+            ?>
+            <tr>
+              <td><span class="code truncate" title="<?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+              <td><strong><?php echo htmlspecialchars($invoice['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
+              <td><span class="code"><?php echo htmlspecialchars($invoice['amount'], ENT_QUOTES, 'UTF-8'); ?></span> BTC</td>
+              <td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?></span></td>
+              <td class="muted"><time datetime="<?php echo date('c', $invoice['created_at']); ?>"><?php echo date('d.m.Y H:i', $invoice['created_at']); ?></time></td>
+              <td>
+                <a href="<?php echo $invoiceUrl; ?>" target="_blank" rel="noopener" class="ghost-btn" aria-label="Otevřít fakturu <?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                  <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                </a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <aside class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-bolt" aria-hidden="true"></i> Rychlé akce</span>
     </div>
-  <?php else: ?>
-    <div class="data-table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Faktura</th>
-            <th>Obchod</th>
-            <th>Částka</th>
-            <th>Stav</th>
-            <th>Vytvořeno</th>
-            <th><span class="visually-hidden">Akce</span></th>
-          </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($invoices as $invoice): ?>
-          <?php
-          $status = $invoice['status'];
-          $statusClass = $statusClasses[$status] ?? 's-unknown';
-          $invoiceUrl = htmlspecialchars(
-              $urlManager->url('/pay', ['id' => $invoice['id']]),
-              ENT_QUOTES,
-              'UTF-8'
-          );
-          ?>
-          <tr>
-            <td><span class="code truncate" title="<?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?></span></td>
-            <td><strong><?php echo htmlspecialchars($invoice['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
-            <td><span class="code"><?php echo htmlspecialchars($invoice['amount'], ENT_QUOTES, 'UTF-8'); ?></span> BTC</td>
-            <td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?></span></td>
-            <td class="muted"><time datetime="<?php echo date('c', $invoice['created_at']); ?>"><?php echo date('d.m.Y H:i', $invoice['created_at']); ?></time></td>
-            <td>
-              <a href="<?php echo $invoiceUrl; ?>" target="_blank" rel="noopener" class="ghost-btn" aria-label="Otevřít fakturu <?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>">
-                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-              </a>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-  <?php endif; ?>
-</section>
+    <p class="card-subtitle">Nejčastější provozní úkony bez hledání v nabídce.</p>
+    <nav class="operations-list" aria-label="Rychlé akce">
+      <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="operation-link">
+        <span class="operation-icon"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i></span>
+        <span class="operation-copy"><strong>Nová faktura</strong><span>Vytvořit databázový checkout</span></span>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </a>
+      <a href="<?php echo $routeUrl('/admin/stores'); ?>" class="operation-link">
+        <span class="operation-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+        <span class="operation-copy"><strong>Správa obchodů</strong><span>API klíče a peněženky</span></span>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </a>
+      <a href="<?php echo $routeUrl('/admin/webhooks'); ?>" class="operation-link">
+        <span class="operation-icon"><i class="fa-solid fa-wave-square" aria-hidden="true"></i></span>
+        <span class="operation-copy"><strong>Doručování událostí</strong><span>Webhook endpointy a podpisy</span></span>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </a>
+      <a href="<?php echo $routeUrl('/admin/url_invoices'); ?>" class="operation-link">
+        <span class="operation-icon"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
+        <span class="operation-copy"><strong>URL faktury</strong><span>Stateless platební odkazy</span></span>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </a>
+    </nav>
+  </aside>
+</div>
 
 <?php require __DIR__ . '/layout/footer.php'; ?>
