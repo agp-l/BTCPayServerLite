@@ -23,7 +23,7 @@ final class ApplicationRouter
             '/client' => $this->page(['GET', 'HEAD', 'POST'], 'client/index.php', 'client', 'client'),
             '/dashboard' => $this->redirect('/client'),
             '/api' => $this->page(['POST'], 'api_stateless.php', 'api'),
-            '/pay' => $this->page(['GET', 'HEAD', 'POST'], 'checkout/pay.php', 'pay'),
+            '/pay' => $this->page(['GET', 'HEAD'], 'checkout/pay.php', 'pay'),
             '/admin' => $this->redirect('/admin/dashboard'),
             '/admin/dashboard' => $this->page(
                 ['GET', 'HEAD'], 'admin/dashboard.php', 'dashboard', 'admin'
