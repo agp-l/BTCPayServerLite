@@ -8,9 +8,16 @@ $config = require __DIR__ . '/../config.php';
 use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
+use BtcPayLite\UrlManager;
 
 AuthManager::startSession();
 AuthManager::sendPrivateResponseHeaders();
+$urlManager = isset($urlManager) && $urlManager instanceof UrlManager
+    ? $urlManager
+    : new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
 
 $error = '';
 $successMsg = '';
