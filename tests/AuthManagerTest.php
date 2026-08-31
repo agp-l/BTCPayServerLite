@@ -137,6 +137,27 @@ expectAuthException(
 );
 $passes[] = 'throttles repeated failures by email and client identity';
 
+$registrationRepository = new FakeAuthUserRepository();
+$registrationAuth = new AuthManager($registrationRepository);
+for ($registration = 1; $registration <= 3; $registration++) {
+    $registrationAuth->registerUser(
+        'person' . $registration . '@example.test',
+        'correct horse battery staple',
+        'correct horse battery staple',
+        '198.51.100.20'
+    );
+}
+expectAuthException(
+    static fn () => $registrationAuth->registerUser(
+        'person4@example.test',
+        'correct horse battery staple',
+        'correct horse battery staple',
+        '198.51.100.20'
+    ),
+    'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
+);
+$passes[] = 'limits wallet-producing registrations per client address';
+
 resetTestSession();
 $user = $auth->login(
     'person@example.test',
@@ -150,6 +171,8 @@ assertSameValue(
 );
 assertSameValue(1, $_SESSION['user_id'] ?? null, 'Session user was not established');
 assertSameValue(true, AuthManager::hasRole('client'), 'Valid role was rejected');
+assertSameValue('BTCPAYLITESESSID', session_name(), 'Session cookie name was not isolated');
+assertSameValue('Lax', session_get_cookie_params()['samesite'], 'SameSite cookie policy is missing');
 $passes[] = 'creates a redacted authenticated session';
 
 $csrfToken = AuthManager::csrfToken();
