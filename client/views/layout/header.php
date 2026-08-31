@@ -68,7 +68,7 @@ $pageTitle = $pageTitle ?? 'Klientský panel';
         </div>
         <div class="sidebar-section-title">Klientská sekce</div>
         <nav class="sidebar-nav">
-            <a href="index.php" class="nav-item active">
+            <a href="<?php echo htmlspecialchars($urlManager->url('/client'), ENT_QUOTES, 'UTF-8'); ?>" class="nav-item active">
                 <i class="fa-solid fa-house-user"></i> Můj účet
             </a>
         </nav>
@@ -76,7 +76,7 @@ $pageTitle = $pageTitle ?? 'Klientský panel';
             <span style="font-size: 12px; font-weight: 600; color: #748078; display: block; padding: 0 12px; margin-bottom: 10px;">
                 <i class="fa-solid fa-user" style="margin-right: 5px;"></i> <?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>
             </span>
-            <form method="POST" action="login" style="margin: 0;">
+            <form method="POST" action="<?php echo htmlspecialchars($urlManager->url('/login'), ENT_QUOTES, 'UTF-8'); ?>" style="margin: 0;">
                 <input type="hidden" name="action" value="logout">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                 <button type="submit" class="nav-item" style="color: #ef4d4d; border: 0; background: transparent; width: 100%; cursor: pointer;">
