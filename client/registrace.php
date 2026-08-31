@@ -38,7 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $auth = new AuthManager($db);
         $db->getPdo()->beginTransaction();
 
-        $userId = $auth->registerUser($email, $password, $passwordConfirm);
+        $clientIdentity = is_string($_SERVER['REMOTE_ADDR'] ?? null)
+            ? $_SERVER['REMOTE_ADDR']
+            : '';
+        $userId = $auth->registerUser($email, $password, $passwordConfirm, $clientIdentity);
         $storeId = 'store_' . bin2hex(random_bytes(16));
         $apiKey = 'sk_' . bin2hex(random_bytes(32));
         $walletDirectory = rtrim(
@@ -51,10 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $walletPath = $walletDirectory . DIRECTORY_SEPARATOR . $storeId . '_wallet';
         $electrumCli = (string) ($config['electrum_cli'] ?? '/opt/electrum/run_electrum');
         $electrumData = (string) ($config['electrum_data_directory'] ?? '/opt/electrum_config');
-        $command = 'python3 ' . escapeshellarg($electrumCli)
+        $command = 'timeout --signal=KILL 30s python3 ' . escapeshellarg($electrumCli)
             . ' -D ' . escapeshellarg($electrumData)
             . ' create --offline -w ' . escapeshellarg($walletPath)
-            . ' 2>&1';
+            . ' > /dev/null 2>&1';
         $output = [];
         $exitCode = 1;
         exec($command, $output, $exitCode);
