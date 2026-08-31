@@ -21,12 +21,12 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - důvěryhodný aplikační origin, striktní parsování URL a deklarativní routing,
 - skutečné HTTP odpovědi 400/404/405/500 a kanonické interní odkazy,
 - `BtcDashboard`, přesné wallet výpočty a oddělený HTTP provider tržních dat,
-- administrační dashboard a peněženka s repository/service vrstvou,
-- klientský dashboard s objektovým store scopingem a bezpečným provisioningem peněženek,
+- administrační dashboard, peněženka, obchody, faktury a webhooky s repository/service vrstvou,
+- klientský dashboard a registrace s objektovým store scopingem, transakcemi a bezpečným provisioningem peněženek,
 - sdílený responzivní design systém pro administraci a klientský portál,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 46 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
+V adresáři `classes/` je 53 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
 
 ### Hlavní soubory mimo `classes/`
 
@@ -36,13 +36,13 @@ V adresáři `classes/` je 46 tříd a rozhraní. Původní velké UI třídy a 
 | `api_stateless.php` | Auditováno | Stateless API, omezení vstupu, autentizace, zámek Electrumu a bezpečné HTTP odpovědi. |
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
-| `admin/webhooks.php` | Částečně auditováno | Vstup vyžaduje admin roli a registrace používá společnou URL policy; zbývá sjednotit celý controller a view s novou dashboard architekturou. |
+| `admin/stores.php`, `admin/invoices.php`, `admin/webhooks.php` | Přepracováno a auditováno | Tenké controllery, jednotná oprávnění a CSRF, validované služby, přesné BTC částky a společná webhook URL policy. |
 | `checkout/pay.php` | Čeká | Veřejná platební stránka a její výstupní/HTTP hranice nebyly samostatně auditovány. |
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
-| `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
-| ostatní `admin/*.php` | Částečně auditováno | Vstupy vyžadují admin roli; diagnostické a testovací stránky ještě potřebují inventuru a sjednocení. |
-| `client/login.php`, `client/registrace.php` a session | Auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID a POST logout. |
+| `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém dashboardu, peněženky, obchodů, faktur a webhooků bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
+| diagnostické `admin/*.php` | Čeká | `test_shop.php`, `test_api_webhook.php`, `url_invoices.php` a `url_pay.php` ještě potřebují inventuru, uzamčení nebo odstranění. |
+| `client/login.php`, `client/registrace.php` a session | Přepracováno a auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID, POST logout a transakční registrace se samostatnou peněženkou. |
 | `client/index.php`, klientský dashboard | Přepracováno a auditováno | Tenký controller, user-scoped repository, bezpečný wallet provisioner, CSRF a escapované responzivní views. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
 | `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
@@ -141,6 +141,12 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `AdminDashboardRepository` | Rozhraní read-only dat potřebných pro administrační statistiky a přehled faktur. | Přepracováno a auditováno |
 | `PdoAdminDashboardRepository` | PDO implementace agregací dashboardu s explicitními dotazy a omezeným výpisem faktur. | Přepracováno a auditováno |
 | `AdminDashboardService` | Skládá normalizovaný view model administračního dashboardu bez SQL v controlleru. | Přepracováno a auditováno |
+| `AdminOperationsRepository` | Rozhraní persistence pro administrační správu obchodů a webhooků. | Přepracováno a auditováno |
+| `PdoAdminOperationsRepository` | PDO implementace omezených seznamů a parametrizovaných změn obchodů a webhooků. | Přepracováno a auditováno |
+| `AdminOperationsService` | Validuje a koordinuje administrační vytvoření obchodu, bezpečný wallet provisioning a správu webhooků. | Přepracováno a auditováno |
+| `AdminOperationsFactory` | Sestavuje administrační služby z validované konfigurace včetně kompatibility starších názvů wallet klíčů. | Přepracováno a auditováno |
+| `AdminOperationsException` | Bezpečná doménová chyba administrační operace s odpovídajícím HTTP statusem. | Přepracováno a auditováno |
+| `AdminInvoiceService` | Validuje přesnou BTC částku a koordinuje administrační vytvoření a odstranění faktury. | Přepracováno a auditováno |
 | `BitcoinMarketDataProvider` | Rozhraní pro tržní cenu BTC a doporučené fee rates. | Přepracováno a auditováno |
 | `HttpBitcoinMarketDataProvider` | Omezený cURL klient tržních API s TLS kontrolou, timeouty a validací odpovědí. | Přepracováno a auditováno |
 | `BtcDashboard` | Typovaná aplikační fasáda administrační peněženky; vrací strojová data, používá přesné satoshi a oddělený market provider. | Přepracováno a auditováno |
@@ -148,8 +154,9 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `PdoClientDashboardRepository` | PDO implementace s objektovým scopingem podle přihlášeného uživatele a omezenými výpisy. | Přepracováno a auditováno |
 | `ClientDashboardService` | Validuje klientské operace, skládá dashboard a koordinuje vytvoření obchodu, walletu a webhooku. | Přepracováno a auditováno |
 | `ClientDashboardException` | Bezpečná doménová chyba klientského dashboardu s HTTP statusem. | Přepracováno a auditováno |
-| `StoreWalletProvisioner` | Rozhraní vytvoření samostatné peněženky pro nový obchod. | Přepracováno a auditováno |
-| `ElectrumCliWalletProvisioner` | Spouští Electrum bez shellu, s timeoutem a kontrolou výsledné cesty a oprávnění; seed výstup neuchovává. | Přepracováno a auditováno |
+| `ClientRegistrationService` | Koordinuje uživatele, obchod a samostatnou peněženku; při selhání persistence bezpečně uklidí nepoužitý wallet soubor. | Přepracováno a auditováno |
+| `StoreWalletProvisioner` | Rozhraní vytvoření samostatné peněženky a bezpečného úklidu nepoužitého wallet souboru. | Přepracováno a auditováno |
+| `ElectrumCliWalletProvisioner` | Spouští Electrum bez shellu, s timeoutem a kontrolou cesty a oprávnění; seed neuchovává a úklid omezuje na spravované wallet soubory. | Přepracováno a auditováno |
 | `AuthManager` | Přihlášení, registrace, odhlášení, bezpečné session/cookies, CSRF, časové limity, role a throttling. | Auditováno |
 | `AuthUserRepository` | Rozhraní úzké persistence uživatelů a autentizačních pokusů. | Auditováno |
 | `PdoAuthUserRepository` | PDO implementace explicitních auth dotazů, binárních identit throttlingu a omezeného úklidu pokusů. | Auditováno |
@@ -218,7 +225,7 @@ return [
 ];
 ```
 
-`app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
+`app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Pro wallet nástroje jsou podporované nové klíče `electrum_cli_path`, `electrum_data_dir`, `store_wallets_dir` i kompatibilní starší názvy `electrum_cli`, `electrum_data_directory`, `wallet_directory`. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
@@ -283,6 +290,12 @@ php tests/AdminUiBoundaryTest.php
 php tests/ClientDashboardServiceTest.php
 php tests/ClientDashboardRepositoryQueryTest.php
 php tests/ClientUiBoundaryTest.php
+php tests/AdminOperationsServiceTest.php
+php tests/AdminOperationsRepositoryQueryTest.php
+php tests/AdminManagementBoundaryTest.php
+php tests/AdminInvoiceServiceTest.php
+php tests/ClientRegistrationServiceTest.php
+php tests/ClientRegistrationBoundaryTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
@@ -302,7 +315,7 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 ## Doporučené pořadí dalšího auditu
 
 1. `checkout/pay.php` a související AJAX/status endpointy.
-2. Zbývající administrační stránky, zejména `admin/webhooks.php` a veřejně dosažitelné testovací nástroje.
+2. Veřejně dosažitelné checkout a administrační diagnostické stránky (`admin/url_*.php`, `admin/test_*.php`).
 3. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
 4. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
 5. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
