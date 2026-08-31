@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use BtcPayLite\DatabaseCheckoutController;
 use BtcPayLite\DatabaseCheckoutFactory;
+use BtcPayLite\CheckoutQrCodeGenerator;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -18,7 +19,7 @@ header('Referrer-Policy: no-referrer');
 header('X-Frame-Options: DENY');
 header(
     "Content-Security-Policy: default-src 'none'; "
-    . "style-src 'self'; script-src 'self'; connect-src 'self'; "
+    . "style-src 'self'; script-src 'self'; connect-src 'self'; img-src data:; "
     . "base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
 );
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
@@ -127,5 +128,17 @@ $statusUrl = $urlManager->url('/pay', [
     'action' => 'check',
 ]);
 $scriptUrl = $urlManager->url('/assets/checkout.js');
+$qrCodeDataUri = null;
+try {
+    $qrCodeDataUri = (new CheckoutQrCodeGenerator())->generateDataUri(
+        (string) ($checkout['bip21_uri'] ?? '')
+    );
+} catch (Throwable $exception) {
+    error_log(sprintf(
+        'Checkout QR preparation failed: %s (%s)',
+        $exception->getMessage(),
+        $exception::class
+    ));
+}
 
 require __DIR__ . '/views/pay_view.php';
