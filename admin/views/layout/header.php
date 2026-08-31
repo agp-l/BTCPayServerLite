@@ -1,10 +1,11 @@
 <?php
-// admin/views/layout/header.php
+
 declare(strict_types=1);
 
+use BtcPayLite\AuthManager;
 use BtcPayLite\UrlManager;
 
-$pageTitle = $pageTitle ?? 'BTCPay Lite';
+$pageTitle = isset($pageTitle) && is_string($pageTitle) ? $pageTitle : 'BTCPay Lite';
 $config = isset($config) && is_array($config) ? $config : require __DIR__ . '/../../../config.php';
 $urlManager = isset($urlManager) && $urlManager instanceof UrlManager
     ? $urlManager
@@ -15,251 +16,110 @@ $urlManager = isset($urlManager) && $urlManager instanceof UrlManager
 $activeMenu = isset($activeMenu) && is_string($activeMenu)
     ? $activeMenu
     : $urlManager->getActiveMenu();
+$csrfToken = isset($csrfToken) && is_string($csrfToken) && $csrfToken !== ''
+    ? $csrfToken
+    : AuthManager::csrfToken();
+$adminEmail = is_string($_SESSION['email'] ?? null) ? $_SESSION['email'] : 'Administrator';
+$adminInitial = strtoupper(substr($adminEmail, 0, 1));
 $routeUrl = static fn (string $path): string => htmlspecialchars(
     $urlManager->url($path),
     ENT_QUOTES,
     'UTF-8'
 );
+$navItem = static function (
+    string $path,
+    string $menu,
+    string $icon,
+    string $label
+) use ($routeUrl, $activeMenu): void {
+    $active = $activeMenu === $menu;
+    ?>
+    <a href="<?php echo $routeUrl($path); ?>"
+       class="admin-nav-link<?php echo $active ? ' is-active' : ''; ?>"
+       <?php echo $active ? 'aria-current="page"' : ''; ?>>
+        <i class="fa-solid <?php echo htmlspecialchars($icon, ENT_QUOTES, 'UTF-8'); ?>" aria-hidden="true"></i>
+        <span><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span>
+    </a>
+    <?php
+};
 ?>
 <!doctype html>
 <html lang="cs">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?php echo htmlspecialchars($pageTitle); ?></title>
+  <meta name="robots" content="noindex, nofollow">
+  <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    * { box-sizing: border-box; }
-    
-    body { 
-      margin: 0; 
-      color: #17201a; 
-      font-family: Inter, sans-serif; 
-      background-color: #ffffff;
-      min-height: 100vh; 
-    }
-
-    /* Celkové rozvržení vycentrované na střed */
-    .admin-wrapper {
-      display: flex;
-      min-height: 100vh;
-      max-width: 1150px;
-      margin: 0 auto;
-    }
-
-    /* Levý postranní panel (Sidebar) */
-    .sidebar {
-      width: 240px;
-      background: #ffffff;
-      border-right: 1px solid #e5eae7;
-      display: flex;
-      flex-direction: column;
-      padding: 30px 16px;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
-      flex-shrink: 0;
-    }
-
-    .sidebar-brand {
-      font-size: 19px;
-      font-weight: 800;
-      color: #17201a;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 10px 24px 10px;
-      border-bottom: 1px solid #f0f4f1;
-      margin-bottom: 16px;
-      text-decoration: none;
-    }
-
-    .sidebar-brand i {
-      color: #2fd35a;
-      font-size: 22px;
-    }
-
-    .sidebar-section-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: #8c9b92;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      padding: 12px 10px 6px 10px;
-    }
-
-    .sidebar-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border-radius: 9px;
-      color: #526056;
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: background 0.15s, color 0.15s;
-    }
-
-    .nav-item i {
-      width: 18px;
-      font-size: 14px;
-      color: #748078;
-      transition: color 0.15s;
-    }
-
-    .nav-item:hover {
-      background: #f4f7f5;
-      color: #17201a;
-    }
-
-    .nav-item:hover i {
-      color: #20b948;
-    }
-
-    .nav-item.active {
-      background: #17201a;
-      color: #ffffff;
-    }
-
-    .nav-item.active i {
-      color: #2fd35a;
-    }
-
-    /* Hlavní obsahová část (Pravá část) */
-    .main-content {
-      flex: 1;
-      padding: 40px 50px;
-      background: #ffffff;
-      max-width: 850px;
-      width: 100%;
-    }
-
-    .page-header {
-      margin-bottom: 28px;
-    }
-
-    .page-header h1 {
-      font-size: 24px;
-      font-weight: 800;
-      margin: 0;
-      color: #17201a;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* Karty a UI prvky */
-    .card { background: #ffffff; border: 1px solid #e5eae7; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
-    .card-title { font-size: 16px; font-weight: 700; margin: 0 0 20px 0; display: flex; align-items: center; justify-content: space-between; }
-    .field { margin-bottom: 18px; }
-    label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 7px; color: #748078; text-transform: uppercase; }
-    
-    .input-wrap { display: flex; border: 1px solid #e5eae7; border-radius: 10px; overflow: hidden; background: #ffffff; transition: border-color 0.2s; }
-    .input-wrap:focus-within { border-color: #2fd35a; }
-    input, select { width: 100%; border: 0; outline: 0; padding: 12px 14px; font: inherit; background: transparent; }
-    select { cursor: pointer; color: #17201a; font-weight: 600; }
-    .unit { padding: 12px 15px; font-weight: 700; color: #748078; border-left: 1px solid #e5eae7; background: #fafcfa; }
-
-    .primary { border: 0; background: #2fd35a; color: #ffffff; border-radius: 10px; padding: 12px 18px; font-weight: 700; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
-    .primary:hover { background: #20b948; }
-
-    .ghost-btn { border: 1px solid #e5eae7; background: #ffffff; border-radius: 9px; padding: 8px 14px; color: #17201a; text-decoration: none; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
-    .ghost-btn:hover { border-color: #17201a; background: #fafcfa; }
-
-    .invoice-item { padding: 16px; border: 1px solid #e5eae7; border-radius: 12px; margin-bottom: 14px; background: #fafcfa; }
-    .invoice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .invoice-amount { font-family: ui-monospace, monospace; font-weight: 800; color: #17201a; font-size: 15px; }
-    .invoice-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-
-    .status-badge { display: inline-block; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-    .s-paid { background: #eafbef; color: #13aa3d; border: 1px solid #13aa3d; }
-    .s-paid_late { background: #f3e8ff; color: #7e22ce; border: 1px solid #7e22ce; }
-    .s-unpaid { background: #ffffff; color: #748078; border: 1px solid #e5eae7; }
-    .s-expired { background: #fee2e2; color: #ef4d4d; border: 1px solid #ef4d4d; }
-    .s-pending_mempool { background: #e0f2fe; color: #0284c7; border: 1px solid #0284c7; }
-    .s-underpaid { background: #fef3c7; color: #d97706; border: 1px solid #d97706; }
-    .s-unknown { background: #f9fafa; color: #748078; border: 1px solid #e5eae7; }
-
-    .toast { position: fixed; right: 25px; bottom: 25px; background: #17201a; color: #fff; padding: 12px 18px; border-radius: 10px; font-weight: 600; font-size: 13px; opacity: 0; transform: translateY(10px); transition: 0.3s; z-index: 1000; }
-    .toast.show { opacity: 1; transform: translateY(0); }
-
-    @media (max-width: 900px) {
-      .admin-wrapper { flex-direction: column; }
-      .sidebar { width: 100%; height: auto; position: static; border-right: 0; border-bottom: 1px solid #e5eae7; padding: 20px; }
-      .main-content { padding: 25px 20px; }
-    }
-  </style>
+  <link rel="stylesheet" href="<?php echo $routeUrl('/assets/admin.css'); ?>">
 </head>
 <body>
-<div class="admin-wrapper">
+<div class="admin-shell">
+  <aside class="admin-sidebar" id="adminSidebar" aria-label="Hlavní navigace">
+    <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="admin-brand">
+      <span class="admin-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+      <span class="admin-brand-copy"><strong>BTCPay Lite</strong><span>Payment operations</span></span>
+    </a>
 
-<!-- LEVÉ MENU -->
-    <aside class="sidebar">
-        <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="sidebar-brand">
-            <i class="fa-solid fa-bolt"></i>
-            <span>BTCPay Lite</span>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Přehled</div>
+        <?php $navItem('/admin/dashboard', 'dashboard', 'fa-chart-line', 'Dashboard'); ?>
+        <?php $navItem('/admin/wallet', 'wallet', 'fa-wallet', 'Peněženka'); ?>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Platby</div>
+        <?php $navItem('/admin/stores', 'stores', 'fa-store', 'Obchody'); ?>
+        <?php $navItem('/admin/invoices', 'invoices', 'fa-file-invoice', 'Faktury'); ?>
+        <?php $navItem('/admin/webhooks', 'webhooks', 'fa-wave-square', 'Webhooky'); ?>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Nástroje</div>
+        <?php $navItem('/admin/url_invoices', 'url_invoices', 'fa-link', 'URL faktury'); ?>
+        <a href="<?php echo $routeUrl('/'); ?>" class="admin-nav-link" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          <span>Otevřít web</span>
         </a>
+      </div>
+    </nav>
 
-        <div class="sidebar-section-title">Správa a Obchody</div>
-        <nav class="sidebar-nav">
-            <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="nav-item <?php echo $activeMenu === 'dashboard' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-chart-pie"></i> Přehled
-            </a>
-            <a href="<?php echo $routeUrl('/admin/wallet'); ?>" class="nav-item <?php echo $activeMenu === 'wallet' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-wallet"></i> Peněženka
-            </a>
-            <a href="<?php echo $routeUrl('/admin/stores'); ?>" class="nav-item <?php echo $activeMenu === 'stores' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-shop"></i> E-shopy
-            </a>
-            <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="nav-item <?php echo $activeMenu === 'invoices' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-database"></i> DB Faktury
-            </a>
-            <a href="<?php echo $routeUrl('/admin/webhooks'); ?>" class="nav-item <?php echo $activeMenu === 'webhooks' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-satellite-dish"></i> Webhooky
-            </a>
-        </nav>
+    <div class="admin-sidebar-footer">
+      <div class="admin-profile">
+        <span class="admin-profile-avatar" aria-hidden="true"><?php echo htmlspecialchars($adminInitial, ENT_QUOTES, 'UTF-8'); ?></span>
+        <span class="admin-profile-copy">
+          <strong>Administrátor</strong>
+          <span title="<?php echo htmlspecialchars($adminEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($adminEmail, ENT_QUOTES, 'UTF-8'); ?></span>
+        </span>
+      </div>
+      <form method="post" action="<?php echo $routeUrl('/login'); ?>" class="admin-logout">
+        <input type="hidden" name="action" value="logout">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <button type="submit" class="admin-nav-link">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Odhlásit se</span>
+        </button>
+      </form>
+    </div>
+  </aside>
 
-        <div class="sidebar-section-title" style="margin-top: 16px;">Bezstavový systém</div>
-        <nav class="sidebar-nav">
-            <a href="<?php echo $routeUrl('/admin/url_invoices'); ?>" class="nav-item <?php echo $activeMenu === 'url_invoices' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-link"></i> URL Faktury
-            </a>
-        </nav>
+  <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
 
-        <div class="sidebar-section-title" style="margin-top: 16px;">Testy & Diagnostika</div>
-        <nav class="sidebar-nav">
-            <a href="<?php echo $routeUrl('/admin/test_shop'); ?>" class="nav-item <?php echo $activeMenu === 'test_shop' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-store"></i> Test Obchodu
-            </a>
-            <a href="<?php echo $routeUrl('/admin/test_api_webhook'); ?>" class="nav-item <?php echo $activeMenu === 'test_api_webhook' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-vial"></i> Test Webhooku
-            </a>
-            <a href="<?php echo $routeUrl('/debugger.php'); ?>" class="nav-item <?php echo $activeMenu === 'debugger.php' || $activeMenu === 'debugger' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-bug"></i> Master Debugger
-            </a>
-            <a href="<?php echo $routeUrl('/test_stateless.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_stateless' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-code"></i> Test Stateless API
-            </a>
-            <a href="<?php echo $routeUrl('/eshop_simulator.php'); ?>" class="nav-item <?php echo $activeMenu === 'eshop_simulator' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-cart-shopping"></i> E-shop Simulátor
-            </a>
-            <a href="<?php echo $routeUrl('/test_direct.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_direct' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-bolt-lightning"></i> Test Direct
-            </a>
-            <a href="<?php echo $routeUrl('/test_create_wallet.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_create_wallet' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-folder-plus"></i> Test Peněženky
-            </a>
-        </nav>
-    </aside>
-
-    <!-- HLAVNÍ PLOCHA OBSAHU -->
-    <main class="main-content">
+  <div class="admin-main">
+    <header class="admin-topbar">
+      <div class="admin-topbar-context">
+        <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="adminSidebar" aria-expanded="false">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span>Zabezpečená administrace</span>
+      </div>
+      <div class="admin-topbar-actions">
+        <span class="badge s-paid"><i class="fa-solid fa-circle" aria-hidden="true"></i> Systém online</span>
+      </div>
+    </header>
+    <main class="admin-content">
