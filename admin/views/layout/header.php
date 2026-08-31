@@ -21,6 +21,15 @@ $csrfToken = isset($csrfToken) && is_string($csrfToken) && $csrfToken !== ''
     : AuthManager::csrfToken();
 $adminEmail = is_string($_SESSION['email'] ?? null) ? $_SESSION['email'] : 'Administrator';
 $adminInitial = strtoupper(substr($adminEmail, 0, 1));
+$menuContext = [
+    'dashboard' => ['label' => 'Dashboard', 'icon' => 'fa-chart-line'],
+    'wallet' => ['label' => 'Peněženka', 'icon' => 'fa-wallet'],
+    'stores' => ['label' => 'Obchody', 'icon' => 'fa-store'],
+    'invoices' => ['label' => 'Faktury', 'icon' => 'fa-file-invoice'],
+    'webhooks' => ['label' => 'Webhooky', 'icon' => 'fa-wave-square'],
+    'url_invoices' => ['label' => 'URL faktury', 'icon' => 'fa-link'],
+];
+$currentContext = $menuContext[$activeMenu] ?? ['label' => 'Administrace', 'icon' => 'fa-shield-halved'];
 $routeUrl = static fn (string $path): string => htmlspecialchars(
     $urlManager->url($path),
     ENT_QUOTES,
@@ -49,6 +58,8 @@ $navItem = static function (
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#090a0f">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -60,8 +71,8 @@ $navItem = static function (
 <div class="admin-shell">
   <aside class="admin-sidebar" id="adminSidebar" aria-label="Hlavní navigace">
     <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="admin-brand">
-      <span class="admin-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
-      <span class="admin-brand-copy"><strong>BTCPay Lite</strong><span>Payment operations</span></span>
+      <span class="admin-brand-mark"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
+      <span class="admin-brand-copy"><strong>BTCPay Lite</strong><span>Platební infrastruktura</span></span>
     </a>
 
     <nav class="admin-nav">
@@ -115,8 +126,8 @@ $navItem = static function (
         <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="adminSidebar" aria-expanded="false">
           <i class="fa-solid fa-bars" aria-hidden="true"></i>
         </button>
-        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-        <span>Zabezpečená administrace</span>
+        <i class="fa-solid <?php echo htmlspecialchars($currentContext['icon'], ENT_QUOTES, 'UTF-8'); ?>" aria-hidden="true"></i>
+        <span>Administrace / <?php echo htmlspecialchars($currentContext['label'], ENT_QUOTES, 'UTF-8'); ?></span>
       </div>
       <div class="admin-topbar-actions">
         <span class="badge s-paid"><i class="fa-solid fa-circle" aria-hidden="true"></i> Systém online</span>
