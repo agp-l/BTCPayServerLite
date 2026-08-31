@@ -1,50 +1,77 @@
 <?php
-// admin/stores.php
+
 declare(strict_types=1);
 
-ini_set('display_errors', '0'); // Na produkci skryto
+use BtcPayLite\AdminOperationsException;
+use BtcPayLite\AdminOperationsFactory;
+use BtcPayLite\AdminOperationsService;
+use BtcPayLite\AuthException;
+use BtcPayLite\AuthManager;
+use BtcPayLite\UrlManager;
+
+ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
+$urlManager = new UrlManager(
+    $_SERVER,
+    is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+);
+AuthManager::requireRole('admin', $urlManager->url('/login'));
 
-use BtcPayLite\Database;
-use BtcPayLite\AuthManager;
+header('Cache-Control: no-store, private');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 
-// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
-AuthManager::requireRole('admin', '../client/login.php');
-
+$csrfToken = AuthManager::csrfToken();
 $toastMsg = '';
+$pageError = null;
 $stores = [];
+$service = null;
 
 try {
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
-    
-    // Zpracování formuláře pro nový obchod
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create') {
-        $name = trim($_POST['store_name'] ?? '');
-        $walletPath = trim($_POST['wallet_path'] ?? '');
-
-        if (empty($name) || empty($walletPath)) {
-            throw new \Exception("Vyplň název obchodu i cestu k peněžence.");
-        }
-
-        // Generování unikátních identifikátorů
-        $storeId = 'store_' . substr(bin2hex(random_bytes(8)), 0, 10);
-        $apiKey = 'sk_' . bin2hex(random_bytes(16)); // Bezpečný API klíč
-
-        $stmt = $db->getPdo()->prepare("INSERT INTO stores (id, name, api_key, wallet_path) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$storeId, $name, $apiKey, $walletPath]);
-
-        $toastMsg = "Obchod '$name' byl úspěšně vytvořen!";
-    }
-
-    // Načtení všech obchodů pro výpis
-    $stores = $db->getPdo()->query("SELECT * FROM stores ORDER BY name ASC")->fetchAll();
-
-} catch (\Throwable $e) {
-    $toastMsg = "Chyba: " . $e->getMessage();
+    $service = AdminOperationsFactory::fromConfig($config);
+} catch (Throwable $exception) {
+    error_log(sprintf('Admin stores initialization failed: %s (%s)', $exception->getMessage(), $exception::class));
+    http_response_code(500);
+    $pageError = 'Správa obchodů nyní není dostupná.';
 }
 
-// Volání View šablony
+if ($service instanceof AdminOperationsService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    try {
+        AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
+        $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+        if ($action !== 'create') {
+            throw new AdminOperationsException('Neznámá operace správy obchodů.');
+        }
+
+        $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
+        $service->createStore($name);
+        $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
+    } catch (AuthException $exception) {
+        http_response_code(403);
+        $pageError = 'Platnost formuláře vypršela. Obnovte stránku a zkuste akci znovu.';
+        error_log('Admin stores CSRF validation failed.');
+    } catch (AdminOperationsException $exception) {
+        http_response_code($exception->getHttpStatus());
+        $pageError = $exception->getMessage();
+        error_log('Admin store operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+    } catch (Throwable $exception) {
+        http_response_code(500);
+        $pageError = 'Operaci se nyní nepodařilo dokončit.';
+        error_log(sprintf('Unexpected admin store failure: %s (%s)', $exception->getMessage(), $exception::class));
+    }
+}
+
+if ($service instanceof AdminOperationsService) {
+    try {
+        $stores = $service->stores();
+    } catch (Throwable $exception) {
+        error_log(sprintf('Admin stores data load failed: %s (%s)', $exception->getMessage(), $exception::class));
+        http_response_code(500);
+        $pageError = 'Seznam obchodů nyní není dostupný.';
+    }
+}
+
 require __DIR__ . '/views/stores_view.php';
