@@ -1,368 +1,259 @@
 # BTC Pay Server Lite
 
-Lehká, samoobslužná **Bitcoin platební brána v PHP**, navržená jako rychlá alternativa k plnohodnotnému BTCPay Serveru.
+Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
-Projekt poskytuje:
+> Stav dokumentace: `main` po auditu webhooků, commit `0d81dc6`, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou, kontraktními testy a provozním smoke testem tam, kde byl potřeba. Neznamená to, že je dokončený audit celého webového projektu.
 
-- kompatibilní **Greenfield API** pro napojení e-shopů, například WooCommerce,
-- zákaznickou platební bránu,
-- administrační rozhraní,
-- automatizovaný systém webhooků,
-- správu Bitcoinových peněženek,
-- komunikaci s Bitcoin sítí prostřednictvím **Electrum Daemonu přes JSON-RPC**.
+## Aktuální stav auditu
 
----
+### Dokončené oblasti
 
-## 📂 1. Struktura systému a umístění dat
+- transport Electrum JSON-RPC a strukturované chyby,
+- práce s Electrum peněženkou,
+- přesná reprezentace BTC částek bez `float` aritmetiky v platebním jádru,
+- životní cyklus databázových a stateless faktur,
+- databázová vrstva, transakce a pojmenované zámky,
+- databázové Greenfield API včetně autentizace a store scopingu,
+- stateless HTTP API,
+- persistentní webhook outbox, retry/backoff, HMAC podpisy a ochrana proti SSRF/DNS rebindingu,
+- autentizace `webhook_cron.php`,
+- databázové preflighty a migrace pro auditované části.
 
-Z bezpečnostních důvodů je systém striktně rozdělen na **aplikaci, data a webový frontend**.
+V adresáři `classes/` je 28 tříd a jedno rozhraní. Fokusovaným auditem prošlo 26 komponent. Zbývají tři původní pomocné/UI třídy:
 
-### A) Systémové cesty
+- `AuthManager`,
+- `BtcDashboard`,
+- `UrlManager`.
 
-Tyto adresáře jsou umístěné mimo dosah webového serveru:
+### Hlavní soubory mimo `classes/`
 
-| Cesta | Účel |
-|---|---|
-| `/opt/electrum/` | Zdrojové kódy a běhový motor Electrum |
-| `/opt/electrum_config/` | Konfigurační soubory démona |
-| `/opt/btcpay_wallets/` | Bezpečný trezor pro klientské peněženky |
+| Soubor / oblast | Stav | Poznámka |
+|---|---|---|
+| `api.php` | Auditováno | Databázové Greenfield API, Bearer autentizace, přesné částky, store scoping a bezpečné chyby. |
+| `api_stateless.php` | Auditováno | Stateless API, omezení vstupu, autentizace, zámek Electrumu a bezpečné HTTP odpovědi. |
+| `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
+| `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
+| `admin/webhooks.php` | Částečně auditováno | Registrace používá společnou URL policy; celý admin formulář a CSRF ochrana ještě čekají. |
+| `checkout/pay.php` | Čeká | Veřejná platební stránka a její výstupní/HTTP hranice nebyly samostatně auditovány. |
+| `index.php` | Čeká | Front controller, routing, chybové režimy a produkční nastavení `display_errors`. |
+| `admin/*.php`, `admin/views/` | Čeká | Autorizace jednotlivých akcí, CSRF, XSS, validace formulářů a práce s citlivými daty. |
+| `client/*.php`, `client/views/` | Čeká | Přihlášení, registrace, session/cookie politika a výstupní escapování. |
+| `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
+| `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
+| testovací a pomocné skripty | Čeká | Staré `test_*.php`, simulátory a případné veřejné diagnostické soubory je nutné inventarizovat a odstranit nebo uzamknout. |
 
-Adresář `/opt/btcpay_wallets/` používá speciální oprávnění `g+s`, aby nové soubory mohly spravovat jak PHP aplikace, tak Electrum démon.
+## Architektura
 
-### B) Webový frontend (`htdocs`)
+Projekt používá Composer PSR-4 autoloading:
 
-| Soubor / složka | Účel |
-|---|---|
-| `config.php` | Hlavní konfigurace databáze, Electru a bezpečnostních klíčů |
-| `api.php` | Zpracování Greenfield API požadavků z e-shopů, generování faktur a webhooků |
-| `pay.php` | Zákaznická platební brána pro úhradu faktur |
-| `webhook_cron.php` | Kontrola plateb v síti a odesílání webhooků do e-shopů |
-| `classes/` | Objektová logika aplikace (OOP) |
-| `admin/` | Administrace systému a obchodníků |
+```json
+{
+  "BtcPayLite\\": "classes/"
+}
+```
 
----
+Zjednodušený tok databázové faktury:
 
-## 🏗️ 2. Architektura a třídy
+```text
+e-shop
+  -> api.php
+  -> GreenfieldApiController
+  -> GreenfieldApiService
+  -> GreenfieldApiRepository / BtcInvoiceManager
+  -> Database + ElectrumWallet
+  -> ElectrumRPC
+  -> Electrum daemon
+```
 
-Systém je rozdělen do tří logických vrstev, aby byl kód čistý, univerzální a snadno rozšiřitelný.
+Tok webhooku:
 
-### Vrstva 1: Kořen komunikace
+```text
+webhook_cron.php
+  -> WebhookCronController
+  -> WebhookCronApplication
+  -> WebhookProcessor
+  -> WebhookDeliveryRepository
+  -> webhook_deliveries (persistentní outbox)
+  -> CurlWebhookTransport
+  -> e-shop
+```
 
-#### `ElectrumRPC.php`
+Událost se nejprve uloží do databáze a až potom odešle. Souběžné workery používají atomické přidělení práce. Dočasné chyby se opakují s prodlužujícími se intervaly; trvalé chyby skončí ve stavu `Dead`. Nově registrovaný webhook nedostává události pro faktury vytvořené před jeho registrací.
 
-Zajišťuje čistou a bezpečnou komunikaci prostřednictvím cURL s JSON-RPC serverem Electrum.
+## Kompletní přehled tříd
 
-Třída neobsahuje Bitcoinovou aplikační logiku. Pouze odesílá RPC požadavky a vrací zpracovaná data nebo vyhazuje výjimky (`Exceptions`).
+### Základní infrastruktura a Bitcoin
 
-#### Hlavní metody
+| Komponenta | Odpovědnost | Stav auditu |
+|---|---|---|
+| `BitcoinAmount` | Neměnná přesná BTC částka uložená v satoshi; převod BTC řetězce, formátování, porovnání a bezpečné sčítání/odčítání. | Auditováno |
+| `Database` | Vytváří bezpečné PDO připojení, poskytuje transakce a pojmenované databázové zámky. | Auditováno |
+| `DatabaseException` | Strukturovaná chyba databázové operace bez vystavování citlivých detailů. | Auditováno |
+| `ElectrumRPC` | Validovaný JSON-RPC 2.0 transport s timeouty, autentizací, kontrolou HTTP/protokolu a wallet scopingem přes `wallet_path`. | Auditováno |
+| `ElectrumRPCException` | Rozlišuje transportní, autentizační, HTTP, protokolové a vzdálené RPC chyby. | Auditováno |
+| `ElectrumWallet` | Typovaná vrstva nad Electrum RPC: načtení peněženky, zůstatky, adresy, UTXO, transakce, payment requesty a odesílání. | Auditováno |
+| `ElectrumWalletException` | Přidává kontext konkrétní operace peněženky. | Auditováno |
 
-- `call($method, $params)` – univerzální odesílač RPC příkazů.
-- `setWallet($walletPath)` – přidá cestu k peněžence do RPC URL, aby démon věděl, se kterou peněženkou má operaci provést.
+### Faktury a stateless režim
 
----
+| Komponenta | Odpovědnost | Stav auditu |
+|---|---|---|
+| `BtcInvoiceManager` | Vytváří a načítá databázové faktury, vytváří stateless faktury a bezpečně mění stavy `New`, `Processing`, `Settled`, `Expired`. | Auditováno |
+| `BtcInvoiceManagerException` | Strukturovaná chyba životního cyklu faktury. | Auditováno |
+| `BtcStatelessTokenCodec` | Podepisuje a ověřuje časově omezené stateless tokeny a odmítá změněný nebo prošlý obsah. | Auditováno |
+| `BtcStatelessService` | Aplikační logika stateless API a platební stránky; ověřuje klienta, wallet mapping, vstupy a stav platby. | Auditováno |
+| `BtcStatelessServiceException` | Chyba stateless operace s bezpečným HTTP statusem a názvem operace. | Auditováno |
+| `BtcStatelessApiController` | HTTP hranice stateless API: metoda, JSON/form data, Bearer token a normalizovaná odpověď. | Auditováno |
+| `BtcStatelessAjaxController` | HTTP/AJAX hranice pro kontrolu stavu stateless faktury. | Auditováno |
 
-### Vrstva 2: Bitcoinový motor
+### Databázové Greenfield API
 
-#### `ElectrumWallet.php`
+| Komponenta | Odpovědnost | Stav auditu |
+|---|---|---|
+| `GreenfieldApiController` | Parsuje bezpečnou cestu požadavku, metodu, JSON a Bearer token; routuje store, invoice a webhook endpointy. | Auditováno |
+| `GreenfieldApiService` | Autentizace admin/store klíče, store scoping, přesné částky, vytvoření/načtení faktury a registrace webhooku. | Auditováno |
+| `GreenfieldApiRepository` | Úzká PDO hranice pro načtení obchodu a idempotentní registraci webhooku s časem registrace. | Auditováno |
+| `GreenfieldApiException` | Bezpečná API chyba s operací a HTTP statusem. | Auditováno |
 
-Univerzální Bitcoinová peněženka. Neřeší faktury ani e-shopy – pouze převádí Bitcoinové operace na RPC příkazy Electrum.
+### Webhooky
 
-#### Hlavní metody
+| Komponenta | Odpovědnost | Stav auditu |
+|---|---|---|
+| `WebhookTransport` | Rozhraní jedné podepsané webhook delivery. | Auditováno |
+| `CurlWebhookTransport` | cURL transport s omezenými timeouty, bez redirectů, TLS kontrolou, připnutou DNS adresou a úspěchem pouze pro HTTP 2xx. | Auditováno |
+| `WebhookEndpointPolicy` | Validuje URL a DNS odpovědi; blokuje credentials, vzdálené HTTP, privátní/rezervované IP a smíšené DNS. Localhost vyžaduje explicitní vývojový opt-in. | Auditováno |
+| `WebhookDeliveryRepository` | Persistentní outbox: vyhledání faktur, vytvoření eventu, atomický claim, obnova uvízlého claimu a stavy `Delivered`, `Retry`, `Dead`. | Auditováno |
+| `WebhookProcessor` | Kontroluje faktury přes sdílený Electrum zámek, ukládá eventy, podepisuje payloady a řídí retry/backoff. | Auditováno |
+| `WebhookCronApplication` | Sestavuje databázi, Electrum, repository, policy, transport a processor z validované konfigurace. | Auditováno |
+| `WebhookCronController` | Autentizuje HTTP cron (`POST` + Bearer), dovoluje CLI a vrací jednotný report bez interních chyb. | Auditováno |
+| `WebhookDeliveryException` | Nese operaci, retryable příznak a případný HTTP status delivery chyby. | Auditováno |
 
-- `loadWallet($walletPath)` – pravidlo **„Highlander“**; zajistí, že je v démonu načtena právě jedna požadovaná peněženka a ostatní se zavřou.
-- `getWalletBalance()` – vrací potvrzený i nepotvrzený zůstatek celé peněženky.
-- `getAddressBalance($address)` – vrací zůstatek konkrétní adresy.
-- `getNewAddress()` – vygeneruje novou přijímací adresu.
-- `sendPayment($dest, $amount, $pass, $fee)` – vytvoří, podepíše a odešle transakci do Bitcoinové sítě.
+### UI, autentizace a URL
 
----
+| Komponenta | Odpovědnost | Stav auditu |
+|---|---|---|
+| `AuthManager` | Přihlášení, registrace, odhlášení, session a kontrola rolí. | Čeká na fokusovaný audit |
+| `BtcDashboard` | Připravuje peněženku, adresy, transakce, poplatky, fiat ceny a export klíčů pro administrační UI. | Čeká na fokusovaný audit |
+| `UrlManager` | Parsuje cestu, skládá základní URL a pomáhá routeru/UI. | Čeká na fokusovaný audit |
 
-### Vrstva 3: Aplikační logika
+## HTTP vstupní body
 
-#### `BtcInvoiceManager.php`
+### `api.php` – databázové API
 
-Řídí kompletní životní cyklus plateb pro e-shopy.
+Podporované cesty:
 
-#### Hlavní metody
+- `GET /api/v1/stores/{storeId}`
+- `POST /api/v1/stores/{storeId}/invoices`
+- `GET /api/v1/stores/{storeId}/invoices/{invoiceId}`
+- `POST /api/v1/stores/{storeId}/webhooks`
 
-- `createDatabaseInvoice(...)` – uloží novou fakturu do databáze, požádá `ElectrumWallet` o novou adresu a připraví návratová data pro e-shop.
-- `checkDatabasePaymentStatus($invoiceId)` – zkontroluje zůstatek na adrese faktury, vyhodnotí její stav a aktualizuje MySQL.
+Autentizace používá `Authorization: Bearer ...`. Částka faktury musí být JSON řetězec s přesnou BTC hodnotou, například `"0.00000001"`; JSON číslo se záměrně odmítá kvůli riziku `float` nepřesnosti.
 
-Možné stavy faktury:
+### `api_stateless.php`
 
-- `New`
-- `Processing`
-- `Settled`
-- `Expired`
+Vytváří stateless fakturu bez databázového invoice záznamu. Přístup je omezen konfigurovanými API klienty a operace s Electrumem používají lokální procesní zámek.
 
-#### `BtcDashboard.php`
+### `webhook_cron.php`
 
-Propojuje surová data z peněženky s formátem připraveným pro administrační UI.
+- CLI spuštění nepotřebuje HTTP credentials.
+- Webové spuštění povoluje pouze `POST` s `Authorization: Bearer <cron_key>`.
+- Query-string klíče a `GET` nejsou podporované.
 
-#### Hlavní metody
+## Konfigurace
 
-- `getAddressesData()` – agreguje adresy a jejich zůstatky.
-- `getTransactionsHistory()` – vrací formátovanou a dekódovanou historii transakcí.
-- `exportKeys()` – bezpečně exportuje seed nebo veřejný `xpub` klíč.
-
----
-
-## 💻 3. Použití tříd ve vlastních skriptech
-
-Třídy jsou navrženy jako **drop-in komponenty**, takže je lze jednoduše použít i ve vlastních PHP skriptech.
-
-Například pro vytvoření vlastního skriptu pro automatické odesílání výplat:
+`config.php` není verzovaný a nesmí se zveřejnit. Používané klíče zahrnují:
 
 ```php
-<?php
-
-// 1. Načtení konfigurace a vrstev
-$config = require __DIR__ . '/config.php';
-
-require __DIR__ . '/classes/ElectrumRPC.php';
-require __DIR__ . '/classes/ElectrumWallet.php';
-
-// 2. Inicializace RPC motoru
-$rpc = new ElectrumRPC(
-    $config['rpc_host'],
-    $config['rpc_port'],
-    $config['rpc_user'],
-    $config['rpc_pass']
-);
-
-$wallet = new ElectrumWallet($rpc);
-
-// 3. Načtení peněženky
-$wallet->loadWallet('/opt/btcpay_wallets/wallet_1');
-
-// 4. Zavolání libovolné akce
-$address = $wallet->getNewAddress();
-$balance = $wallet->getWalletBalance();
-
+return [
+    'rpc_host' => '127.0.0.1',
+    'rpc_port' => 7777,
+    'rpc_user' => '...',
+    'rpc_pass' => '...',
+    'db_host' => '127.0.0.1',
+    'db_port' => 3306,
+    'db_name' => '...',
+    'db_user' => '...',
+    'db_pass' => '...',
+    'admin_api_key' => '...',
+    'secret_key' => '...',
+    'cron_key' => '...',
+    'app_url' => 'https://pay.example.com',
+    'api_clients' => [
+        'client-bearer-token' => 'wallet-id',
+    ],
+];
 ```
 
----
+Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
-## ⚙️ 4. Instalace a správa Electrum Daemonu
+Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
-Systém vyžaduje běžící **Electrum Daemon**, který na pozadí zpracovává RPC příkazy přicházející z PHP aplikace.
+## Databáze a migrace
 
-### A) Prvotní příprava a oprávnění
+Produkční schéma používá tabulky `stores`, `invoices`, `webhooks` a `webhook_deliveries` s indexy a cizími klíči.
 
-Vytvoř systémové složky a nastav správného vlastníka.
+Audit přidal tyto jednorázové migrace a read-only kontroly:
 
-V tomto příkladu:
+- `migrations/20260830_database_preflight.sql`
+- `migrations/20260830_harden_database_schema.sql`
+- `migrations/20260831_webhook_delivery_preflight.sql`
+- `migrations/20260830_add_webhook_deliveries.sql`
 
-- `ag` = uživatel, pod kterým běží Electrum,
-- `daemon` = skupina / uživatel webového serveru.
+Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Preflight musí skončit bez problémů. Migrační soubory nejsou obecný idempotentní instalační skript.
+
+## Instalace a požadavky
+
+- PHP 8.0 nebo novější,
+- rozšíření cURL, JSON a PDO MySQL,
+- MariaDB 10.4+ nebo kompatibilní MySQL,
+- Composer,
+- běžící Electrum daemon s JSON-RPC,
+- Apache/Nginx nakonfigurovaný tak, aby PHP dostalo hlavičku `Authorization`.
 
 ```bash
-# Instalace Electrum
-sudo mv /cesta/k/stazenemu/electrum /opt/electrum
-sudo chown -R ag:daemon /opt/electrum
-sudo chmod -R 755 /opt/electrum
-
-# Konfigurační složka
-sudo mkdir -p /opt/electrum_config
-sudo chown -R ag:daemon /opt/electrum_config
-sudo chmod -R 775 /opt/electrum_config
-
-# Složka pro peněženky
-sudo mkdir -p /opt/btcpay_wallets
-sudo chown -R ag:daemon /opt/btcpay_wallets
-sudo chmod -R 775 /opt/btcpay_wallets
-
-# Setgid – nové soubory zachovají skupinu adresáře
-sudo chmod g+s /opt/btcpay_wallets
+composer install
+composer dump-autoload
 ```
 
-> **Bezpečnostní poznámka:** Adresář `/opt/btcpay_wallets/` by měl zůstat mimo veřejný webový root (`htdocs`), aby nebylo možné stáhnout soubory peněženek přes HTTP.
+Adresáře s peněženkami a zálohami databáze držte mimo `htdocs` a mimo Git.
 
----
+## Testy
 
-### B) Vytvoření Systemd služby
-
-Aby Electrum Daemon automaticky běžel po restartu serveru, vytvoř:
+Kontraktní testy jsou samostatné PHP skripty:
 
 ```bash
-sudo nano /etc/systemd/system/electrum.service
+php tests/BitcoinAmountTest.php
+php tests/ElectrumWalletTest.php
+php tests/BtcInvoiceManagerTest.php
+php tests/BtcStatelessServiceTest.php
+php tests/DatabaseTest.php
+php tests/GreenfieldApiTest.php
+php tests/WebhookEndpointPolicyTest.php
+php tests/WebhookCronControllerTest.php
+php tests/WebhookProcessorTest.php
+php tests/WebhookDeliveryRepositoryQueryTest.php
 ```
 
-Obsah služby:
+Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
 
-```ini
-[Unit]
-Description=Electrum RPC Daemon
-After=network.target
+## Bezpečnostní zásady
 
-[Service]
-User=ag
-Group=daemon
-Type=simple
-ExecStart=/usr/bin/python3 /opt/electrum/run_electrum -D /opt/electrum_config daemon --rpcport 7777
-Restart=always
-RestartSec=10
+- Neukládejte seed, xprv, hesla ani API klíče do Gitu nebo logů.
+- Nevystavujte Electrum RPC ani adresář peněženek do internetu.
+- Webhook secret používejte k ověření hlavičky `Btcpay-Sig` nad nezměněným raw JSON tělem.
+- `allow_local_webhooks` nepovolujte v produkci.
+- Cron nespouštějte přes URL query parametr; používejte CLI nebo Bearer hlavičku.
+- Před migrací vždy vytvořte a ověřte obnovitelnou databázovou zálohu.
+- Neošetřené výjimky a odpovědi Electrumu neposílejte klientům.
 
-[Install]
-WantedBy=multi-user.target
-```
+## Doporučené pořadí dalšího auditu
 
-Následně načti konfiguraci systemd a službu spusť:
+1. `AuthManager` společně s `client/login.php`, `client/registrace.php`, session a cookie nastavením.
+2. `UrlManager` a `index.php`, včetně Host headeru, routingu, redirectů a produkčních chybových režimů.
+3. `BtcDashboard` a `admin/wallet.php`, zejména přesnost částek, vzdálené cenové API, export seed/xprv a CSRF.
+4. `checkout/pay.php` a související AJAX/status endpointy.
+5. Zbytek `admin/` a `client/` formulářů a views: CSRF, XSS, autorizace objektů a bezpečné mazání.
+6. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
+7. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable electrum
-sudo systemctl start electrum
-```
-
-Kontrola stavu služby:
-
-```bash
-sudo systemctl status electrum
-```
-
-Logy služby lze sledovat pomocí:
-
-```bash
-sudo journalctl -u electrum -f
-```
-
----
-
-## 🛠️ 5. Užitečné CLI příkazy
-
-Při manuálních zásazích je nutné Electrum vždy nasměrovat na naši konfigurační složku pomocí `-D`.
-
-### Vytvoření nové peněženky offline
-
-```bash
-python3 /opt/electrum/run_electrum \
-    -D /opt/electrum_config \
-    create \
-    --offline \
-    -w "/opt/btcpay_wallets/nova_penezenka"
-```
-
-### Zjištění zůstatku
-
-```bash
-python3 /opt/electrum/run_electrum \
-    -D /opt/electrum_config \
-    getbalance \
-    -w "/opt/btcpay_wallets/wallet_1"
-```
-
-### Generování adresy / payment requestu
-
-```bash
-python3 /opt/electrum/run_electrum \
-    -D /opt/electrum_config \
-    -w "/opt/btcpay_wallets/wallet_1" \
-    add_request \
-    0.001 \
-    -m "Test"
-```
-
----
-
-## 🔐 6. Bezpečnostní principy
-
-Projekt je navržen s důrazem na oddělení webové aplikace od citlivých dat.
-
-### Doporučení
-
-- Peněženky ukládat výhradně mimo `htdocs`.
-- Nikdy nevystavovat `/opt/btcpay_wallets/` přes HTTP.
-- RPC port Electrumu (`7777`) nevystavovat veřejně do internetu.
-- Přístup k RPC chránit autentizací a síťovým firewallem.
-- Seed fráze a privátní klíče nikdy neukládat do veřejně dostupných souborů.
-- `config.php` chránit před neoprávněným čtením.
-- Pravidelně zálohovat databázi i peněženky.
-- Při exportu seedů nebo privátních klíčů používat zabezpečené prostředí.
-- Webový uživatel by měl mít pouze taková oprávnění, která aplikace skutečně potřebuje.
-
----
-
-## 🔄 7. Tok platby
-
-Zjednodušený tok platby v systému:
-
-```text
-E-shop
-   │
-   │ Greenfield API
-   ▼
-api.php
-   │
-   ▼
-BtcInvoiceManager
-   │
-   ├──► MySQL
-   │
-   └──► ElectrumWallet
-            │
-            ▼
-       ElectrumRPC
-            │
-            ▼
-      Electrum Daemon
-            │
-            ▼
-       Bitcoin Network
-```
-
-Po zaplacení faktury:
-
-```text
-Bitcoin Network
-      │
-      ▼
-Electrum Daemon
-      │
-      ▼
-webhook_cron.php
-      │
-      ▼
-BtcInvoiceManager
-      │
-      ├──► Aktualizace MySQL
-      │
-      └──► Webhook
-             │
-             ▼
-           E-shop
-```
-
----
-
-## 📌 8. Shrnutí
-
-**BTC Pay Server Lite** poskytuje jednoduchou architekturu Bitcoinové platební brány bez potřeby provozovat kompletní BTCPay Server.
-
-Hlavní komponenty:
-
-```text
-PHP Application
-├── Greenfield API
-├── Payment Gateway
-├── Admin Interface
-├── Invoice Management
-└── Webhook System
-        │
-        ▼
-ElectrumWallet
-        │
-        ▼
-ElectrumRPC
-        │
-        ▼
-Electrum Daemon
-        │
-        ▼
-Bitcoin Network
-```
-
-Projekt je vhodný především pro vlastní e-shopy a služby, které potřebují **lehkou, samoobslužnou Bitcoin platební infrastrukturu s PHP backendem a Electrum Daemonem**.
-
-
-
+Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
