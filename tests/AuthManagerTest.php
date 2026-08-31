@@ -44,7 +44,7 @@ final class FakeAuthUserRepository implements AuthUserRepository
         }
     }
 
-    public function countRecentLoginFailures(string $identityHash, int $since): int
+    public function countRecentAttempts(string $identityHash, int $since): int
     {
         return count(array_filter(
             $this->failures[$identityHash] ?? [],
@@ -52,12 +52,12 @@ final class FakeAuthUserRepository implements AuthUserRepository
         ));
     }
 
-    public function recordLoginFailure(string $identityHash, int $attemptedAt): void
+    public function recordAttempt(string $identityHash, int $attemptedAt): void
     {
         $this->failures[$identityHash][] = $attemptedAt;
     }
 
-    public function clearLoginFailures(string $identityHash): void
+    public function clearAttempts(string $identityHash): void
     {
         unset($this->failures[$identityHash]);
     }
