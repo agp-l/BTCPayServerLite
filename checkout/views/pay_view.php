@@ -1,0 +1,145 @@
+<?php
+
+declare(strict_types=1);
+
+use JsonException;
+
+/** @var array<string,mixed> $checkout */
+/** @var string $statusUrl */
+/** @var string $stylesheetUrl */
+/** @var string $scriptUrl */
+
+$statusLabels = [
+    'New' => ['Čekáme na platbu', 'new'],
+    'Processing' => ['Platba přijata, čekáme na potvrzení', 'processing'],
+    'Settled' => ['Platba potvrzena', 'settled'],
+    'Expired' => ['Platnost faktury vypršela', 'expired'],
+];
+[$statusLabel, $statusTone] = $statusLabels[$checkout['status']];
+$isSettled = $checkout['status'] === 'Settled';
+$isExpired = $checkout['status'] === 'Expired';
+$isPartial = $checkout['additional_status'] === 'PaidPartial';
+
+try {
+    $clientData = json_encode(
+        [
+            'statusUrl' => $statusUrl,
+            'initialStatus' => $checkout['status'],
+            'secondsRemaining' => $checkout['seconds_remaining'],
+        ],
+        JSON_UNESCAPED_SLASHES
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
+    );
+} catch (JsonException) {
+    $clientData = '{"statusUrl":"","initialStatus":"Expired","secondsRemaining":0}';
+}
+?>
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title><?= htmlspecialchars((string) $checkout['title'], ENT_QUOTES, 'UTF-8') ?> · Bitcoin platba</title>
+    <link rel="stylesheet" href="<?= htmlspecialchars($stylesheetUrl, ENT_QUOTES, 'UTF-8') ?>">
+    <script src="<?= htmlspecialchars($scriptUrl, ENT_QUOTES, 'UTF-8') ?>" defer></script>
+</head>
+<body>
+<main class="checkout-shell">
+    <section class="checkout-card" aria-labelledby="checkout-title">
+        <header class="checkout-header">
+            <a class="checkout-brand" href="https://bitcoin.org/" rel="noopener noreferrer" target="_blank"
+               aria-label="Informace o Bitcoinu">
+                <span class="brand-mark" aria-hidden="true">₿</span>
+                <span>
+                    <strong>Bitcoin checkout</strong>
+                    <small>Bezpečná on-chain platba</small>
+                </span>
+            </a>
+            <div class="network-pill"><span aria-hidden="true"></span> Bitcoin</div>
+        </header>
+
+        <div class="checkout-summary">
+            <p class="eyebrow">Platební požadavek</p>
+            <h1 id="checkout-title"><?= htmlspecialchars((string) $checkout['title'], ENT_QUOTES, 'UTF-8') ?></h1>
+            <p class="invoice-id">ID <?= htmlspecialchars((string) $checkout['id'], ENT_QUOTES, 'UTF-8') ?></p>
+        </div>
+
+        <div id="status-badge"
+             class="status-badge status-<?= htmlspecialchars($statusTone, ENT_QUOTES, 'UTF-8') ?>"
+             role="status"
+             aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-label"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+
+        <section id="success-panel" class="success-panel<?= $isSettled ? ' is-visible' : '' ?>" aria-live="polite">
+            <span class="success-symbol" aria-hidden="true">✓</span>
+            <div>
+                <h2>Děkujeme, platba je potvrzena</h2>
+                <p>Faktura byla bezpečně uhrazena v bitcoinové síti.</p>
+            </div>
+        </section>
+
+        <section id="payment-panel" class="payment-panel<?= $isSettled ? ' is-hidden' : '' ?>">
+            <div class="amount-section">
+                <span>Částka k úhradě</span>
+                <strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?> <small>BTC</small></strong>
+                <button class="text-button" type="button" data-copy-value="<?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?>">
+                    Kopírovat částku
+                </button>
+            </div>
+
+            <div id="partial-notice" class="notice notice-warning<?= $isPartial ? ' is-visible' : '' ?>" role="alert">
+                Dorazila pouze část platby. Zbývá doplatit
+                <strong id="missing-amount"><?= htmlspecialchars((string) $checkout['missing_amount'], ENT_QUOTES, 'UTF-8') ?> BTC</strong>.
+            </div>
+
+            <div class="address-section">
+                <div class="section-heading">
+                    <span>Bitcoinová adresa</span>
+                    <button class="text-button" type="button" data-copy-target="payment-address">Kopírovat</button>
+                </div>
+                <code id="payment-address"><?= htmlspecialchars((string) $checkout['address'], ENT_QUOTES, 'UTF-8') ?></code>
+            </div>
+
+            <a id="wallet-link"
+               class="wallet-button<?= $isExpired ? ' is-disabled' : '' ?>"
+               href="<?= $isExpired ? '#' : htmlspecialchars((string) $checkout['bip21_uri'], ENT_QUOTES, 'UTF-8') ?>"
+               <?= $isExpired ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
+                <span aria-hidden="true">₿</span>
+                Otevřít Bitcoin peněženku
+            </a>
+
+            <p id="checkout-timer" class="checkout-timer" aria-live="polite">
+                <?= $isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' ?>
+            </p>
+        </section>
+
+        <footer class="checkout-footer">
+            <p>
+                Odesílejte pouze BTC v bitcoinové síti. Stav se obnovuje automaticky;
+                stránku nemusíte ručně aktualizovat.
+            </p>
+            <div class="privacy-note">
+                <span aria-hidden="true">◆</span>
+                Platební údaje neposíláme externí službě pro generování QR kódu.
+            </div>
+        </footer>
+
+        <noscript>
+            <p class="notice notice-static">
+                Pro automatickou kontrolu platby povolte JavaScript nebo stránku ručně obnovte.
+            </p>
+        </noscript>
+    </section>
+</main>
+<div id="copy-toast" class="copy-toast" role="status" aria-live="polite">Zkopírováno</div>
+<script id="checkout-data" type="application/json"><?= $clientData ?></script>
+</body>
+</html>
