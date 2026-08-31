@@ -1,191 +1,182 @@
 <?php
-// client/views/index_view.php
+
 declare(strict_types=1);
 
 $pageTitle = 'Můj účet - BTCPay Lite';
 require __DIR__ . '/layout/header.php';
+
+$clientUrl = htmlspecialchars($urlManager->url('/client'), ENT_QUOTES, 'UTF-8');
+$statusClasses = [
+    'New' => 'badge-New',
+    'Processing' => 'badge-Processing',
+    'Settled' => 'badge-Settled',
+    'Expired' => 'badge-Expired',
+];
 ?>
 
-<style>
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }
-.stat-card { background: #ffffff; border: 1px solid #e5eae7; border-radius: 16px; padding: 20px; }
-.stat-label { font-size: 12px; font-weight: 700; color: #748078; text-transform: uppercase; margin-bottom: 5px; }
-.stat-value { font-size: 24px; font-weight: 800; color: #17201a; }
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Merchant portal</p>
+    <h1>Přehled účtu</h1>
+    <p>Spravujte své obchody, integrační klíče, webhooky a poslední přijaté faktury.</p>
+  </div>
+</section>
 
-.key-box { background: #f9fafa; border: 1px solid #e5eae7; border-radius: 8px; padding: 10px 15px; font-family: ui-monospace, monospace; font-size: 13px; color: #17201a; margin-top: 5px; margin-bottom: 15px; word-break: break-all; }
-.code-label { font-size: 11px; font-weight: 700; color: #748078; text-transform: uppercase; }
+<?php if ($pageError !== null): ?>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><?php echo htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8'); ?></span></div>
+<?php endif; ?>
 
-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-th { text-align: left; padding: 12px 10px; color: #748078; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #e5eae7; }
-td { padding: 14px 10px; border-bottom: 1px solid #f0f4f1; vertical-align: middle; }
-.badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px; }
-.badge-New { background: #fef3c7; color: #d97706; }
-.badge-Processing { background: #e0f2fe; color: #0284c7; }
-.badge-Settled { background: #eafbef; color: #13aa3d; }
-.badge-Expired { background: #fee2e2; color: #ef4d4d; }
+<section class="stats-grid" aria-label="Statistiky účtu">
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+    <div class="stat-label">Moje obchody</div>
+    <div class="stat-value"><?php echo number_format($clientStats['total_stores'], 0, ',', ' '); ?></div>
+    <div class="stat-meta">Aktivní API integrace</div>
+  </article>
+  <article class="stat-card stat-card-blue">
+    <span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span>
+    <div class="stat-label">Vytvořené faktury</div>
+    <div class="stat-value"><?php echo number_format($clientStats['total_invoices'], 0, ',', ' '); ?></div>
+    <div class="stat-meta">Napříč všemi obchody</div>
+  </article>
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+    <div class="stat-label">Zaplacené faktury</div>
+    <div class="stat-value"><?php echo number_format($clientStats['paid_invoices'], 0, ',', ' '); ?></div>
+    <div class="stat-meta">Potvrzené platby</div>
+  </article>
+</section>
 
-.wh-item { background: #f9fafa; border: 1px solid #e5eae7; border-radius: 12px; padding: 20px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap;}
-</style>
+<section class="card">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-store" aria-hidden="true"></i> Obchody a API přístup</span>
+  </div>
+  <p class="card-subtitle">Každý obchod má vlastní peněženku a oddělený API klíč.</p>
 
-<div class="page-header">
-    <h1><i class="fa-solid fa-house-user" style="color:#2fd35a;"></i> Přehled účtu</h1>
-</div>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Aktivní E-shopy</div>
-        <div class="stat-value"><?php echo $clientStats['total_stores']; ?></div>
+  <details class="disclosure">
+    <summary><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit nový obchod</summary>
+    <div class="disclosure-body">
+      <form method="post" action="<?php echo $clientUrl; ?>" class="form-stack">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="action" value="create_store">
+        <div class="field"><label for="storeName">Název obchodu</label><div class="input-wrap"><input id="storeName" name="store_name" type="text" maxlength="100" required></div></div>
+        <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit obchod</button></div>
+      </form>
     </div>
-    <div class="stat-card">
-        <div class="stat-label">Vygenerováno faktur</div>
-        <div class="stat-value"><?php echo $clientStats['total_invoices']; ?></div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Úspěšně zaplaceno</div>
-        <div class="stat-value" style="color: #13aa3d;"><?php echo $clientStats['paid_invoices']; ?></div>
-    </div>
-</div>
+  </details>
 
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-        <h2 class="card-title" style="margin: 0;"><i class="fa-solid fa-shop" style="color:#20b948;"></i> Moje e-shopy (API Klíče)</h2>
-        <button onclick="document.getElementById('newStoreForm').style.display='block'" class="ghost-btn"><i class="fa-solid fa-plus"></i> Nový e-shop</button>
-    </div>
-
-    <!-- Nový e-shop (Skrytý formulář) -->
-    <div id="newStoreForm" style="display: none; background: #f9fafa; padding: 20px; border-radius: 12px; border: 1px solid #e5eae7; margin-bottom: 25px;">
-        <h3 style="margin: 0 0 15px 0; font-size: 14px;">Založit nový e-shop / projekt</h3>
-        <form method="POST" style="margin: 0; display: flex; flex-direction: column; gap: 15px; max-width: 400px;">
-            <input type="hidden" name="action" value="create_store">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-            <div class="field" style="margin:0;">
-                <label>Název projektu (např. Alza.cz)</label>
-                <div class="input-wrap"><input type="text" name="store_name" placeholder="Název vašeho e-shopu" required></div>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button type="submit" class="primary"><i class="fa-solid fa-check"></i> Vytvořit e-shop</button>
-                <button type="button" class="ghost-btn" onclick="document.getElementById('newStoreForm').style.display='none'">Zrušit</button>
-            </div>
-        </form>
-    </div>
-
-    <?php if (empty($stores)): ?>
-        <p style="color: #748078;">Zatím nemáte vytvořen žádný e-shop.</p>
-    <?php else: ?>
-        <div style="display: grid; gap: 20px;">
-            <?php foreach ($stores as $store): ?>
-                <div style="border: 1px solid #e5eae7; border-radius: 12px; padding: 20px;">
-                    <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #17201a;"><?php echo htmlspecialchars($store['name']); ?></h3>
-                    <div class="code-label">Store ID (ID Obchodu):</div>
-                    <div class="key-box"><?php echo htmlspecialchars($store['id']); ?></div>
-                    <div class="code-label">API Klíč (Zadejte do WooCommerce):</div>
-                    <div class="key-box" style="margin-bottom: 0;"><?php echo htmlspecialchars($store['api_key']); ?></div>
-                </div>
-            <?php endforeach; ?>
+  <?php if ($stores === []): ?>
+    <div class="empty-state"><div><i class="fa-solid fa-store-slash" aria-hidden="true"></i><p>Zatím nemáte vytvořený žádný obchod.</p></div></div>
+  <?php else: ?>
+    <div class="store-grid">
+    <?php foreach ($stores as $store): ?>
+      <article class="store-card">
+        <div class="store-card-head"><h3><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></h3><span class="badge s-paid">Aktivní</span></div>
+        <div class="credential">
+          <span class="credential-label">Store ID</span>
+          <div class="credential-value"><code><?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?></code><button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div>
         </div>
-    <?php endif; ?>
-</div>
+        <div class="credential">
+          <span class="credential-label">API klíč</span>
+          <div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="API klíč"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit API klíč"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat API klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div>
+        </div>
+      </article>
+    <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</section>
 
-<div class="card">
-    <h2 class="card-title"><i class="fa-solid fa-satellite-dish" style="color:#748078;"></i> Správa Webhooků</h2>
-    
-    <?php if (!empty($stores)): ?>
-    <div style="background: #f9fafa; padding: 20px; border-radius: 12px; border: 1px solid #e5eae7; margin-bottom: 25px;">
-        <h3 style="margin: 0 0 15px 0; font-size: 14px;">Přidat nový Webhook</h3>
-        <form method="POST" style="margin: 0; display: flex; flex-direction: column; gap: 15px; max-width: 400px;">
+<div class="merchant-grid">
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Webhooky</span></div>
+    <p class="card-subtitle">Notifikace se odesílají pouze na bezpečně ověřené HTTPS endpointy.</p>
+
+    <?php if ($stores !== []): ?>
+      <details class="disclosure">
+        <summary><i class="fa-solid fa-plus" aria-hidden="true"></i> Přidat webhook</summary>
+        <div class="disclosure-body">
+          <form method="post" action="<?php echo $clientUrl; ?>" class="form-stack">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="action" value="create_webhook">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-            <div class="field" style="margin:0;">
-                <label>Vyberte obchod</label>
-                <div class="input-wrap">
-                    <select name="store_id" required>
-                        <option value="">-- Vyberte obchod --</option>
-                        <?php foreach ($stores as $s): ?>
-                            <option value="<?php echo htmlspecialchars($s['id']); ?>"><?php echo htmlspecialchars($s['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            <div class="field" style="margin:0;">
-                <label>URL adresa notifikace</label>
-                <div class="input-wrap">
-                    <input type="url" name="url" placeholder="https://muj-eshop.cz/wc-api/webhook/" required>
-                </div>
-            </div>
-            <button type="submit" class="primary" style="width: fit-content;"><i class="fa-solid fa-plus"></i> Uložit Webhook</button>
-        </form>
-    </div>
-    <?php else: ?>
-        <p style="color: #748078; font-size: 13px;">Pro vytvoření webhooku si nejprve musíte založit e-shop.</p>
-    <?php endif; ?>
-
-    <h3 style="margin: 0 0 15px 0; font-size: 14px;">Aktivní Webhooky</h3>
-    <?php if (empty($webhooks)): ?>
-        <p style="color: #748078; font-size: 13px;">Zatím nemáte vytvořené žádné webhooky.</p>
-    <?php else: ?>
-        <?php foreach ($webhooks as $w): ?>
-            <div class="wh-item">
-                <div class="wh-info">
-                    <div class="code-label">Obchod: <?php echo htmlspecialchars($w['store_name']); ?></div>
-                    <h4 style="margin: 0 0 10px 0; font-size: 14px; word-break: break-all;"><?php echo htmlspecialchars($w['url']); ?></h4>
-                    <div class="code-label">Secret klíč:</div>
-                    <div class="key-box" style="margin-bottom: 0; padding: 6px 10px;"><?php echo htmlspecialchars($w['secret']); ?></div>
-                </div>
-                <form method="POST" style="margin:0;" onsubmit="return confirm('Opravdu smazat tento webhook?');">
-                    <input type="hidden" name="action" value="delete_webhook">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-                    <input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($w['id']); ?>">
-                    <button type="submit" class="danger-btn"><i class="fa-solid fa-trash"></i> Smazat</button>
-                </form>
-            </div>
-        <?php endforeach; ?>
-    <?php endif; ?>
-</div>
-
-<div class="card">
-    <h2 class="card-title"><i class="fa-solid fa-file-invoice" style="color:#748078;"></i> Přijaté faktury</h2>
-    <?php if (empty($invoices)): ?>
-        <p style="color: #748078; font-size: 14px;">Zatím nemáte žádné transakce.</p>
-    <?php else: ?>
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>E-shop</th>
-                        <th>ID Faktury</th>
-                        <th>Částka</th>
-                        <th>Stav</th>
-                        <th>Vytvořeno</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($invoices as $inv): ?>
-                        <?php $dateStr = is_numeric($inv['created_at']) ? date('d.m.Y H:i', (int)$inv['created_at']) : date('d.m.Y H:i', strtotime($inv['created_at'])); ?>
-                        <tr>
-                            <td><strong><?php echo htmlspecialchars($inv['store_name']); ?></strong></td>
-                            <td style="font-family: monospace; font-size: 12px;"><?php echo htmlspecialchars(substr($inv['id'], 0, 15)) . '...'; ?></td>
-                            <td><strong><?php echo htmlspecialchars($inv['amount']); ?> BTC</strong></td>
-                            <td><span class="badge badge-<?php echo htmlspecialchars($inv['status']); ?>"><?php echo htmlspecialchars($inv['status']); ?></span></td>
-                            <td style="color: #748078;"><?php echo $dateStr; ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="field"><label for="webhookStore">Obchod</label><div class="input-wrap"><select id="webhookStore" name="store_id" required><option value="">Vyberte obchod</option><?php foreach ($stores as $store): ?><option value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?></select></div></div>
+            <div class="field"><label for="webhookUrl">HTTPS URL</label><div class="input-wrap"><input id="webhookUrl" name="url" type="url" maxlength="2048" placeholder="https://example.com/webhook" required></div></div>
+            <button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Uložit webhook</button>
+          </form>
         </div>
+      </details>
     <?php endif; ?>
+
+    <?php if ($webhooks === []): ?>
+      <div class="empty-state"><p>Žádné aktivní webhooky.</p></div>
+    <?php else: ?>
+      <div class="webhook-list">
+      <?php foreach ($webhooks as $webhook): ?>
+        <article class="webhook-item">
+          <div class="webhook-main">
+            <strong><?php echo htmlspecialchars($webhook['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
+            <code title="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?></code>
+            <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div></div>
+          </div>
+          <form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Opravdu chcete webhook odstranit?">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="action" value="delete_webhook">
+            <input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="danger-btn" aria-label="Odstranit webhook"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+          </form>
+        </article>
+      <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Integrace</span></div>
+    <p class="card-subtitle">Store ID a API klíč použijte v e-shopovém pluginu. Webhook secret slouží k ověření podpisu přijaté notifikace.</p>
+    <div class="alert alert-warning"><i class="fa-solid fa-key" aria-hidden="true"></i><span>API klíče a webhook secrety ukládejte jako hesla. Nevkládejte je do veřejného zdrojového kódu.</span></div>
+  </section>
 </div>
+
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Poslední faktury</span></div>
+  <?php if ($invoices === []): ?>
+    <div class="empty-state"><p>Zatím nemáte žádné faktury.</p></div>
+  <?php else: ?>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Obchod</th><th>Faktura</th><th>Částka</th><th>Stav</th><th>Vytvořeno</th></tr></thead><tbody>
+    <?php foreach ($invoices as $invoice): ?>
+      <?php $statusClass = $statusClasses[$invoice['status']] ?? 's-unknown'; ?>
+      <tr><td><strong><?php echo htmlspecialchars($invoice['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td><td><code class="truncate" title="<?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars($invoice['amount'], ENT_QUOTES, 'UTF-8'); ?></code> BTC</td><td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($invoice['status'], ENT_QUOTES, 'UTF-8'); ?></span></td><td class="muted"><time datetime="<?php echo date('c', $invoice['created_at']); ?>"><?php echo date('d.m.Y H:i', $invoice['created_at']); ?></time></td></tr>
+    <?php endforeach; ?>
+    </tbody></table></div>
+  <?php endif; ?>
+</section>
 
 <script>
-  const toastMsg = "<?php echo addslashes($toastMsg); ?>";
-  if (toastMsg.trim() !== '') {
-      const t = document.getElementById('toast');
-      const tMsg = document.getElementById('toastMsg');
-      if (t && tMsg) {
-          tMsg.innerHTML = `<i class="fa-solid fa-circle-info"></i> ${toastMsg}`;
-          t.classList.add('show');
-          setTimeout(() => t.classList.remove('show'), 4000);
-      }
-  }
+(() => {
+  const toast = document.getElementById('toast');
+  const toastText = document.getElementById('toastMsg');
+  const showToast = (message) => {
+    if (!toast || !toastText || !message) return;
+    toastText.textContent = message;
+    toast.classList.add('show');
+    window.setTimeout(() => toast.classList.remove('show'), 3000);
+  };
+  showToast(<?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
+
+  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(button.dataset.copy || ''); showToast('Zkopírováno do schránky.'); }
+    catch (error) { showToast('Kopírování se nepodařilo.'); }
+  }));
+  document.querySelectorAll('[data-reveal]').forEach((button) => button.addEventListener('click', () => {
+    const input = button.parentElement?.querySelector('input');
+    if (!input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    button.innerHTML = reveal ? '<i class="fa-regular fa-eye-slash" aria-hidden="true"></i>' : '<i class="fa-regular fa-eye" aria-hidden="true"></i>';
+  }));
+  document.querySelectorAll('[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
+    if (!window.confirm(form.dataset.confirm || 'Potvrdit operaci?')) event.preventDefault();
+  }));
+})();
 </script>
 
 <?php require __DIR__ . '/layout/footer.php'; ?>
