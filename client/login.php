@@ -1,47 +1,57 @@
 <?php
-// client/login.php (Zabezpečený, plně objektový kontroler)
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
 
-use BtcPayLite\Database;
+use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
+use BtcPayLite\Database;
 
-$db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
-$auth = new AuthManager($db);
-
-// Odhlášení jedním čistým voláním metody
-if (isset($_GET['logout'])) {
-    $auth->logout();
-    header("Location: login.php");
-    exit;
-}
+AuthManager::startSession();
+AuthManager::sendPrivateResponseHeaders();
 
 $error = '';
 
-// Přihlášení
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $user = $auth->login($_POST['email'] ?? '', $_POST['password'] ?? '');
-        
-        // Směrovač podle role
-        header("Location: " . ($user['role'] === 'admin' ? '../admin/index.php' : 'index.php'));
+        AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
+        $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : 'login';
+        $db = new Database(
+            $config['db_host'],
+            $config['db_name'],
+            $config['db_user'],
+            $config['db_pass'],
+            (int) ($config['db_port'] ?? 3306)
+        );
+        $auth = new AuthManager($db);
+
+        if ($action === 'logout') {
+            $auth->logout();
+            header('Location: login', true, 303);
+            exit;
+        }
+        if ($action !== 'login') {
+            throw new AuthException('Neplatná akce formuláře.');
+        }
+
+        $email = is_string($_POST['email'] ?? null) ? $_POST['email'] : '';
+        $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+        $clientIdentity = is_string($_SERVER['REMOTE_ADDR'] ?? null)
+            ? $_SERVER['REMOTE_ADDR']
+            : '';
+        $user = $auth->login($email, $password, $clientIdentity);
+
+        header('Location: ' . ($user['role'] === 'admin' ? 'admin/dashboard' : 'client'), true, 303);
         exit;
-        
-    } catch (\Exception $e) {
-        // OBRANA PROTI BRUTE-FORCE: Umělé zpoždění odpovědi
-        sleep(1); 
-        // Vypíše pouze naše kontrolované chybové hlášky z AuthManageru
-        $error = $e->getMessage();
-        
-    } catch (\Throwable $e) {
-        // OBRANA PROTI ÚNIKU DAT: Zachytí kritické systémové chyby (např. výpadek databáze)
-        sleep(1);
-        error_log("Kritická chyba v login.php: " . $e->getMessage()); // Zapíše skrytou chybu do server logu
-        $error = "Došlo k interní systémové chybě. Zkuste to prosím později."; // Uživatel vidí jen toto
+    } catch (AuthException $exception) {
+        $error = $exception->getMessage();
+    } catch (Throwable $exception) {
+        error_log('Unexpected login failure: ' . $exception->getMessage());
+        $error = 'Došlo k interní systémové chybě. Zkuste to prosím později.';
     }
 }
 
-// Načtení šablony
+$csrfToken = AuthManager::csrfToken();
 require __DIR__ . '/views/login_view.php';
