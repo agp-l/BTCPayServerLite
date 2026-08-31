@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace BtcPayLite;
+
+interface ClientDashboardRepository
+{
+    /** @return array{total_stores:int,total_invoices:int,paid_invoices:int} */
+    public function fetchSummary(int $userId): array;
+
+    /** @return list<array{id:string,name:string,api_key:string,wallet_path:string}> */
+    public function fetchStores(int $userId): array;
+
+    /** @return list<array{id:string,store_id:string,store_name:string,amount:string,status:string,created_at:int}> */
+    public function fetchInvoices(int $userId, int $limit): array;
+
+    /** @return list<array{id:string,store_id:string,store_name:string,url:string,secret:string,created_at:int}> */
+    public function fetchWebhooks(int $userId): array;
+
+    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void;
+
+    public function ownsStore(int $userId, string $storeId): bool;
+
+    /** @return array{id:string,url:string,secret:string} */
+    public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array;
+
+    public function deleteWebhook(int $userId, string $webhookId): bool;
+}
