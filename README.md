@@ -41,12 +41,12 @@ V adresáři `classes/` je 53 tříd a rozhraní. Původní velké UI třídy a 
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
 | `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém dashboardu, peněženky, obchodů, faktur a webhooků bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
-| diagnostické `admin/*.php` | Čeká | `test_shop.php`, `test_api_webhook.php`, `url_invoices.php` a `url_pay.php` ještě potřebují inventuru, uzamčení nebo odstranění. |
+| `admin/url_invoices.php`, `admin/url_pay.php` | Zachovat a přepracovat | Alternativní stateless URL faktury bez databázových invoice záznamů; potřebují bezpečnou veřejnou platební stránku, oddělený controller/view a testy. |
 | `client/login.php`, `client/registrace.php` a session | Přepracováno a auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID, POST logout a transakční registrace se samostatnou peněženkou. |
 | `client/index.php`, klientský dashboard | Přepracováno a auditováno | Tenký controller, user-scoped repository, bezpečný wallet provisioner, CSRF a escapované responzivní views. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
 | `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
-| testovací a pomocné skripty | Čeká | Staré `test_*.php`, simulátory a případné veřejné diagnostické soubory je nutné inventarizovat a odstranit nebo uzamknout. |
+| testovací a pomocné skripty | Částečně uklizeno | Veřejný debugger, stará registrace a zastaralé ruční testy byly odstraněny. `eshop_simulator.php` bude přepracován na univerzální integrační ukázku mimo web root v `tools/`. |
 
 ## Architektura
 
@@ -315,8 +315,8 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 ## Doporučené pořadí dalšího auditu
 
 1. `checkout/pay.php` a související AJAX/status endpointy.
-2. Veřejně dosažitelné checkout a administrační diagnostické stránky (`admin/url_*.php`, `admin/test_*.php`).
-3. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
+2. Zachování a modernizace alternativních stateless URL faktur (`admin/url_invoices.php`, `admin/url_pay.php`).
+3. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
 4. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
 5. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
