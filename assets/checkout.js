@@ -26,6 +26,7 @@
     const successPanel = document.getElementById('success-panel');
     const timer = document.getElementById('checkout-timer');
     const walletLink = document.getElementById('wallet-link');
+    const qrPaymentLink = document.getElementById('qr-payment-link');
     const partialNotice = document.getElementById('partial-notice');
     const missingAmount = document.getElementById('missing-amount');
     const toast = document.getElementById('copy-toast');
@@ -99,12 +100,15 @@
         if (successPanel) {
             successPanel.classList.toggle('is-visible', settled);
         }
-        if (walletLink && expired) {
-            walletLink.classList.add('is-disabled');
-            walletLink.setAttribute('aria-disabled', 'true');
-            walletLink.setAttribute('tabindex', '-1');
-            walletLink.removeAttribute('href');
-        }
+        [walletLink, qrPaymentLink].forEach((paymentLink) => {
+            if (!paymentLink || !expired) {
+                return;
+            }
+            paymentLink.classList.add('is-disabled');
+            paymentLink.setAttribute('aria-disabled', 'true');
+            paymentLink.setAttribute('tabindex', '-1');
+            paymentLink.removeAttribute('href');
+        });
 
         const partial = data.additional_status === 'PaidPartial' && !settled;
         if (partialNotice) {
