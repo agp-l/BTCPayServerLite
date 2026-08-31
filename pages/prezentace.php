@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 // Získáme základní URL pro správné fungování odkazů
 use BtcPayLite\UrlManager;
-$urlManager = new UrlManager();
+
+if (!isset($urlManager) || !$urlManager instanceof UrlManager) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    $config = isset($config) && is_array($config) ? $config : require __DIR__ . '/../config.php';
+    $urlManager = new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
+}
 $baseUrl = $urlManager->getBaseUrl();
 ?>
 <!doctype html>

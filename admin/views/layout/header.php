@@ -5,15 +5,21 @@ declare(strict_types=1);
 use BtcPayLite\UrlManager;
 
 $pageTitle = $pageTitle ?? 'BTCPay Lite';
-$adminPrefix = $adminPrefix ?? '';
-$rootPrefix = $rootPrefix ?? '../';
-
-// NEPRŮSTŘELNÉ ŘEŠENÍ: Hlavička se nespoléhá na globální scope.
-// Zjistí si aktivní menu sama, pokud k ní proměnná nedoputovala.
-if (!isset($activeMenu)) {
-    $urlHelper = new UrlManager();
-    $activeMenu = $urlHelper->getActiveMenu();
-}
+$config = isset($config) && is_array($config) ? $config : require __DIR__ . '/../../../config.php';
+$urlManager = isset($urlManager) && $urlManager instanceof UrlManager
+    ? $urlManager
+    : new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
+$activeMenu = isset($activeMenu) && is_string($activeMenu)
+    ? $activeMenu
+    : $urlManager->getActiveMenu();
+$routeUrl = static fn (string $path): string => htmlspecialchars(
+    $urlManager->url($path),
+    ENT_QUOTES,
+    'UTF-8'
+);
 ?>
 <!doctype html>
 <html lang="cs">
@@ -198,58 +204,58 @@ if (!isset($activeMenu)) {
 
 <!-- LEVÉ MENU -->
     <aside class="sidebar">
-        <a href="<?php echo $adminPrefix; ?>dashboard" class="sidebar-brand">
+        <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="sidebar-brand">
             <i class="fa-solid fa-bolt"></i>
             <span>BTCPay Lite</span>
         </a>
 
         <div class="sidebar-section-title">Správa a Obchody</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>dashboard" class="nav-item <?php echo $activeMenu === 'dashboard' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="nav-item <?php echo $activeMenu === 'dashboard' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-chart-pie"></i> Přehled
             </a>
-            <a href="<?php echo $adminPrefix; ?>wallet" class="nav-item <?php echo $activeMenu === 'wallet' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/wallet'); ?>" class="nav-item <?php echo $activeMenu === 'wallet' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-wallet"></i> Peněženka
             </a>
-            <a href="<?php echo $adminPrefix; ?>stores" class="nav-item <?php echo $activeMenu === 'stores' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/stores'); ?>" class="nav-item <?php echo $activeMenu === 'stores' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-shop"></i> E-shopy
             </a>
-            <a href="<?php echo $adminPrefix; ?>invoices" class="nav-item <?php echo $activeMenu === 'invoices' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="nav-item <?php echo $activeMenu === 'invoices' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-database"></i> DB Faktury
             </a>
-            <a href="<?php echo $adminPrefix; ?>webhooks" class="nav-item <?php echo $activeMenu === 'webhooks' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/webhooks'); ?>" class="nav-item <?php echo $activeMenu === 'webhooks' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-satellite-dish"></i> Webhooky
             </a>
         </nav>
 
         <div class="sidebar-section-title" style="margin-top: 16px;">Bezstavový systém</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>url_invoices" class="nav-item <?php echo $activeMenu === 'url_invoices' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/url_invoices'); ?>" class="nav-item <?php echo $activeMenu === 'url_invoices' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-link"></i> URL Faktury
             </a>
         </nav>
 
         <div class="sidebar-section-title" style="margin-top: 16px;">Testy & Diagnostika</div>
         <nav class="sidebar-nav">
-            <a href="<?php echo $adminPrefix; ?>test_shop" class="nav-item <?php echo $activeMenu === 'test_shop' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/test_shop'); ?>" class="nav-item <?php echo $activeMenu === 'test_shop' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-store"></i> Test Obchodu
             </a>
-            <a href="<?php echo $adminPrefix; ?>test_api_webhook" class="nav-item <?php echo $activeMenu === 'test_api_webhook' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/admin/test_api_webhook'); ?>" class="nav-item <?php echo $activeMenu === 'test_api_webhook' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-vial"></i> Test Webhooku
             </a>
-            <a href="<?php echo $rootPrefix; ?>debugger.php" class="nav-item <?php echo $activeMenu === 'debugger.php' || $activeMenu === 'debugger' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/debugger.php'); ?>" class="nav-item <?php echo $activeMenu === 'debugger.php' || $activeMenu === 'debugger' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-bug"></i> Master Debugger
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_stateless" class="nav-item <?php echo $activeMenu === 'test_stateless' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/test_stateless.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_stateless' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-code"></i> Test Stateless API
             </a>
-            <a href="<?php echo $rootPrefix; ?>eshop_simulator" class="nav-item <?php echo $activeMenu === 'eshop_simulator' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/eshop_simulator.php'); ?>" class="nav-item <?php echo $activeMenu === 'eshop_simulator' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-cart-shopping"></i> E-shop Simulátor
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_direct" class="nav-item <?php echo $activeMenu === 'test_direct' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/test_direct.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_direct' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-bolt-lightning"></i> Test Direct
             </a>
-            <a href="<?php echo $rootPrefix; ?>test_create_wallet" class="nav-item <?php echo $activeMenu === 'test_create_wallet' ? 'active' : ''; ?>">
+            <a href="<?php echo $routeUrl('/test_create_wallet.php'); ?>" class="nav-item <?php echo $activeMenu === 'test_create_wallet' ? 'active' : ''; ?>">
                 <i class="fa-solid fa-folder-plus"></i> Test Peněženky
             </a>
         </nav>

@@ -7,8 +7,15 @@ $config = require __DIR__ . '/../config.php';
 
 use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
+use BtcPayLite\UrlManager;
 
-AuthManager::requireRole('client', 'login');
+$urlManager = isset($urlManager) && $urlManager instanceof UrlManager
+    ? $urlManager
+    : new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
+AuthManager::requireRole('client', $urlManager->url('/login'));
 $csrfToken = AuthManager::csrfToken();
 $userId = $_SESSION['user_id'];
 $stores = [];

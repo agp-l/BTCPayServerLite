@@ -1,119 +1,110 @@
 <?php
-// index.php - Hlavní směrovač (Front Controller)
+
 declare(strict_types=1);
 
-require_once __DIR__ . '/vendor/autoload.php';
-$config = require __DIR__ . '/config.php';
-
-use BtcPayLite\UrlManager;
+use BtcPayLite\ApplicationRouter;
 use BtcPayLite\AuthManager;
+use BtcPayLite\RouterException;
+use BtcPayLite\UrlManager;
 
-AuthManager::startSession();
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
 
-// Inicializace správce URL
-$urlManager = new UrlManager();
-// Načtení prvního a druhého segmentu URL
-$segment1 = $urlManager->getSegment(0) ?: 'home';
-$segment2 = $urlManager->getSegment(1) ?: '';
+require_once __DIR__ . '/vendor/autoload.php';
 
-// ZÍSKÁNÍ AKTIVNÍHO MENU PRO ŠABLONY
-$activeMenu = $urlManager->getActiveMenu();
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: same-origin');
+header('X-Frame-Options: DENY');
 
-// ==========================================
-// ROUTER (Směrovač aplikací)
-// ==========================================
-// ... (zbytek tvého stávajícího kódu) ...
+$urlManager = null;
+$requestMethod = is_string($_SERVER['REQUEST_METHOD'] ?? null)
+    ? strtoupper($_SERVER['REQUEST_METHOD'])
+    : '';
 
-// ==========================================
-// ROUTER (Směrovač aplikací)
-// ==========================================
-
-// 1. VĚTEV: ADMINISTRÁTORSKÁ SEKCE (/admin/...)
-// 1. VĚTEV: ADMINISTRÁTORSKÁ SEKCE (/admin/...)
-if ($segment1 === 'admin') {
-    
-    // Zabezpečení celé větve
-    AuthManager::requireRole('admin', $urlManager->getBaseUrl() . '/login');
-
-    // Pod-směrovač pro to, co je za slovem /admin/
-    switch ($segment2) {
-        case 'dashboard':
-        case '': 
-            require __DIR__ . '/admin/dashboard.php';
-            break;
-            
-        case 'wallet':
-            require __DIR__ . '/admin/wallet.php';
-            break;
-
-        case 'stores': // <--- ZDE JE OPRAVA PRO OBCHODY
-            require __DIR__ . '/admin/stores.php';
-            break;
-            
-        case 'invoices':
-            require __DIR__ . '/admin/invoices.php';
-            break;
-
-        case 'webhooks': 
-            require __DIR__ . '/admin/webhooks.php';
-            break;
-
-        case 'url_invoices': 
-            require __DIR__ . '/admin/url_invoices.php';
-            break;
-
-        case 'test_shop': 
-            require __DIR__ . '/admin/test_shop.php';
-            break;
-
-        case 'test_api_webhook': 
-            require __DIR__ . '/admin/test_api_webhook.php';
-            break;
-            
-        default:
-            // Neznámá adresa -> přesměrování
-            header("Location: " . $urlManager->getBaseUrl() . "/admin/dashboard");
-            exit;
+try {
+    $config = require __DIR__ . '/config.php';
+    if (!is_array($config)) {
+        throw new RuntimeException('Application configuration must be an array.');
     }
-}
-// 2. VĚTEV: VEŘEJNÁ A KLIENTSKÁ SEKCE
-else {
-    switch ($segment1) {
-        
-        // --- VEŘEJNÉ STRÁNKY (Nová složka pages) ---
-        case 'home':
-        case 'prezentace':
-            require __DIR__ . '/pages/prezentace.php'; 
-            break;
 
-        // --- KLIENTSKÁ SEKCE (Složka client) ---
-        case 'login':
-            require __DIR__ . '/client/login.php';
-            break;
+    AuthManager::startSession();
 
-        case 'registrace':
-            require __DIR__ . '/client/registrace.php';
-            break;
-            
-        case 'dashboard':
-        case 'client':
-            // Sem případně nasměrujeme klientský index, pokud bude mít čistou URL
-            require __DIR__ . '/client/index.php';
-            break;
+    $configuredBaseUrl = is_string($config['app_url'] ?? null)
+        ? $config['app_url']
+        : null;
+    $urlManager = new UrlManager($_SERVER, $configuredBaseUrl);
+    if ($requestMethod === '') {
+        throw new RouterException('Požadavek nemá platnou HTTP metodu.', 400);
+    }
 
-        // --- API A EXTERNÍ NÁSTROJE ---
-        case 'api':
-            require __DIR__ . '/api_stateless.php';
-            break;
+    $route = (new ApplicationRouter())->match($urlManager->getPath(), $requestMethod);
+    if ($route->isRedirect()) {
+        header('Location: ' . $urlManager->url((string) $route->getRedirectPath()), true, 308);
+        exit;
+    }
 
-        case 'pay':
-            require __DIR__ . '/pay.php';
-            break;
+    $requiredRole = $route->getRequiredRole();
+    if ($requiredRole !== null) {
+        AuthManager::requireRole($requiredRole, $urlManager->url('/login'));
+    }
 
-        // --- VÝCHOZÍ PRAVIDLO (404) ---
-        default:
-            // Pokud uživatel zadá nesmyslnou URL, hodíme ho zpět na hlavní stranu
-            header("Location: " . $urlManager->getBaseUrl() . "/"); 
-            exit;
+    $handler = $route->getHandler();
+    if ($handler === null) {
+        throw new RuntimeException('Matched route has no handler.');
+    }
+    $root = realpath(__DIR__);
+    $handlerPath = realpath(__DIR__ . DIRECTORY_SEPARATOR . $handler);
+    if ($root === false
+        || $handlerPath === false
+        || !str_starts_with($handlerPath, $root . DIRECTORY_SEPARATOR)
+        || !is_file($handlerPath)
+    ) {
+        throw new RuntimeException('Matched route handler is unavailable.');
+    }
+
+    $activeMenu = $route->getMenu();
+    if ($requestMethod === 'HEAD') {
+        ob_start();
+        require $handlerPath;
+        ob_end_clean();
+        exit;
+    }
+
+    require $handlerPath;
+} catch (RouterException $exception) {
+    $errorStatus = $exception->getHttpStatus();
+    if ($errorStatus === 405 && $exception->getAllowedMethods() !== []) {
+        header('Allow: ' . implode(', ', $exception->getAllowedMethods()));
+    }
+    http_response_code($errorStatus);
+    header('Cache-Control: no-store');
+    $errorTitle = $errorStatus === 404
+        ? 'Stránka nebyla nalezena'
+        : ($errorStatus === 405 ? 'Nepovolená metoda' : 'Neplatný požadavek');
+    $errorMessage = $exception->getMessage();
+    $homeUrl = $urlManager instanceof UrlManager ? $urlManager->url('/') : '/';
+    if ($requestMethod !== 'HEAD') {
+        require __DIR__ . '/pages/error.php';
+    }
+} catch (InvalidArgumentException $exception) {
+    http_response_code(400);
+    header('Cache-Control: no-store');
+    $errorStatus = 400;
+    $errorTitle = 'Neplatná adresa';
+    $errorMessage = 'Požadovaná URL není platná.';
+    $homeUrl = $urlManager instanceof UrlManager ? $urlManager->url('/') : '/';
+    if ($requestMethod !== 'HEAD') {
+        require __DIR__ . '/pages/error.php';
+    }
+} catch (Throwable $exception) {
+    error_log('Front controller failed: ' . $exception->getMessage());
+    http_response_code(500);
+    header('Cache-Control: no-store');
+    $errorStatus = 500;
+    $errorTitle = 'Interní chyba';
+    $errorMessage = 'Požadavek nyní nelze dokončit. Zkuste to prosím později.';
+    $homeUrl = $urlManager instanceof UrlManager ? $urlManager->url('/') : '/';
+    if ($requestMethod !== 'HEAD') {
+        require __DIR__ . '/pages/error.php';
     }
 }

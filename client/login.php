@@ -8,9 +8,16 @@ $config = require __DIR__ . '/../config.php';
 use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
+use BtcPayLite\UrlManager;
 
 AuthManager::startSession();
 AuthManager::sendPrivateResponseHeaders();
+$urlManager = isset($urlManager) && $urlManager instanceof UrlManager
+    ? $urlManager
+    : new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
 
 $error = '';
 
@@ -29,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'logout') {
             $auth->logout();
-            header('Location: login', true, 303);
+            header('Location: ' . $urlManager->url('/login'), true, 303);
             exit;
         }
         if ($action !== 'login') {
@@ -43,7 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             : '';
         $user = $auth->login($email, $password, $clientIdentity);
 
-        header('Location: ' . ($user['role'] === 'admin' ? 'admin/dashboard' : 'client'), true, 303);
+        header(
+            'Location: ' . $urlManager->url(
+                $user['role'] === 'admin' ? '/admin/dashboard' : '/client'
+            ),
+            true,
+            303
+        );
         exit;
     } catch (AuthException $exception) {
         $error = $exception->getMessage();
