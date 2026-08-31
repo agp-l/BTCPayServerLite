@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
 use BtcPayLite\ClientDashboardException;
 use BtcPayLite\ClientDashboardService;
@@ -46,6 +47,7 @@ $invoices = [];
 $webhooks = [];
 $toastMsg = '';
 $pageError = null;
+$service = null;
 
 try {
     $walletPath = $config['wallet_path'] ?? null;
@@ -78,8 +80,18 @@ try {
             ($config['allow_local_webhooks'] ?? false) === true
         )
     );
+} catch (Throwable $exception) {
+    error_log(sprintf(
+        'Client dashboard initialization failed: %s (%s)',
+        $exception->getMessage(),
+        $exception::class
+    ));
+    http_response_code(500);
+    $pageError = 'Klientský panel nyní není dostupný. Zkuste to prosím později.';
+}
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($service instanceof ClientDashboardService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
@@ -99,25 +111,41 @@ try {
         } else {
             throw new ClientDashboardException('Neznámá operace klientského panelu.');
         }
+    } catch (AuthException $exception) {
+        http_response_code(403);
+        $pageError = 'Platnost formuláře vypršela. Obnovte stránku a zkuste akci znovu.';
+        error_log('Client dashboard CSRF validation failed.');
+    } catch (ClientDashboardException $exception) {
+        http_response_code($exception->getHttpStatus());
+        $pageError = $exception->getMessage();
+        error_log('Client dashboard operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+    } catch (Throwable $exception) {
+        http_response_code(500);
+        $pageError = 'Operaci se nyní nepodařilo dokončit. Zkuste to prosím později.';
+        error_log(sprintf(
+            'Unexpected client dashboard operation failure: %s (%s)',
+            $exception->getMessage(),
+            $exception::class
+        ));
     }
+}
 
-    $dashboard = $service->load($userId);
-    $clientStats = $dashboard['summary'];
-    $stores = $dashboard['stores'];
-    $invoices = $dashboard['invoices'];
-    $webhooks = $dashboard['webhooks'];
-} catch (ClientDashboardException $exception) {
-    http_response_code($exception->getHttpStatus());
-    $pageError = $exception->getMessage();
-    error_log('Client dashboard operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
-} catch (Throwable $exception) {
-    error_log(sprintf(
-        'Unexpected client dashboard failure: %s (%s)',
-        $exception->getMessage(),
-        $exception::class
-    ));
-    http_response_code(500);
-    $pageError = 'Klientský panel nyní není dostupný. Zkuste to prosím později.';
+if ($service instanceof ClientDashboardService) {
+    try {
+        $dashboard = $service->load($userId);
+        $clientStats = $dashboard['summary'];
+        $stores = $dashboard['stores'];
+        $invoices = $dashboard['invoices'];
+        $webhooks = $dashboard['webhooks'];
+    } catch (Throwable $exception) {
+        error_log(sprintf(
+            'Client dashboard data load failed: %s (%s)',
+            $exception->getMessage(),
+            $exception::class
+        ));
+        http_response_code(500);
+        $pageError = 'Data klientského panelu nyní nejsou dostupná. Zkuste to prosím později.';
+    }
 }
 
 require __DIR__ . '/views/index_view.php';
