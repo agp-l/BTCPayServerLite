@@ -140,20 +140,15 @@ $passes[] = 'throttles repeated failures by email and client identity';
 $registrationRepository = new FakeAuthUserRepository();
 $registrationAuth = new AuthManager($registrationRepository);
 for ($registration = 1; $registration <= 3; $registration++) {
+    $registrationAuth->recordRegistrationAttempt('198.51.100.20');
     $registrationAuth->registerUser(
         'person' . $registration . '@example.test',
         'correct horse battery staple',
-        'correct horse battery staple',
-        '198.51.100.20'
+        'correct horse battery staple'
     );
 }
 expectAuthException(
-    static fn () => $registrationAuth->registerUser(
-        'person4@example.test',
-        'correct horse battery staple',
-        'correct horse battery staple',
-        '198.51.100.20'
-    ),
+    static fn () => $registrationAuth->recordRegistrationAttempt('198.51.100.20'),
     'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
 );
 $passes[] = 'limits wallet-producing registrations per client address';
