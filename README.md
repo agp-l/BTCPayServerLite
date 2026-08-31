@@ -2,7 +2,7 @@
 
 Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
-> Stav dokumentace: větev `audit/auth-session` po dokončeném auditu autentizace, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou, kontraktními testy a provozním smoke testem tam, kde byl potřeba. Neznamená to, že je dokončený audit celého webového projektu.
+> Stav dokumentace: větev `develop/url-routing` po vývojovém refaktoru URL a front controlleru, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou, kontraktními testy a provozním smoke testem tam, kde byl potřeba. Neznamená to, že je dokončený audit celého webového projektu.
 
 ## Aktuální stav auditu
 
@@ -18,12 +18,13 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - persistentní webhook outbox, retry/backoff, HMAC podpisy a ochrana proti SSRF/DNS rebindingu,
 - autentizace `webhook_cron.php`,
 - přihlášení, registrace, session/cookie politika, CSRF, role a persistentní throttling,
+- důvěryhodný aplikační origin, striktní parsování URL a deklarativní routing,
+- skutečné HTTP odpovědi 400/404/405/500 a kanonické interní odkazy,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 30 tříd a dvě rozhraní. Fokusovaným auditem prošlo 30 komponent. Zbývají dvě pomocné/UI třídy:
+V adresáři `classes/` je 33 tříd a dvě rozhraní. Fokusovaným auditem nebo samostatným vývojovým refaktorem prošlo 34 komponent. Zbývá jedna původní UI třída:
 
-- `BtcDashboard`,
-- `UrlManager`.
+- `BtcDashboard`.
 
 ### Hlavní soubory mimo `classes/`
 
@@ -35,7 +36,7 @@ V adresáři `classes/` je 30 tříd a dvě rozhraní. Fokusovaným auditem pro�
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
 | `admin/webhooks.php` | Částečně auditováno | Vstup vyžaduje admin roli a registrace používá společnou URL policy; audit celého formuláře a jeho mutací ještě čeká. |
 | `checkout/pay.php` | Čeká | Veřejná platební stránka a její výstupní/HTTP hranice nebyly samostatně auditovány. |
-| `index.php` | Částečně auditováno | Bezpečné spuštění session a skryté PHP chyby jsou hotové; routing, Host header a redirecty ještě čekají. |
+| `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/*.php`, `admin/views/` | Částečně auditováno | Přímé vstupy do kontrolovaných admin stránek vyžadují admin roli; CSRF, XSS, validace formulářů a citlivá data ještě čekají. |
 | `client/login.php`, `client/registrace.php` a session | Auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID a POST logout. |
 | `client/index.php`, ostatní client views | Částečně auditováno | Role a CSRF hranice mutací jsou hotové; širší audit dashboardu, objektové autorizace a výstupů ještě čeká. |
@@ -138,7 +139,16 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `PdoAuthUserRepository` | PDO implementace explicitních auth dotazů, binárních identit throttlingu a omezeného úklidu pokusů. | Auditováno |
 | `AuthException` | Bezpečná doménová chyba autentizace bez úniku interních detailů. | Auditováno |
 | `BtcDashboard` | Připravuje peněženku, adresy, transakce, poplatky, fiat ceny a export klíčů pro administrační UI. | Čeká na fokusovaný audit |
-| `UrlManager` | Parsuje cestu, skládá základní URL a pomáhá routeru/UI. | Čeká na fokusovaný audit |
+| `UrlManager` | Odděluje důvěryhodný origin od request URI, validuje Host/app_url, dekóduje bezpečné segmenty a skládá kanonické interní URL. | Přepracováno a auditováno |
+| `ApplicationRouter` | Deklarativní tabulka přesných cest, HTTP metod, handlerů, aktivního menu a požadovaných rolí. | Přepracováno a auditováno |
+| `ApplicationRoute` | Neměnný výsledek routingu pro handler nebo interní redirect. | Přepracováno a auditováno |
+| `RouterException` | Bezpečná routovací chyba s HTTP statusem a seznamem metod pro hlavičku `Allow`. | Přepracováno a auditováno |
+
+## Front controller a čisté URL
+
+Hlavní `index.php` používá přesné route bez prefixového porovnávání. Aliasové cesty `/home`, `/prezentace`, `/dashboard` a `/admin` vracejí kanonický redirect. Neznámá cesta vrací 404; známá cesta s nepovolenou metodou vrací 405 a hlavičku `Allow`.
+
+`app_url` je důvěryhodný origin aplikace a má zahrnovat i instalační podadresář, například `http://localhost/BTCPayLite`. Je-li nastavený, odkazy ani redirecty nepoužívají klientský Host header. Routovací segmenty zůstávají daty a HTML escapování se provádí až ve view.
 
 ## HTTP vstupní body
 
@@ -188,7 +198,7 @@ return [
 ];
 ```
 
-Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
+`app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
@@ -241,6 +251,10 @@ php tests/WebhookDeliveryRepositoryQueryTest.php
 php tests/AuthManagerTest.php
 php tests/AuthRepositoryQueryTest.php
 php tests/AuthHttpBoundaryTest.php
+php tests/UrlManagerTest.php
+php tests/ApplicationRouterTest.php
+php tests/FrontControllerBoundaryTest.php
+php tests/RouteLinkBoundaryTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
@@ -259,11 +273,10 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 
 ## Doporučené pořadí dalšího auditu
 
-1. `UrlManager` a `index.php`, včetně Host headeru, routingu, redirectů a produkčních chybových režimů.
-2. `BtcDashboard` a `admin/wallet.php`, zejména přesnost částek, vzdálené cenové API, export seed/xprv a CSRF.
-3. `checkout/pay.php` a související AJAX/status endpointy.
-4. Zbytek `admin/` a `client/` formulářů a views: CSRF, XSS, autorizace objektů a bezpečné mazání.
-5. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
-6. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
+1. `BtcDashboard` a `admin/wallet.php`, zejména přesnost částek, vzdálené cenové API, export seed/xprv a CSRF.
+2. `checkout/pay.php` a související AJAX/status endpointy.
+3. Zbytek `admin/` a `client/` formulářů a views: CSRF, XSS, autorizace objektů a bezpečné mazání.
+4. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
+5. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
