@@ -73,6 +73,13 @@ final class AdminOperationsService
                 $store['wallet_path']
             );
         } catch (Throwable $exception) {
+            if ($store['wallet_path'] !== '') {
+                try {
+                    $this->walletProvisioner->discard($store['wallet_path']);
+                } catch (Throwable $cleanupException) {
+                    error_log('Unused admin wallet cleanup failed: ' . $cleanupException::class);
+                }
+            }
             throw new AdminOperationsException(
                 'Obchod a jeho peněženku se nyní nepodařilo vytvořit.',
                 503,
