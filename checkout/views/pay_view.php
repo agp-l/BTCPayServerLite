@@ -90,7 +90,6 @@ $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:
                                      width="248"
                                      height="248"
                                      alt="QR kód bitcoinové platby">
-                                <span class="qr-center" aria-hidden="true">₿</span>
                             </span>
                         </a>
                     <?php else: ?>
