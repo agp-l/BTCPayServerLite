@@ -1,130 +1,242 @@
 <?php
+
 declare(strict_types=1);
+
 namespace BtcPayLite;
 
-use Exception;
-use PDO;
-
 /**
- * Třída pro správu autentizace a uživatelských účtů (Zabezpečeno a Auditováno).
+ * Authentication, registration, CSRF and session lifecycle boundary.
  */
 class AuthManager
 {
-    private Database $db;
+    private const MIN_PASSWORD_BYTES = 12;
+    private const MAX_PASSWORD_BYTES = 72;
+    private const MAX_EMAIL_BYTES = 254;
+    private const MAX_LOGIN_FAILURES = 5;
+    private const LOGIN_WINDOW_SECONDS = 900;
+    private const SESSION_IDLE_SECONDS = 1800;
+    private const SESSION_ABSOLUTE_SECONDS = 43200;
+    private const DUMMY_PASSWORD_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
 
-    public function __construct(Database $db)
+    private AuthUserRepository $users;
+
+    public function __construct(Database|AuthUserRepository $users)
     {
-        $this->db = $db;
+        $this->users = $users instanceof Database
+            ? new PdoAuthUserRepository($users)
+            : $users;
     }
 
-    /**
-     * Pokusí se přihlásit uživatele. V případě úspěchu vrátí jeho data.
-     */
-    public function login(string $email, string $password): array
+    /** @return array{id:int,email:string,role:string} */
+    public function login(string $email, string $password, string $clientIdentity = ''): array
     {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new Exception("Neplatný formát e-mailové adresy.");
+        $email = $this->normalizeEmail($email);
+        if ($password === '' || strlen($password) > self::MAX_PASSWORD_BYTES) {
+            throw new AuthException('Nesprávný e-mail nebo heslo.');
         }
 
-        $stmt = $this->db->getPdo()->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $now = time();
+        $identityHash = hash('sha256', $email . "\0" . $clientIdentity);
+        $failures = $this->users->countRecentLoginFailures(
+            $identityHash,
+            $now - self::LOGIN_WINDOW_SECONDS
+        );
+        if ($failures >= self::MAX_LOGIN_FAILURES) {
+            throw new AuthException('Příliš mnoho pokusů o přihlášení. Zkuste to znovu za 15 minut.');
+        }
 
-        if ($user && password_verify($password, $user['password_hash'])) {
-            
-            // OBRANA PROTI SESSION FIXATION: Okamžité přegenerování ID relace
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_regenerate_id(true);
+        $user = $this->users->findByEmail($email);
+        $passwordHash = $user['password_hash'] ?? self::DUMMY_PASSWORD_HASH;
+        $passwordMatches = password_verify($password, $passwordHash);
+
+        if ($user === null || !$passwordMatches) {
+            $this->users->recordLoginFailure($identityHash, $now);
+            throw new AuthException('Nesprávný e-mail nebo heslo.');
+        }
+        if (!in_array($user['role'], ['admin', 'client'], true)) {
+            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+        }
+
+        $this->users->clearLoginFailures($identityHash);
+        if (password_needs_rehash($passwordHash, PASSWORD_DEFAULT)) {
+            $newHash = password_hash($password, PASSWORD_DEFAULT);
+            if (is_string($newHash)) {
+                $this->users->updatePasswordHash($user['id'], $newHash);
             }
-
-            // Bezpečné nastavení session
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['email'] = $user['email'];
-
-            return $user;
         }
 
-        // Stejná chybová hláška zamezuje hádání existujících e-mailů (User Enumeration)
-        throw new Exception("Nesprávný e-mail nebo heslo.");
+        self::startSession();
+        if (!session_regenerate_id(true)) {
+            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+        }
+
+        $_SESSION = [
+            'user_id' => $user['id'],
+            'role' => $user['role'],
+            'email' => $user['email'],
+            'auth_issued_at' => $now,
+            'auth_last_activity' => $now,
+        ];
+
+        return [
+            'id' => $user['id'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+        ];
     }
 
-    /**
-     * Zaregistruje nového uživatele a vrátí jeho ID.
-     */
     public function registerUser(string $email, string $password, string $passwordConfirm): int
     {
-        if (empty($email) || empty($password)) {
-            throw new Exception("Vyplňte prosím e-mail a heslo.");
+        $email = $this->normalizeEmail($email);
+        $passwordLength = strlen($password);
+        if ($passwordLength < self::MIN_PASSWORD_BYTES || $passwordLength > self::MAX_PASSWORD_BYTES) {
+            throw new AuthException('Heslo musí mít 12 až 72 znaků včetně mezer.');
         }
-
-        // VALIDACE FORMÁTU E-MAILU NA STRANĚ SERVERU
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new Exception("Zadejte prosím platnou e-mailovou adresu.");
+        if (!hash_equals($password, $passwordConfirm)) {
+            throw new AuthException('Zadaná hesla se neshodují.');
         }
-
-        if ($password !== $passwordConfirm) {
-            throw new Exception("Zadaná hesla se neshodují.");
-        }
-
-        $stmt = $this->db->getPdo()->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            throw new Exception("Tento e-mail je již zaregistrovaný.");
+        if ($this->users->findByEmail($email) !== null) {
+            throw new AuthException('Registraci s těmito údaji nelze dokončit.');
         }
 
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $this->db->getPdo()->prepare("INSERT INTO users (email, password_hash, role) VALUES (?, ?, 'client')");
-        $stmt->execute([$email, $passwordHash]);
-        
-        return (int)$this->db->getPdo()->lastInsertId();
+        if (!is_string($passwordHash)) {
+            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
+        }
+
+        return $this->users->createClient($email, $passwordHash);
     }
 
-    /**
-     * Bezpečně zničí aktuální session, odhlásí uživatele a odstraní Cookie.
-     */
     public function logout(): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        // 1. Vymazání dat z paměti
+        self::startSession();
         $_SESSION = [];
 
-        // 2. Vymazání fyzické Session Cookie z prohlížeče uživatele
-        if (ini_get("session.use_cookies")) {
+        if ((bool) ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'],
+                'domain' => $params['domain'],
+                'secure' => $params['secure'],
+                'httponly' => true,
+                'samesite' => $params['samesite'] ?: 'Lax',
+            ]);
         }
 
-        // 3. Totální zničení session na serveru
         session_destroy();
     }
 
+    public static function startSession(?bool $secure = null): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            return;
+        }
+        if (headers_sent()) {
+            throw new AuthException('Relaci nyní nelze bezpečně spustit.');
+        }
 
-    /**
-     * Zabezpečí stránku pouze pro určitou roli.
-     * Pokud uživatel nemá oprávnění, přesměruje ho pryč.
-     */
+        $secure ??= !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
+        ini_set('session.use_trans_sid', '0');
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+
+        if (!session_start()) {
+            throw new AuthException('Relaci nyní nelze bezpečně spustit.');
+        }
+    }
+
+    public static function csrfToken(): string
+    {
+        self::startSession();
+        if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+
+        return $_SESSION['csrf_token'];
+    }
+
+    public static function requireCsrfToken(mixed $token): void
+    {
+        self::startSession();
+        if (
+            !is_string($token)
+            || !isset($_SESSION['csrf_token'])
+            || !is_string($_SESSION['csrf_token'])
+            || !hash_equals($_SESSION['csrf_token'], $token)
+        ) {
+            throw new AuthException('Formulář vypršel. Obnovte stránku a zkuste to znovu.');
+        }
+    }
+
+    public static function hasRole(string $requiredRole, ?int $now = null): bool
+    {
+        self::startSession();
+        $now ??= time();
+        $issuedAt = $_SESSION['auth_issued_at'] ?? null;
+        $lastActivity = $_SESSION['auth_last_activity'] ?? null;
+        if (
+            !is_int($_SESSION['user_id'] ?? null)
+            || !is_string($_SESSION['role'] ?? null)
+            || $_SESSION['role'] !== $requiredRole
+            || !is_int($issuedAt)
+            || !is_int($lastActivity)
+            || $issuedAt > $now
+            || $lastActivity > $now
+            || $now - $issuedAt > self::SESSION_ABSOLUTE_SECONDS
+            || $now - $lastActivity > self::SESSION_IDLE_SECONDS
+        ) {
+            return false;
+        }
+
+        $_SESSION['auth_last_activity'] = $now;
+        return true;
+    }
+
     public static function requireRole(string $requiredRole, string $redirectUrl = '../client/login.php'): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        // OCHRANA PROTI "BACK BUTTON" ÚTOKU (Zákaz cachování prohlížečem)
-        header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-        header("Cache-Control: post-check=0, pre-check=0", false);
-        header("Pragma: no-cache");
-
-        // STRIKTNÍ KONTROLA ROLE
-        if (empty($_SESSION['user_id']) || empty($_SESSION['role']) || $_SESSION['role'] !== $requiredRole) {
-            header("Location: " . $redirectUrl);
+        self::sendPrivateResponseHeaders();
+        if (!self::hasRole($requiredRole)) {
+            self::clearInvalidSession();
+            header('Location: ' . $redirectUrl, true, 303);
             exit;
         }
+    }
+
+    public static function sendPrivateResponseHeaders(): void
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Content-Type-Options: nosniff');
+        header('Referrer-Policy: same-origin');
+        header('X-Frame-Options: DENY');
+    }
+
+    private function normalizeEmail(string $email): string
+    {
+        $email = strtolower(trim($email));
+        if (
+            $email === ''
+            || strlen($email) > self::MAX_EMAIL_BYTES
+            || filter_var($email, FILTER_VALIDATE_EMAIL) === false
+        ) {
+            throw new AuthException('Nesprávný e-mail nebo heslo.');
+        }
+
+        return $email;
+    }
+
+    private static function clearInvalidSession(): void
+    {
+        self::startSession();
+        $_SESSION = [];
     }
 }
