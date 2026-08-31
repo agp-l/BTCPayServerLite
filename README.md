@@ -26,7 +26,7 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - sdílený responzivní design systém pro administraci a klientský portál,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 59 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
+V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
 
 ### Hlavní soubory mimo `classes/`
 
@@ -37,7 +37,7 @@ V adresáři `classes/` je 59 tříd a rozhraní. Původní velké UI třídy a 
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
 | `admin/stores.php`, `admin/invoices.php`, `admin/webhooks.php` | Přepracováno a auditováno | Tenké controllery, jednotná oprávnění a CSRF, validované služby, přesné BTC částky a společná webhook URL policy. |
-| `checkout/pay.php`, `checkout/views/`, `assets/checkout.*` | Přepracováno a auditováno | Tenký veřejný controller pro databázové faktury, bezpečný JSON status endpoint, přesné částky, lokální BIP21 odkaz, responzivní design a žádné předávání platebních dat externí QR službě. |
+| `checkout/pay.php`, `checkout/views/`, `assets/checkout.*` | Přepracováno a auditováno | Tenký veřejný controller pro databázové faktury, bezpečný JSON status endpoint, přesné částky, lokálně generovaný BIP21 QR kód, zelený responzivní design a žádné předávání platebních dat externí službě. |
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
 | `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém dashboardu, peněženky, obchodů, faktur a webhooků bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
@@ -112,6 +112,7 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `DatabaseCheckoutFactory` | Sestavuje checkout z validované konfigurace a spouští kontrolu Electrumu pod sdíleným databázovým zámkem. | Auditováno |
 | `DatabaseCheckoutController` | HTTP hranice veřejného checkoutu pro HTML a minimální JSON status odpověď; povoluje pouze `GET` a `HEAD`. | Auditováno |
 | `CheckoutException` | Veřejně bezpečná checkout chyba s HTTP statusem a stabilním názvem operace. | Auditováno |
+| `CheckoutQrCodeGenerator` | Lokálně generuje zelený SVG QR kód z validovaného BIP21 URI; při chybějící knihovně bezpečně zachová běžný wallet odkaz. | Auditováno |
 | `BtcStatelessTokenCodec` | Podepisuje a ověřuje časově omezené stateless tokeny a odmítá změněný nebo prošlý obsah. | Auditováno |
 | `BtcStatelessService` | Aplikační logika stateless API a platební stránky; ověřuje klienta, wallet mapping, vstupy a stav platby. | Auditováno |
 | `BtcStatelessServiceException` | Chyba stateless operace s bezpečným HTTP statusem a názvem operace. | Auditováno |
@@ -184,7 +185,7 @@ Hlavní `index.php` používá přesné route bez prefixového porovnávání. A
 
 Veřejná cesta `GET /pay?id={invoiceId}` zobrazuje zákazníkovi částku, bitcoinovou adresu, zbývající čas a aktuální stav databázové faktury. Stav se obnovuje přes `GET /pay?id={invoiceId}&action=check`; JSON odpověď obsahuje pouze dynamické platební údaje potřebné pro UI.
 
-Checkout používá přesné osmidesetinné BTC řetězce, společný databázový zámek pro Electrum a bezpečné chybové odpovědi. Tlačítko „Otevřít Bitcoin peněženku“ používá lokálně sestavené BIP21 URI. Původní vzdálený generátor QR byl odstraněn, aby adresa, částka a invoice ID neopouštěly aplikaci.
+Checkout používá přesné osmidesetinné BTC řetězce, společný databázový zámek pro Electrum a bezpečné chybové odpovědi. Tlačítko „Otevřít Bitcoin peněženku“ používá lokálně sestavené BIP21 URI. Původní vzdálený generátor QR byl nahrazen lokálním SVG generátorem `endroid/qr-code` 4.7.0, aby adresa, částka a invoice ID neopouštěly aplikaci. Verze je záměrně připnutá kvůli kompatibilitě s PHP 8.0.
 
 ### `api.php` – databázové API
 
@@ -267,7 +268,8 @@ Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Pre
 
 ```bash
 composer install
-composer dump-autoload
+composer update endroid/qr-code --with-all-dependencies
+composer dump-autoload --optimize
 ```
 
 Adresáře s peněženkami a zálohami databáze držte mimo `htdocs` a mimo Git.
@@ -283,6 +285,7 @@ php tests/BtcInvoiceManagerTest.php
 php tests/DatabaseCheckoutServiceTest.php
 php tests/CheckoutRepositoryQueryTest.php
 php tests/CheckoutHttpBoundaryTest.php
+php tests/CheckoutQrCodeGeneratorTest.php
 php tests/BtcStatelessServiceTest.php
 php tests/DatabaseTest.php
 php tests/GreenfieldApiTest.php
