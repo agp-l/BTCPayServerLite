@@ -13,6 +13,7 @@ class AuthManager
     private const MAX_PASSWORD_BYTES = 72;
     private const MAX_EMAIL_BYTES = 254;
     private const MAX_LOGIN_FAILURES = 5;
+    private const MAX_CLIENT_FAILURES = 25;
     private const LOGIN_WINDOW_SECONDS = 900;
     private const SESSION_IDLE_SECONDS = 1800;
     private const SESSION_ABSOLUTE_SECONDS = 43200;
@@ -36,12 +37,20 @@ class AuthManager
         }
 
         $now = time();
-        $identityHash = hash('sha256', $email . "\0" . $clientIdentity);
-        $failures = $this->users->countRecentLoginFailures(
+        $identityHash = hash('sha256', "account\0" . $email . "\0" . $clientIdentity);
+        $clientHash = hash('sha256', "client\0" . $clientIdentity);
+        $accountFailures = $this->users->countRecentLoginFailures(
             $identityHash,
             $now - self::LOGIN_WINDOW_SECONDS
         );
-        if ($failures >= self::MAX_LOGIN_FAILURES) {
+        $clientFailures = $clientIdentity === '' ? 0 : $this->users->countRecentLoginFailures(
+            $clientHash,
+            $now - self::LOGIN_WINDOW_SECONDS
+        );
+        if (
+            $accountFailures >= self::MAX_LOGIN_FAILURES
+            || $clientFailures >= self::MAX_CLIENT_FAILURES
+        ) {
             throw new AuthException('Příliš mnoho pokusů o přihlášení. Zkuste to znovu za 15 minut.');
         }
 
@@ -51,6 +60,9 @@ class AuthManager
 
         if ($user === null || !$passwordMatches) {
             $this->users->recordLoginFailure($identityHash, $now);
+            if ($clientIdentity !== '') {
+                $this->users->recordLoginFailure($clientHash, $now);
+            }
             throw new AuthException('Nesprávný e-mail nebo heslo.');
         }
         if (!in_array($user['role'], ['admin', 'client'], true)) {
