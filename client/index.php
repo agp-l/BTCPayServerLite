@@ -67,13 +67,19 @@ try {
         new ElectrumCliWalletProvisioner(
             is_string($config['electrum_cli_path'] ?? null)
                 ? $config['electrum_cli_path']
-                : '/opt/electrum/run_electrum',
+                : (is_string($config['electrum_cli'] ?? null)
+                    ? $config['electrum_cli']
+                    : '/opt/electrum/run_electrum'),
             is_string($config['electrum_data_dir'] ?? null)
                 ? $config['electrum_data_dir']
-                : '/opt/electrum_config',
+                : (is_string($config['electrum_data_directory'] ?? null)
+                    ? $config['electrum_data_directory']
+                    : '/opt/electrum_config'),
             is_string($config['store_wallets_dir'] ?? null)
                 ? $config['store_wallets_dir']
-                : dirname($walletPath)
+                : (is_string($config['wallet_directory'] ?? null)
+                    ? $config['wallet_directory']
+                    : dirname($walletPath))
         ),
         new WebhookEndpointPolicy(
             null,
