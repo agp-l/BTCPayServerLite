@@ -36,12 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (int) ($config['db_port'] ?? 3306)
         );
         $auth = new AuthManager($db);
-        $db->getPdo()->beginTransaction();
-
         $clientIdentity = is_string($_SERVER['REMOTE_ADDR'] ?? null)
             ? $_SERVER['REMOTE_ADDR']
             : '';
-        $userId = $auth->registerUser($email, $password, $passwordConfirm, $clientIdentity);
+        $auth->recordRegistrationAttempt($clientIdentity);
+        $db->getPdo()->beginTransaction();
+
+        $userId = $auth->registerUser($email, $password, $passwordConfirm);
         $storeId = 'store_' . bin2hex(random_bytes(16));
         $apiKey = 'sk_' . bin2hex(random_bytes(32));
         $walletDirectory = rtrim(
