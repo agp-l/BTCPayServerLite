@@ -427,6 +427,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .invoice-url a { color: var(--admin-accent-light); text-decoration: none; }
 .invoice-url a:hover { text-decoration: underline; }
 .danger-text { color: var(--admin-danger) !important; }
+.verification-summary { margin-bottom: 12px; }
+.verification-data { color: var(--admin-text-soft); font-size: 13px; line-height: 1.75; }
+.verification-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.underpaid-note { margin-top: 6px; color: var(--admin-warning); font-weight: 750; }
+.error-text { display: inline-flex; align-items: center; gap: 8px; color: #fda4af; font-weight: 650; }
+.invoice-description { font-size: 15px; }
+.invoice-meta { margin-top: 4px; color: var(--admin-muted); font-size: 11px; }
+.invoice-amount-block { text-align: right; }
+.invoice-status { margin-top: 5px; }
+.push-right { margin-left: auto; }
 
 @media (max-width: 1280px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
