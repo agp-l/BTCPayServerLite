@@ -1,150 +1,123 @@
 <?php
-// client/index.php - Klientský dashboard (Kontroler)
+
 declare(strict_types=1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
-$config = require __DIR__ . '/../config.php';
-
 use BtcPayLite\AuthManager;
+use BtcPayLite\ClientDashboardException;
+use BtcPayLite\ClientDashboardService;
 use BtcPayLite\Database;
+use BtcPayLite\ElectrumCliWalletProvisioner;
+use BtcPayLite\PdoClientDashboardRepository;
 use BtcPayLite\UrlManager;
+use BtcPayLite\WebhookEndpointPolicy;
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+$config = require __DIR__ . '/../config.php';
 $urlManager = isset($urlManager) && $urlManager instanceof UrlManager
     ? $urlManager
     : new UrlManager(
         $_SERVER,
         is_string($config['app_url'] ?? null) ? $config['app_url'] : null
     );
+
 AuthManager::requireRole('client', $urlManager->url('/login'));
+
+header('Cache-Control: no-store, private');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
+
 $csrfToken = AuthManager::csrfToken();
-$userId = $_SESSION['user_id'];
+$sessionUserId = $_SESSION['user_id'] ?? null;
+if (is_int($sessionUserId)) {
+    $userId = $sessionUserId;
+} elseif (is_string($sessionUserId) && ctype_digit($sessionUserId)) {
+    $userId = (int) $sessionUserId;
+} else {
+    $userId = 0;
+}
+
+$clientStats = ['total_stores' => 0, 'total_invoices' => 0, 'paid_invoices' => 0];
 $stores = [];
 $invoices = [];
 $webhooks = [];
 $toastMsg = '';
-$clientStats = ['total_stores' => 0, 'total_invoices' => 0, 'paid_invoices' => 0];
+$pageError = null;
 
 try {
-    $db = new Database(
+    $walletPath = $config['wallet_path'] ?? null;
+    if (!is_string($walletPath) || trim($walletPath) === '') {
+        throw new RuntimeException('Configured default wallet path is unavailable.');
+    }
+
+    $database = new Database(
         $config['db_host'],
         $config['db_name'],
         $config['db_user'],
         $config['db_pass'],
         (int) ($config['db_port'] ?? 3306)
     );
-    
-    // Zpracování formulářů (Tvorba e-shopu, Webhooky)
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $service = new ClientDashboardService(
+        new PdoClientDashboardRepository($database),
+        new ElectrumCliWalletProvisioner(
+            is_string($config['electrum_cli_path'] ?? null)
+                ? $config['electrum_cli_path']
+                : '/opt/electrum/run_electrum',
+            is_string($config['electrum_data_dir'] ?? null)
+                ? $config['electrum_data_dir']
+                : '/opt/electrum_config',
+            is_string($config['store_wallets_dir'] ?? null)
+                ? $config['store_wallets_dir']
+                : dirname($walletPath)
+        ),
+        new WebhookEndpointPolicy(
+            null,
+            ($config['allow_local_webhooks'] ?? false) === true
+        )
+    );
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
-        
-        // 1. AKCE: Vytvoření nového e-shopu (a peněženky na pozadí)
-        if ($_POST['action'] === 'create_store') {
-            $storeName = trim($_POST['store_name'] ?? '');
-            if (empty($storeName)) $storeName = 'Nový e-shop';
+        $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
-            $storeId = 'store_' . substr(bin2hex(random_bytes(8)), 0, 10);
-            $apiKey = bin2hex(random_bytes(16));
-            $walletPath = '/opt/btcpay_wallets/' . $storeId . '_wallet';
-            
-            // Fyzické vytvoření peněženky v Linuxu
-            $cmd = "python3 /opt/electrum/run_electrum -D /opt/electrum_config create --offline -w " . escapeshellarg($walletPath) . " 2>&1";
-            shell_exec($cmd);
-
-            // Nastavíme práva, aby k souboru mohl přistoupit hlavní Electrum démon
-            if (file_exists($walletPath)) {
-                chmod($walletPath, 0664);
-            }
-            
-            $stmt = $db->getPdo()->prepare("INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$storeId, $storeName, $apiKey, $walletPath, $userId]);
-            $toastMsg = "Obchod $storeName byl úspěšně založen!";
-        }
-        
-        // 2. AKCE: Přidání Webhooku
-        elseif ($_POST['action'] === 'create_webhook') {
-            $storeId = trim($_POST['store_id'] ?? '');
-            $url = trim($_POST['url'] ?? '');
-
-            if (!empty($storeId) && !empty($url)) {
-                $stmt = $db->getPdo()->prepare("SELECT id FROM stores WHERE id = ? AND user_id = ?");
-                $stmt->execute([$storeId, $userId]);
-                if ($stmt->fetch()) {
-                    $whId = 'wh_' . substr(bin2hex(random_bytes(8)), 0, 10);
-                    $whSecret = bin2hex(random_bytes(16));
-                    $insStmt = $db->getPdo()->prepare("INSERT INTO webhooks (id, store_id, url, secret) VALUES (?, ?, ?, ?)");
-                    $insStmt->execute([$whId, $storeId, $url, $whSecret]);
-                    $toastMsg = "Webhook byl úspěšně přidán!";
-                } else {
-                    $toastMsg = "Chyba: Neoprávněný přístup k obchodu.";
-                }
-            }
-        } 
-        
-        // 3. AKCE: Smazání Webhooku
-        elseif ($_POST['action'] === 'delete_webhook') {
-            $whId = trim($_POST['webhook_id'] ?? '');
-            
-            $stmt = $db->getPdo()->prepare("
-                SELECT w.id FROM webhooks w 
-                JOIN stores s ON w.store_id = s.id 
-                WHERE w.id = ? AND s.user_id = ?
-            ");
-            $stmt->execute([$whId, $userId]);
-            if ($stmt->fetch()) {
-                $delStmt = $db->getPdo()->prepare("DELETE FROM webhooks WHERE id = ?");
-                $delStmt->execute([$whId]);
-                $toastMsg = "Webhook byl smazán.";
-            } else {
-                $toastMsg = "Chyba: Nemáte oprávnění ke smazání tohoto webhooku.";
-            }
+        if ($action === 'create_store') {
+            $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
+            $service->createStore($userId, $name);
+            $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
+        } elseif ($action === 'create_webhook') {
+            $storeId = is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '';
+            $url = is_string($_POST['url'] ?? null) ? $_POST['url'] : '';
+            $service->createWebhook($userId, $storeId, $url);
+            $toastMsg = 'Webhook byl bezpečně ověřen a uložen.';
+        } elseif ($action === 'delete_webhook') {
+            $webhookId = is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : '';
+            $service->deleteWebhook($userId, $webhookId);
+            $toastMsg = 'Webhook byl odstraněn.';
+        } else {
+            throw new ClientDashboardException('Neznámá operace klientského panelu.');
         }
     }
 
-    // Načtení klientských statistik
-    $statStmt = $db->getPdo()->prepare("
-        SELECT 
-            (SELECT COUNT(*) FROM stores WHERE user_id = ?) as total_stores,
-            (SELECT COUNT(*) FROM invoices i JOIN stores s ON i.store_id = s.id WHERE s.user_id = ?) as total_invoices,
-            (SELECT COUNT(*) FROM invoices i JOIN stores s ON i.store_id = s.id WHERE s.user_id = ? AND i.status = 'Settled') as paid_invoices
-    ");
-    $statStmt->execute([$userId, $userId, $userId]);
-    $clientStats = $statStmt->fetch() ?: $clientStats;
-
-    // Načtení e-shopů
-    $stmt = $db->getPdo()->prepare("SELECT * FROM stores WHERE user_id = ? ORDER BY id DESC");
-    $stmt->execute([$userId]);
-    $stores = $stmt->fetchAll();
-
-    if (!empty($stores)) {
-        $storeIds = array_column($stores, 'id');
-        $placeholders = implode(',', array_fill(0, count($storeIds), '?'));
-        
-        // Načtení faktur
-        $invStmt = $db->getPdo()->prepare("
-            SELECT i.*, s.name as store_name 
-            FROM invoices i 
-            JOIN stores s ON i.store_id = s.id 
-            WHERE i.store_id IN ($placeholders) 
-            ORDER BY i.created_at DESC 
-            LIMIT 30
-        ");
-        $invStmt->execute($storeIds);
-        $invoices = $invStmt->fetchAll();
-
-        // Načtení webhooků
-        $whStmt = $db->getPdo()->prepare("
-            SELECT w.*, s.name as store_name 
-            FROM webhooks w 
-            JOIN stores s ON w.store_id = s.id 
-            WHERE w.store_id IN ($placeholders) 
-            ORDER BY w.id DESC
-        ");
-        $whStmt->execute($storeIds);
-        $webhooks = $whStmt->fetchAll();
-    }
-} catch (\Throwable $e) {
-    error_log('Unexpected client dashboard failure: ' . $e->getMessage());
-    $toastMsg = 'Operaci nyní nelze dokončit. Zkuste to prosím později.';
+    $dashboard = $service->load($userId);
+    $clientStats = $dashboard['summary'];
+    $stores = $dashboard['stores'];
+    $invoices = $dashboard['invoices'];
+    $webhooks = $dashboard['webhooks'];
+} catch (ClientDashboardException $exception) {
+    http_response_code($exception->getHttpStatus());
+    $pageError = $exception->getMessage();
+    error_log('Client dashboard operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+} catch (Throwable $exception) {
+    error_log(sprintf(
+        'Unexpected client dashboard failure: %s (%s)',
+        $exception->getMessage(),
+        $exception::class
+    ));
+    http_response_code(500);
+    $pageError = 'Klientský panel nyní není dostupný. Zkuste to prosím později.';
 }
 
 require __DIR__ . '/views/index_view.php';
