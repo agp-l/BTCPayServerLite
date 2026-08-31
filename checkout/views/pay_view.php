@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use JsonException;
-
 /** @var array<string,mixed> $checkout */
 /** @var string $statusUrl */
 /** @var string $stylesheetUrl */
@@ -19,24 +17,6 @@ $statusLabels = [
 $isSettled = $checkout['status'] === 'Settled';
 $isExpired = $checkout['status'] === 'Expired';
 $isPartial = $checkout['additional_status'] === 'PaidPartial';
-
-try {
-    $clientData = json_encode(
-        [
-            'statusUrl' => $statusUrl,
-            'initialStatus' => $checkout['status'],
-            'secondsRemaining' => $checkout['seconds_remaining'],
-        ],
-        JSON_UNESCAPED_SLASHES
-            | JSON_HEX_TAG
-            | JSON_HEX_AMP
-            | JSON_HEX_APOS
-            | JSON_HEX_QUOT
-            | JSON_THROW_ON_ERROR
-    );
-} catch (JsonException) {
-    $clientData = '{"statusUrl":"","initialStatus":"Expired","secondsRemaining":0}';
-}
 ?>
 <!doctype html>
 <html lang="cs">
@@ -50,7 +30,11 @@ try {
     <script src="<?= htmlspecialchars($scriptUrl, ENT_QUOTES, 'UTF-8') ?>" defer></script>
 </head>
 <body>
-<main class="checkout-shell">
+<main id="checkout-app"
+      class="checkout-shell"
+      data-status-url="<?= htmlspecialchars($statusUrl, ENT_QUOTES, 'UTF-8') ?>"
+      data-initial-status="<?= htmlspecialchars((string) $checkout['status'], ENT_QUOTES, 'UTF-8') ?>"
+      data-seconds-remaining="<?= htmlspecialchars((string) $checkout['seconds_remaining'], ENT_QUOTES, 'UTF-8') ?>">
     <section class="checkout-card" aria-labelledby="checkout-title">
         <header class="checkout-header">
             <a class="checkout-brand" href="https://bitcoin.org/" rel="noopener noreferrer" target="_blank"
@@ -140,6 +124,5 @@ try {
     </section>
 </main>
 <div id="copy-toast" class="copy-toast" role="status" aria-live="polite">Zkopírováno</div>
-<script id="checkout-data" type="application/json"><?= $clientData ?></script>
 </body>
 </html>
