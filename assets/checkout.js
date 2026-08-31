@@ -1,17 +1,17 @@
 (() => {
     'use strict';
 
-    const configElement = document.getElementById('checkout-data');
-    if (!configElement) {
+    const app = document.getElementById('checkout-app');
+    if (!app) {
         return;
     }
 
-    let config;
-    try {
-        config = JSON.parse(configElement.textContent || '{}');
-    } catch (_error) {
-        return;
-    }
+    const parsedSeconds = Number.parseInt(app.dataset.secondsRemaining || '0', 10);
+    const config = {
+        statusUrl: app.dataset.statusUrl || '',
+        initialStatus: app.dataset.initialStatus || 'Expired',
+        secondsRemaining: Number.isSafeInteger(parsedSeconds) ? parsedSeconds : 0,
+    };
 
     const statusMeta = {
         New: ['Čekáme na platbu', 'new'],
