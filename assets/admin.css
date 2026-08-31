@@ -389,12 +389,53 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .invoice-history-main { min-width: 0; display: grid; gap: 3px; }
 .invoice-history-item code { color: var(--admin-accent-light); font-size: 12px; font-weight: 800; white-space: nowrap; }
 
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.55fr); gap: 24px; align-items: start; }
+.dashboard-grid > .card { margin-bottom: 0; }
+.operations-list { display: grid; gap: 10px; }
+.operation-link {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid var(--admin-line);
+  border-radius: 13px;
+  background: rgba(7, 8, 12, 0.34);
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.operation-link:hover { border-color: rgba(192, 132, 252, 0.3); background: var(--admin-accent-soft); transform: translateY(-1px); }
+.operation-icon { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid rgba(192, 132, 252, 0.16); border-radius: 12px; background: var(--admin-accent-soft); color: var(--admin-accent-light); }
+.operation-copy { min-width: 0; display: grid; gap: 2px; }
+.operation-copy strong { font-size: 12px; }
+.operation-copy span { color: var(--admin-muted); font-size: 10px; }
+.operation-link > i { color: #5d5764; font-size: 10px; }
+
+.management-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr); gap: 24px; align-items: start; }
+.management-grid > .card { margin-bottom: 0; }
+.management-aside { position: sticky; top: 96px; }
+.surface-note { display: flex; gap: 11px; margin-top: 18px; padding: 14px; border: 1px solid var(--admin-line); border-radius: 13px; background: rgba(7, 8, 12, 0.32); color: var(--admin-muted); font-size: 11px; }
+.surface-note i { margin-top: 2px; color: var(--admin-accent-light); }
+
+.url-invoice-workspace { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr); gap: 24px; align-items: start; }
+.url-invoice-workspace > .card { margin-bottom: 0; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+.form-grid-wide { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.result-panel { display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--admin-line); border-radius: 14px; background: rgba(7, 8, 12, 0.4); }
+.history-toolbar { display: flex; gap: 9px; flex-wrap: wrap; }
+.invoice-url { margin-top: 14px; padding: 11px 12px; border: 1px solid var(--admin-line); border-radius: 10px; background: rgba(7, 8, 12, 0.48); word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; }
+.invoice-url a { color: var(--admin-accent-light); text-decoration: none; }
+.invoice-url a:hover { text-decoration: underline; }
+.danger-text { color: var(--admin-danger) !important; }
+
 @media (max-width: 1280px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-grid { grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr); }
 }
 
 @media (max-width: 1040px) {
-  .wallet-grid, .merchant-grid { grid-template-columns: 1fr; }
+  .wallet-grid, .merchant-grid, .dashboard-grid, .management-grid, .url-invoice-workspace { grid-template-columns: 1fr; }
+  .management-aside { position: static; }
 }
 
 @media (max-width: 860px) {
@@ -410,7 +451,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media (max-width: 720px) {
-  .two-column-form { grid-template-columns: 1fr; gap: 0; }
+  .two-column-form, .form-grid, .form-grid-wide { grid-template-columns: 1fr; gap: 0; }
   .invoice-result { grid-template-columns: auto minmax(0, 1fr); }
   .invoice-result > .ghost-btn { grid-column: 1 / -1; }
   .invoice-history-item { grid-template-columns: minmax(0, 1fr) auto; }
