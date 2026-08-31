@@ -59,6 +59,15 @@ try {
 }
 $passes[] = 'returns 405 with an exact Allow contract';
 
+try {
+    $router->match('/pay', 'POST');
+    throw new RuntimeException('Checkout accepted a mutating method');
+} catch (RouterException $exception) {
+    routeSame(405, $exception->getHttpStatus(), 'Checkout method status mismatch');
+    routeSame(['GET', 'HEAD'], $exception->getAllowedMethods(), 'Checkout Allow methods mismatch');
+}
+$passes[] = 'keeps the public checkout read-only';
+
 $head = $router->match('/admin/dashboard', 'HEAD');
 routeSame('admin/dashboard.php', $head->getHandler(), 'HEAD did not reuse the GET page');
 $passes[] = 'supports HEAD on read-only pages';
