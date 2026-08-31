@@ -1,106 +1,96 @@
 <?php
-// admin/views/webhooks_view.php
+
 declare(strict_types=1);
 
-$pageTitle = 'Správa Webhooků - BTCPay Lite';
+$pageTitle = 'Webhooky - BTCPay Lite';
 $activeMenu = 'webhooks';
 require __DIR__ . '/layout/header.php';
+
+$webhooksUrl = $routeUrl('/admin/webhooks');
 ?>
 
-<style>
-/* Specifické styly pro výpis webhooků */
-.wh-item { background: #f9fafa; border: 1px solid #e5eae7; border-radius: 12px; padding: 20px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
-.wh-info { flex: 1; min-width: 0; }
-.wh-url { font-weight: 700; margin: 0 0 10px 0; word-break: break-all; color: #17201a; font-size: 15px; }
-.code-box { background: #ffffff; border: 1px solid #e5eae7; padding: 10px; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; margin-bottom: 12px; color: #17201a; }
-.code-label { font-size: 11px; font-weight: 700; color: #748078; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Notifikace</p>
+    <h1>Webhooky</h1>
+    <p>Správa podepsaných notifikací o změnách stavu faktur.</p>
+  </div>
+</section>
 
-/* Tlačítko pro odstranění */
-.danger-btn { border: 1px solid #fee2e2; background: #fff0f0; border-radius: 9px; padding: 8px 14px; color: #ef4d4d; text-decoration: none; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; }
-.danger-btn:hover { background: #ef4d4d; color: #ffffff; border-color: #ef4d4d; }
+<?php if ($pageError !== null): ?>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><?php echo htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8'); ?></span></div>
+<?php endif; ?>
 
-/* Vertikální uspořádání formuláře */
-.form-stack { display: flex; flex-direction: column; gap: 18px; max-width: 480px; }
-</style>
-
-<div class="page-header">
-    <h1><i class="fa-solid fa-satellite-dish" style="color:#2fd35a;"></i> Správa Webhooků</h1>
-</div>
-
-<div class="card">
-    <h2 class="card-title"><i class="fa-solid fa-plus-circle" style="color:#20b948;"></i> Přidat Webhook ručně</h2>
-    <p style="font-size: 13px; color: #748078; margin-top: -10px; margin-bottom: 20px;">Poznámka: Většina e-shopů si webhook vytvoří automaticky přes API. Zde to můžeš udělat ručně např. pro testování.</p>
-    
-    <form method="POST" action="webhooks.php">
-        <input type="hidden" name="action" value="create">
-        
-        <div class="form-stack">
-            <div class="field" style="margin-bottom: 0;">
-                <label>Přiřadit k obchodu</label>
-                <div class="input-wrap">
-                    <select name="store_id" required>
-                        <option value="">-- Vyber obchod --</option>
-                        <?php foreach ($stores as $s): ?>
-                            <option value="<?php echo htmlspecialchars($s['id']); ?>"><?php echo htmlspecialchars($s['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="field" style="margin-bottom: 0;">
-                <label>URL adresa (Kam odeslat notifikaci o platbě)</label>
-                <div class="input-wrap">
-                    <input type="url" name="url" placeholder="https://tvuj-eshop.cz/wc-api/WC_Gateway_BtcPay/" required>
-                </div>
-            </div>
-            
-            <button type="submit" class="primary" style="margin-top: 5px;"><i class="fa-solid fa-plus"></i> Vytvořit Webhook</button>
-        </div>
-    </form>
-</div>
-
-<div class="card">
-    <h2 class="card-title"><i class="fa-solid fa-list" style="color:#748078;"></i> Aktivní Webhooky</h2>
-    
-    <?php if (empty($webhooks)): ?>
-        <p style="color: #748078; font-size: 14px;">Zatím nemáš vytvořené žádné webhooky.</p>
+<div class="merchant-grid">
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-plus" aria-hidden="true"></i> Přidat webhook</span></div>
+    <p class="card-subtitle">Endpoint se před uložením ověří proti SSRF, privátním adresám a nebezpečným DNS odpovědím.</p>
+    <?php if ($stores === []): ?>
+      <div class="alert alert-warning"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>Nejprve vytvořte obchod.</span></div>
     <?php else: ?>
-        <?php foreach ($webhooks as $w): ?>
-            <div class="wh-item">
-                <div class="wh-info">
-                    <div class="code-label">Obchod: <?php echo htmlspecialchars($w['store_name'] ?? 'Neznámý obchod'); ?></div>
-                    <h3 class="wh-url"><?php echo htmlspecialchars($w['url']); ?></h3>
-                    
-                    <div class="code-label">Webhook Secret (Pro ověření podpisů):</div>
-                    <div class="code-box"><?php echo htmlspecialchars($w['secret']); ?></div>
-                    
-                    <div class="code-label">ID Webhooku:</div>
-                    <div style="font-size: 12px; color: #748078; font-family: ui-monospace, monospace;"><?php echo htmlspecialchars($w['id']); ?></div>
-                </div>
-                <form method="POST" style="margin:0;" onsubmit="return confirm('Opravdu smazat tento webhook?');">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($w['id']); ?>">
-                    <button type="submit" class="danger-btn"><i class="fa-solid fa-trash"></i> Smazat</button>
-                </form>
-            </div>
-        <?php endforeach; ?>
+      <form method="post" action="<?php echo $webhooksUrl; ?>" class="form-stack">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="action" value="create">
+        <div class="field"><label for="webhookStore">Obchod</label><div class="input-wrap"><select id="webhookStore" name="store_id" required><option value="">Vyberte obchod</option><?php foreach ($stores as $store): ?><option value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?></select></div></div>
+        <div class="field"><label for="webhookUrl">HTTPS URL</label><div class="input-wrap"><input id="webhookUrl" type="url" name="url" maxlength="2048" placeholder="https://shop.example/webhook" required></div></div>
+        <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Uložit webhook</button></div>
+      </form>
     <?php endif; ?>
+  </section>
+
+  <section class="card security-card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Bezpečné doručování</span></div>
+    <p class="card-subtitle">Webhook secret ověřuje HMAC podpis. Neodesílejte jej v URL ani jej nezveřejňujte ve zdrojovém kódu.</p>
+    <div class="alert alert-warning"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Lokální HTTP endpointy povolujte jen při vývoji pomocí explicitní konfigurace.</span></div>
+  </section>
 </div>
+
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Aktivní webhooky</span><span class="badge s-unknown"><?php echo count($webhooks); ?></span></div>
+  <?php if ($webhooks === []): ?>
+    <div class="empty-state"><p>Žádné aktivní webhooky.</p></div>
+  <?php else: ?>
+    <div class="webhook-list">
+    <?php foreach ($webhooks as $webhook): ?>
+      <article class="webhook-item">
+        <div class="webhook-main">
+          <strong><?php echo htmlspecialchars($webhook['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
+          <code title="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?></code>
+          <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Webhook secret"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div></div>
+          <span class="muted code">ID: <?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?></span>
+        </div>
+        <form method="post" action="<?php echo $webhooksUrl; ?>" data-confirm="Opravdu chcete webhook odstranit?">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>">
+          <button type="submit" class="danger-btn"><i class="fa-solid fa-trash" aria-hidden="true"></i> Odstranit</button>
+        </form>
+      </article>
+    <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</section>
 
 <script>
-  // Zobrazení notifikace přes toast ve footer.php
-  const toastMsg = "<?php echo addslashes($toastMsg); ?>";
-  if (toastMsg.trim() !== '') {
-      const t = document.getElementById('toast');
-      const tMsg = document.getElementById('toastMsg');
-      if (t && tMsg) {
-          tMsg.innerHTML = `<i class="fa-solid fa-circle-info"></i> ${toastMsg}`;
-          t.classList.add('show');
-          setTimeout(() => t.classList.remove('show'), 4000);
-      } else {
-          alert(toastMsg);
-      }
-  }
+(() => {
+  const toast = document.getElementById('toast');
+  const toastText = document.getElementById('toastMsg');
+  const showToast = (message) => {
+    if (!toast || !toastText || !message) return;
+    toastText.textContent = message;
+    toast.classList.add('show');
+    window.setTimeout(() => toast.classList.remove('show'), 3000);
+  };
+  showToast(<?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
+  document.querySelectorAll('[data-reveal]').forEach((button) => button.addEventListener('click', () => {
+    const input = button.parentElement?.querySelector('input');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }));
+  document.querySelectorAll('[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
+    if (!window.confirm(form.dataset.confirm || 'Potvrdit operaci?')) event.preventDefault();
+  }));
+})();
 </script>
 
 <?php require __DIR__ . '/layout/footer.php'; ?>

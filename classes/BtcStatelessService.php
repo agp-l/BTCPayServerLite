@@ -67,8 +67,11 @@ class BtcStatelessService
         $dashboard = new BtcDashboard($this->wallet, $this->walletDirectory());
 
         // Fiat is display-only. BTC invoice calculations remain in satoshis.
-        $fiatRate = $dashboard->getFiatPrice('CZK');
-        $fiatAmount = $fiatRate > 0 ? round((float) $invoiceData['v'] * $fiatRate, 2) : 0.0;
+        $market = $dashboard->marketSnapshot('CZK');
+        $fiatRate = $market['fiat_price'];
+        $fiatAmount = $fiatRate !== null
+            ? round((float) $invoiceData['v'] * $fiatRate, 2)
+            : 0.0;
 
         return [
             'invoice' => $invoiceData,
