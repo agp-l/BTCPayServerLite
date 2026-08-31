@@ -1,38 +1,69 @@
 <?php
-// admin/dashboard.php
+
 declare(strict_types=1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
-$config = $config ?? require __DIR__ . '/../config.php';
-
-use BtcPayLite\Database;
+use BtcPayLite\AdminDashboardService;
 use BtcPayLite\AuthManager;
+use BtcPayLite\Database;
+use BtcPayLite\PdoAdminDashboardRepository;
+use BtcPayLite\UrlManager;
 
-AuthManager::requireRole('admin', '../login');
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+$config = isset($config) && is_array($config) ? $config : require __DIR__ . '/../config.php';
+$urlManager = isset($urlManager) && $urlManager instanceof UrlManager
+    ? $urlManager
+    : new UrlManager(
+        $_SERVER,
+        is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+    );
+
+AuthManager::requireRole('admin', $urlManager->url('/login'));
+
+header('Cache-Control: no-store, private');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
+
+$dashboardSummary = [
+    'total_stores' => 0,
+    'total_invoices' => 0,
+    'settled_invoices' => 0,
+    'total_btc_volume' => '0.00000000',
+    'settlement_rate' => 0,
+];
+$invoices = [];
+$pageError = null;
 
 try {
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
+    $database = new Database(
+        $config['db_host'],
+        $config['db_name'],
+        $config['db_user'],
+        $config['db_pass'],
+        (int) ($config['db_port'] ?? 3306)
+    );
+    $dashboard = (new AdminDashboardService(
+        new PdoAdminDashboardRepository($database->getPdo())
+    ))->load();
 
-    // Statistiky pro dashboard
-    $totalStores = $db->getPdo()->query("SELECT COUNT(*) FROM stores")->fetchColumn();
-    $totalInvoices = $db->getPdo()->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
-    $settledInvoices = $db->getPdo()->query("SELECT COUNT(*) FROM invoices WHERE status = 'Settled'")->fetchColumn();
-    $totalBtcVolume = $db->getPdo()->query("SELECT SUM(amount) FROM invoices WHERE status = 'Settled'")->fetchColumn() ?? 0;
-
-    // Načtení posledních faktur s názvem obchodu
-    $invoices = $db->getPdo()->query("
-        SELECT i.*, s.name as store_name 
-        FROM invoices i 
-        LEFT JOIN stores s ON i.store_id = s.id 
-        ORDER BY i.created_at DESC 
-        LIMIT 20
-    ")->fetchAll();
-
-} catch (Exception $e) {
-    die("Chyba při načítání dashboardu: " . htmlspecialchars($e->getMessage()));
+    $dashboardSummary = $dashboard['summary'];
+    $invoices = $dashboard['invoices'];
+} catch (Throwable $exception) {
+    error_log(sprintf(
+        'Admin dashboard load failed: %s (%s)',
+        $exception->getMessage(),
+        $exception::class
+    ));
+    $pageError = 'Aktuální provozní data se nepodařilo načíst. Zkuste stránku obnovit později.';
 }
 
-// ==========================================
-// VYKRESLENÍ ŠABLONY (VIEW)
-// ==========================================
+// Temporary aliases keep the existing view compatible until the UI checkpoint.
+$totalStores = $dashboardSummary['total_stores'];
+$totalInvoices = $dashboardSummary['total_invoices'];
+$settledInvoices = $dashboardSummary['settled_invoices'];
+$totalBtcVolume = $dashboardSummary['total_btc_volume'];
+
 require __DIR__ . '/views/index_view.php';
