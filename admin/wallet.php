@@ -41,6 +41,7 @@ $requestedWallet = $_GET['w'] ?? $defaultWalletName;
 
 $toastMsg = '';
 $sendResult = '';
+$sendSucceeded = false;
 $sendResultColor = '#dc2626';
 $sendResultIcon = '';
 $exportedSeed = '';
@@ -150,6 +151,7 @@ try {
 
             $txid = $dashboard->sendPayment($destination, $amount, $password, $feeRate);
             $sendResult = 'Transakce byla odeslána. TXID: ' . $txid;
+            $sendSucceeded = true;
             $sendResultColor = '#15803d';
             $sendResultIcon = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i> ';
             $toastMsg = 'Platba byla úspěšně odeslána.';
