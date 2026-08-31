@@ -102,6 +102,28 @@ rejectsUrl(
 );
 $passes[] = 'decodes safe segments and rejects route boundary bypasses';
 
+rejectsUrl(
+    static fn () => new UrlManager([
+        'REQUEST_URI' => 'http://proxy-target.example/BTCPayLite/login',
+        'SCRIPT_NAME' => '/BTCPayLite/index.php',
+        'HTTP_HOST' => 'localhost',
+    ]),
+    'Absolute-form request target was accepted'
+);
+rejectsUrl(
+    static fn () => new UrlManager([
+        'REQUEST_URI' => '//proxy-target.example/BTCPayLite/login',
+        'SCRIPT_NAME' => '/BTCPayLite/index.php',
+        'HTTP_HOST' => 'localhost',
+    ]),
+    'Network-path request target was accepted'
+);
+rejectsUrl(
+    static fn () => $trusted->url('/admin%2Fwallet'),
+    'Encoded slash was accepted by the URL builder'
+);
+$passes[] = 'rejects ambiguous request targets and generated paths';
+
 $externalReferer = new UrlManager($trustedServer + [
     'HTTP_REFERER' => 'https://pay.example.com.evil.test/BTCPayLite/admin',
 ], 'https://pay.example.com/BTCPayLite/');
