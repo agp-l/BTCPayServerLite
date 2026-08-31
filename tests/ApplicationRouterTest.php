@@ -58,6 +58,30 @@ $head = $router->match('/admin/dashboard', 'HEAD');
 routeSame('admin/dashboard.php', $head->getHandler(), 'HEAD did not reuse the GET page');
 $passes[] = 'supports HEAD on read-only pages';
 
+$handlerCases = [
+    ['/', 'GET'],
+    ['/login', 'GET'],
+    ['/registrace', 'GET'],
+    ['/client', 'GET'],
+    ['/api', 'POST'],
+    ['/pay', 'GET'],
+    ['/admin/dashboard', 'GET'],
+    ['/admin/wallet', 'GET'],
+    ['/admin/stores', 'GET'],
+    ['/admin/invoices', 'GET'],
+    ['/admin/webhooks', 'GET'],
+    ['/admin/url_invoices', 'GET'],
+    ['/admin/test_shop', 'GET'],
+    ['/admin/test_api_webhook', 'GET'],
+];
+foreach ($handlerCases as [$path, $method]) {
+    $handler = $router->match($path, $method)->getHandler();
+    if ($handler === null || !is_file(dirname(__DIR__) . '/' . $handler)) {
+        throw new RuntimeException('Route handler does not exist: ' . $path);
+    }
+}
+$passes[] = 'maps every executable route to an existing handler';
+
 foreach ($passes as $pass) {
     echo '[PASS] ' . $pass . PHP_EOL;
 }
