@@ -177,6 +177,23 @@ class WebhookEndpointPolicy
 
     private function isPublicIp(string $address): bool
     {
+        $binary = @inet_pton($address);
+        if ($binary === false) {
+            return false;
+        }
+
+        // PHP's reserved/private flags have differed for IPv4-mapped IPv6
+        // addresses. Classify the embedded IPv4 address explicitly so forms
+        // such as ::ffff:127.0.0.1 cannot bypass the SSRF policy.
+        if (
+            strlen($binary) === 16
+            && substr($binary, 0, 12) === str_repeat("\0", 10) . "\xff\xff"
+        ) {
+            $mappedIpv4 = @inet_ntop(substr($binary, 12));
+
+            return is_string($mappedIpv4) && $this->isPublicIp($mappedIpv4);
+        }
+
         return filter_var(
             $address,
             FILTER_VALIDATE_IP,
