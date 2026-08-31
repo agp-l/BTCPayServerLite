@@ -17,7 +17,7 @@ use Throwable;
  * reserve their address through an Electrum payment request; legacy invoices
  * without a request ID remain readable through the address-balance fallback.
  */
-class BtcInvoiceManager
+class BtcInvoiceManager implements BtcStatelessInvoiceGateway
 {
     private const MAX_EXPIRATION_MINUTES = 43_200;
     private const MAX_METADATA_BYTES = 16_384;
@@ -30,7 +30,7 @@ class BtcInvoiceManager
     private const ELECTRUM_STATUS_UNCONFIRMED = 7;
 
     private ElectrumWallet $wallet;
-    private BtcStatelessTokenCodec $tokenCodec;
+    private BtcStatelessInvoiceManager $statelessManager;
     private ?Database $db;
     private Closure $clock;
 
@@ -41,7 +41,7 @@ class BtcInvoiceManager
         ?callable $clock = null
     ) {
         $this->wallet = $wallet;
-        $this->tokenCodec = new BtcStatelessTokenCodec($secretKey);
+        $this->statelessManager = new BtcStatelessInvoiceManager($wallet, $secretKey, $clock);
         $this->db = $db;
         $this->clock = $clock === null
             ? static fn (): int => time()
@@ -293,45 +293,12 @@ class BtcInvoiceManager
         array $customData = [],
         int $expirationMinutes = 15
     ): array {
-        $amount = $this->requirePositiveAmount($amountBtc);
-        $description = $this->validateNonEmptyString(
+        return $this->statelessManager->createStatelessInvoice(
+            $amountBtc,
             $description,
-            'Invoice description',
-            self::MAX_DESCRIPTION_BYTES
+            $customData,
+            $expirationMinutes
         );
-        $expirationSeconds = $this->expirationSeconds($expirationMinutes);
-        $now = $this->now();
-
-        // Validate caller-controlled data before mutating the Electrum wallet.
-        $this->encodeJson($customData, 'custom invoice data', self::MAX_STATELESS_JSON_BYTES);
-
-        $request = $this->reservePaymentRequest($amount, $description, $expirationSeconds);
-        $payload = [
-            'ver' => 2,
-            'a' => $request['address'],
-            'r' => $request['request_id'],
-            'v' => $amount->toBtcString(),
-            'd' => $description,
-            'p' => $customData,
-            't' => $now,
-            'e' => $now + $expirationSeconds,
-        ];
-
-        try {
-            $token = $this->tokenCodec->encode($payload);
-        } catch (Throwable $exception) {
-            $this->removePaymentRequestQuietly($request['request_id']);
-            throw $exception;
-        }
-
-        return [
-            'token' => $token,
-            'bip21_uri' => $this->generateBip21Uri(
-                $request['address'],
-                $amount->toBtcString(),
-                $description
-            ),
-        ];
     }
 
     /**
@@ -341,7 +308,7 @@ class BtcInvoiceManager
      */
     public function decodeStatelessToken(string $token): array
     {
-        return $this->tokenCodec->decode($token);
+        return $this->statelessManager->decodeStatelessToken($token);
     }
 
     /**
@@ -349,45 +316,7 @@ class BtcInvoiceManager
      */
     public function checkStatelessPaymentStatus(string $token): array
     {
-        $data = $this->decodeStatelessToken($token);
-        $expected = $this->requirePositiveAmount((string) $data['v']);
-        $now = $this->now();
-        $isExpired = $now >= (int) $data['e'];
-        $observation = $this->observePayment(
-            (string) $data['a'],
-            isset($data['r']) ? (string) $data['r'] : null,
-            $expected
-        );
-
-        $status = $this->statelessStatus(
-            $observation['electrum_status'],
-            $observation['confirmed'],
-            $observation['received'],
-            $expected,
-            $isExpired
-        );
-        $missing = BitcoinAmount::max(
-            BitcoinAmount::fromSatoshis(0),
-            $expected->subtract($observation['received'])
-        );
-
-        return [
-            'status' => $status,
-            'is_expired' => $isExpired,
-            'seconds_remaining' => $isExpired ? 0 : ((int) $data['e'] - $now),
-            'invoice' => $data,
-            'payment' => [
-                'received_total' => $observation['received']->toBtcString(),
-                // Backwards-compatible alias used by existing clients.
-                'total_received' => $observation['received']->toBtcString(),
-                'missing_amount' => $missing->toBtcString(),
-            ],
-            'bip21_uri' => $this->generateBip21Uri(
-                (string) $data['a'],
-                $expected->toBtcString(),
-                (string) $data['d']
-            ),
-        ];
+        return $this->statelessManager->checkStatelessPaymentStatus($token);
     }
 
     /**
