@@ -15,6 +15,8 @@ class AuthManager
     private const MAX_LOGIN_FAILURES = 5;
     private const MAX_CLIENT_FAILURES = 25;
     private const LOGIN_WINDOW_SECONDS = 900;
+    private const MAX_REGISTRATIONS = 3;
+    private const REGISTRATION_WINDOW_SECONDS = 3600;
     private const SESSION_IDLE_SECONDS = 1800;
     private const SESSION_ABSOLUTE_SECONDS = 43200;
     private const DUMMY_PASSWORD_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
@@ -39,11 +41,11 @@ class AuthManager
         $now = time();
         $identityHash = hash('sha256', "account\0" . $email . "\0" . $clientIdentity);
         $clientHash = hash('sha256', "client\0" . $clientIdentity);
-        $accountFailures = $this->users->countRecentLoginFailures(
+        $accountFailures = $this->users->countRecentAttempts(
             $identityHash,
             $now - self::LOGIN_WINDOW_SECONDS
         );
-        $clientFailures = $clientIdentity === '' ? 0 : $this->users->countRecentLoginFailures(
+        $clientFailures = $clientIdentity === '' ? 0 : $this->users->countRecentAttempts(
             $clientHash,
             $now - self::LOGIN_WINDOW_SECONDS
         );
@@ -59,9 +61,9 @@ class AuthManager
         $passwordMatches = password_verify($password, $passwordHash);
 
         if ($user === null || !$passwordMatches) {
-            $this->users->recordLoginFailure($identityHash, $now);
+            $this->users->recordAttempt($identityHash, $now);
             if ($clientIdentity !== '') {
-                $this->users->recordLoginFailure($clientHash, $now);
+                $this->users->recordAttempt($clientHash, $now);
             }
             throw new AuthException('Nesprávný e-mail nebo heslo.');
         }
@@ -69,7 +71,7 @@ class AuthManager
             throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
         }
 
-        $this->users->clearLoginFailures($identityHash);
+        $this->users->clearAttempts($identityHash);
         if (password_needs_rehash($passwordHash, PASSWORD_DEFAULT)) {
             $newHash = password_hash($password, PASSWORD_DEFAULT);
             if (is_string($newHash)) {
@@ -97,7 +99,12 @@ class AuthManager
         ];
     }
 
-    public function registerUser(string $email, string $password, string $passwordConfirm): int
+    public function registerUser(
+        string $email,
+        string $password,
+        string $passwordConfirm,
+        string $clientIdentity = ''
+    ): int
     {
         $email = $this->normalizeEmail($email);
         $passwordLength = strlen($password);
@@ -106,6 +113,20 @@ class AuthManager
         }
         if (!hash_equals($password, $passwordConfirm)) {
             throw new AuthException('Zadaná hesla se neshodují.');
+        }
+
+        if ($clientIdentity !== '') {
+            $now = time();
+            $registrationHash = hash('sha256', "registration\0" . $clientIdentity);
+            if ($this->users->countRecentAttempts(
+                $registrationHash,
+                $now - self::REGISTRATION_WINDOW_SECONDS
+            ) >= self::MAX_REGISTRATIONS) {
+                throw new AuthException(
+                    'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
+                );
+            }
+            $this->users->recordAttempt($registrationHash, $now);
         }
         if ($this->users->findByEmail($email) !== null) {
             throw new AuthException('Registraci s těmito údaji nelze dokončit.');
