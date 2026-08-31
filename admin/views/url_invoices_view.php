@@ -7,17 +7,25 @@ $activeMenu = 'url_invoices';
 require __DIR__ . '/layout/header.php';
 ?>
 
-<div class="page-header">
-    <h1><i class="fa-solid fa-link" style="color:#2fd35a;"></i> Stateless URL Faktury</h1>
-</div>
-
-<!-- Generování faktury -->
-<div class="card">
-    <div class="card-title">
-        <span style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-plus-circle" style="color:#20b948;"></i> Vystavit Stateless Fakturu (URL)</span>
+<section class="page-header">
+    <div class="page-header-copy">
+        <p class="page-eyebrow">Bez databáze</p>
+        <h1>Stateless URL faktury</h1>
+        <p>Podepsané platební odkazy bez databázového úložiště. Historie zůstává pouze v tomto prohlížeči.</p>
     </div>
+    <div class="page-actions">
+        <a href="<?php echo $routeUrl('/admin/invoices'); ?>" class="ghost-btn"><i class="fa-solid fa-database" aria-hidden="true"></i> Databázové faktury</a>
+    </div>
+</section>
+
+<div class="url-invoice-workspace">
+<section class="card">
+    <div class="card-title">
+        <span class="card-title-group"><i class="fa-solid fa-plus-circle" aria-hidden="true"></i> Vystavit URL fakturu</span>
+    </div>
+    <p class="card-subtitle">Server podepíše parametry faktury a vrátí přenositelný platební odkaz.</p>
     <form id="createForm">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div class="form-grid">
             <div class="field">
                 <label>Cílová peněženka</label>
                 <div class="input-wrap">
@@ -33,8 +41,7 @@ require __DIR__ . '/layout/header.php';
                 <div class="input-wrap"><input type="text" id="amount" placeholder="0.00100000" required><div class="unit">BTC</div></div>
             </div>
         </div>
-        <!-- Grid s expirací -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div class="form-grid form-grid-wide">
             <div class="field">
                 <label>Popis / Název položky</label>
                 <div class="input-wrap"><input type="text" id="desc" placeholder="Např. Osobní konzultace" required></div>
@@ -58,13 +65,13 @@ require __DIR__ . '/layout/header.php';
         </div>
         <button type="submit" class="primary" id="btnCreate"><i class="fa-solid fa-magic"></i> Vygenerovat zabezpečený odkaz</button>
     </form>
-</div>
+</section>
 
-<!-- Ověřovač cizích faktur -->
-<div class="card">
+<section class="card">
     <div class="card-title">
-        <span style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-magnifying-glass" style="color:#20b948;"></i> Lupa - Ověřit cizí URL fakturu</span>
+        <span class="card-title-group"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Ověřit URL fakturu</span>
     </div>
+    <p class="card-subtitle">Ověří podpis, platnost a odpovídající peněženku bez uložení faktury do databáze.</p>
     <form id="verifyForm">
         <div class="field">
             <label>Vložte odkaz (nebo token) od zákazníka</label>
@@ -74,67 +81,329 @@ require __DIR__ . '/layout/header.php';
         </div>
         <button type="submit" class="primary" id="btnVerify"><i class="fa-solid fa-radar"></i> Ověřit a detekovat peněženku</button>
     </form>
-    <div id="verifyResult" style="display:none; margin-top: 15px; padding: 15px; background: #ffffff; border: 1px solid #e5eae7; border-radius: 8px;"></div>
+    <div id="verifyResult" class="result-panel"></div>
+    <div class="surface-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Nikdy nedůvěřujte ručně upravenému odkazu. Platný kryptografický podpis je podmínkou zobrazení údajů.</span></div>
+</section>
 </div>
 
-<!-- Výpis faktur z prohlížeče -->
-<div class="card">
+<section class="card">
     <div class="card-title">
-        <span style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-clock-rotate-left" style="color:#748078;"></i> Historie v prohlížeči</span>
-        <div style="display:flex; gap:10px;">
-            <button class="ghost-btn" onclick="document.getElementById('importFile').click()"><i class="fa-solid fa-file-import"></i> Import</button>
-            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
-            <button class="ghost-btn" onclick="exportData()"><i class="fa-solid fa-file-export"></i> Export</button>
-            <button class="ghost-btn" onclick="clearHistory()" style="color:#ef4d4d; border-color:#fee2e2; background:#fff0f0;"><i class="fa-solid fa-trash"></i> Smazat z paměti</button>
+        <span class="card-title-group"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Historie v prohlížeči</span>
+        <div class="history-toolbar">
+            <button type="button" class="ghost-btn" data-history-import><i class="fa-solid fa-file-import"></i> Import</button>
+            <input type="file" id="importFile" class="visually-hidden" accept=".json,application/json">
+            <button type="button" class="ghost-btn" data-history-export><i class="fa-solid fa-file-export"></i> Export</button>
+            <button type="button" class="danger-btn" data-history-clear><i class="fa-solid fa-trash"></i> Smazat z paměti</button>
         </div>
     </div>
+    <p class="card-subtitle">Lokální pracovní historie se neposílá na server. Export slouží jako přenositelná záloha.</p>
     <div id="invoiceList"></div>
-</div>
+</section>
 
 <script>
-const STORAGE_KEY = 'url_btc_invoices';
+(() => {
+    'use strict';
 
-const showToast = (msg) => {
-    document.getElementById('toastMsg').innerText = msg;
-    const t = document.getElementById('toast');
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}
+    const STORAGE_KEY = 'url_btc_invoices';
+    const CSRF_TOKEN = <?php echo json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    const allowedStatuses = new Set(['paid', 'paid_late', 'pending_mempool', 'unpaid', 'expired', 'underpaid', 'unknown']);
+    const statusLabels = {
+        paid: 'Zaplaceno',
+        paid_late: 'Zaplaceno (zpožděně)',
+        pending_mempool: 'V síti',
+        unpaid: 'Nezaplaceno',
+        expired: 'Vypršela',
+        underpaid: 'Nedoplatek',
+        unknown: 'Neznámý stav'
+    };
 
-const getInvoices = () => JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-const saveInvoices = (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMsg');
+    const createForm = document.getElementById('createForm');
+    const verifyForm = document.getElementById('verifyForm');
+    const verifyResult = document.getElementById('verifyResult');
+    const invoiceList = document.getElementById('invoiceList');
+    const importFile = document.getElementById('importFile');
 
-// AJAX volání
-async function apiCall(action, formData) {
-    formData.append('api_action', action);
-    try {
-        const res = await fetch(window.location.href, { method: 'POST', body: formData });
-        return await res.json();
-    } catch (err) {
-        throw new Error('Chyba spojení se serverem.');
-    }
-}
+    const createElement = (tag, className = '', text = '') => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+    };
 
-// VYTVOŘENÍ FAKTURY
-document.getElementById('createForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btnCreate');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Zpracovávám...';
+    const createIcon = (className) => {
+        const icon = createElement('i', `fa-solid ${className}`);
+        icon.setAttribute('aria-hidden', 'true');
+        return icon;
+    };
 
-    const formData = new URLSearchParams();
-    formData.append('wallet', document.getElementById('walletSelect').value);
-    formData.append('amount', document.getElementById('amount').value);
-    formData.append('description', document.getElementById('desc').value);
-    formData.append('order_id', document.getElementById('order_id').value);
-    formData.append('expiration_minutes', document.getElementById('expiration_minutes').value);
+    const setButtonState = (button, busy, label, icon) => {
+        if (!button) return;
+        button.disabled = busy;
+        button.replaceChildren(createIcon(icon), document.createTextNode(` ${label}`));
+    };
 
-    try {
-        const data = await apiCall('create', formData);
+    const showToast = (message) => {
+        if (!toast || !toastMessage || !message) return;
+        toastMessage.textContent = String(message);
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 3000);
+    };
 
-        if (data.status === 'ok') {
-            const invoices = getInvoices();
-            invoices.unshift({
+    const safeHttpUrl = (value) => {
+        try {
+            const url = new URL(String(value), window.location.href);
+            return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+        } catch (error) {
+            return null;
+        }
+    };
+
+    const normalizeStatus = (value) => {
+        const status = String(value || 'unknown');
+        return allowedStatuses.has(status) ? status : 'unknown';
+    };
+
+    const normalizeInvoice = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+        const token = String(value.token || '').slice(0, 8192);
+        const url = safeHttpUrl(value.url);
+        const amount = String(value.amount || '').slice(0, 64);
+        const desc = String(value.desc || '').slice(0, 200);
+        const orderId = String(value.order_id || '').slice(0, 100);
+        const wallet = String(value.wallet || '').slice(0, 255);
+        const time = Number.isFinite(Number(value.time)) ? Math.max(0, Math.trunc(Number(value.time))) : 0;
+
+        if (!token || !url || !amount || !desc || !wallet) return null;
+        return {
+            token,
+            url,
+            amount,
+            desc,
+            order_id: orderId,
+            wallet,
+            time,
+            lastStatus: normalizeStatus(value.lastStatus)
+        };
+    };
+
+    const getInvoices = () => {
+        try {
+            const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
+            return Array.isArray(parsed) ? parsed.map(normalizeInvoice).filter(Boolean).slice(0, 500) : [];
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const saveInvoices = (invoices) => {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices.map(normalizeInvoice).filter(Boolean).slice(0, 500)));
+    };
+
+    const statusBadge = (statusValue) => {
+        const status = normalizeStatus(statusValue);
+        return createElement('span', `status-badge s-${status}`, statusLabels[status]);
+    };
+
+    const apiCall = async (action, formData) => {
+        formData.set('api_action', action);
+        formData.set('csrf_token', CSRF_TOKEN);
+        const response = await window.fetch(window.location.href, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: formData
+        });
+        const data = await response.json().catch(() => null);
+        if (!data || typeof data !== 'object') throw new Error('Server vrátil neplatnou odpověď.');
+        if (!response.ok && typeof data.message !== 'string') throw new Error('Požadavek se nepodařilo dokončit.');
+        return data;
+    };
+
+    const appendDefinition = (container, label, value) => {
+        const row = createElement('div', 'verification-row');
+        row.append(createElement('strong', '', label), createElement('span', '', String(value)));
+        container.append(row);
+    };
+
+    const saveVerifiedToHistory = (invoice) => {
+        const normalized = normalizeInvoice(invoice);
+        if (!normalized) {
+            showToast('Fakturu nelze uložit.');
+            return;
+        }
+        const invoices = getInvoices();
+        if (invoices.some((item) => item.token === normalized.token)) {
+            showToast('Tato faktura již v historii je.');
+            return;
+        }
+        invoices.unshift(normalized);
+        saveInvoices(invoices);
+        renderInvoices();
+        showToast('Faktura byla uložena do historie.');
+    };
+
+    const renderVerification = (data) => {
+        if (!verifyResult) return;
+        verifyResult.replaceChildren();
+        verifyResult.style.display = 'block';
+
+        if (data.status !== 'ok') {
+            const error = createElement('span', 'error-text');
+            error.append(createIcon('fa-circle-xmark'), document.createTextNode(` ${String(data.message || 'Ověření se nezdařilo.')}`));
+            verifyResult.append(error);
+            return;
+        }
+
+        const summary = createElement('div', 'verification-summary');
+        summary.append(statusBadge(data.payment_status));
+        const values = createElement('div', 'verification-data');
+        appendDefinition(values, 'Popis', data.desc || '');
+        appendDefinition(values, 'Částka', `${String(data.amount || '')} BTC`);
+        if (data.order_id) appendDefinition(values, 'Interní ID', data.order_id);
+        appendDefinition(values, 'Peněženka', data.wallet || '');
+        if (normalizeStatus(data.payment_status) === 'underpaid') {
+            values.append(createElement('div', 'underpaid-note', `Chybí doplatit: ${String(data.missing_amount || '')} BTC`));
+        }
+
+        const actions = createElement('div', 'verification-actions');
+        const saveButton = createElement('button', 'ghost-btn', ' Uložit do historie');
+        saveButton.type = 'button';
+        saveButton.prepend(createIcon('fa-floppy-disk'));
+        saveButton.addEventListener('click', () => saveVerifiedToHistory({
+            token: data.token,
+            url: data.url,
+            amount: data.amount,
+            desc: data.desc,
+            order_id: data.order_id,
+            wallet: data.wallet,
+            time: data.time,
+            lastStatus: data.payment_status
+        }));
+        actions.append(saveButton);
+
+        const verifiedUrl = safeHttpUrl(data.url);
+        if (verifiedUrl) {
+            const openLink = createElement('a', 'ghost-btn', ' Otevřít fakturu');
+            openLink.href = verifiedUrl;
+            openLink.target = '_blank';
+            openLink.rel = 'noopener';
+            openLink.prepend(createIcon('fa-arrow-up-right-from-square'));
+            actions.append(openLink);
+        }
+
+        verifyResult.append(summary, values, actions);
+    };
+
+    const checkStatusByToken = async (token, button) => {
+        const invoices = getInvoices();
+        const index = invoices.findIndex((invoice) => invoice.token === token);
+        if (index < 0) return;
+        setButtonState(button, true, 'Kontroluji', 'fa-spinner fa-spin');
+        try {
+            const formData = new URLSearchParams({ token });
+            const data = await apiCall('check_status', formData);
+            if (data.status !== 'ok') throw new Error(String(data.message || 'Kontrola stavu se nezdařila.'));
+            invoices[index].lastStatus = normalizeStatus(data.payment_status);
+            saveInvoices(invoices);
+            renderInvoices();
+            showToast('Stav faktury byl aktualizován.');
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Kontrola stavu se nezdařila.');
+            setButtonState(button, false, 'Zkontrolovat stav', 'fa-rotate');
+        }
+    };
+
+    const renderInvoices = () => {
+        if (!invoiceList) return;
+        invoiceList.replaceChildren();
+        const invoices = getInvoices();
+        if (invoices.length === 0) {
+            const empty = createElement('div', 'empty-state');
+            const content = createElement('div');
+            content.append(createIcon('fa-inbox'), createElement('p', '', 'Zatím nemáte uložené žádné URL faktury.'));
+            empty.append(content);
+            invoiceList.append(empty);
+            return;
+        }
+
+        invoices.forEach((invoice, index) => {
+            const item = createElement('article', 'invoice-item');
+            const header = createElement('div', 'invoice-header');
+            const main = createElement('div');
+            main.append(createElement('strong', 'invoice-description', invoice.desc));
+            const meta = createElement('div', 'invoice-meta');
+            const date = invoice.time > 0 ? new Date(invoice.time * 1000).toLocaleString('cs-CZ') : 'Čas neuveden';
+            meta.textContent = `${date} · ${invoice.wallet}${invoice.order_id ? ` · ID: ${invoice.order_id}` : ''}`;
+            main.append(meta);
+
+            const amount = createElement('div', 'invoice-amount-block');
+            amount.append(createElement('div', 'invoice-amount', `${invoice.amount} BTC`));
+            const status = createElement('div', 'invoice-status');
+            status.append(statusBadge(invoice.lastStatus));
+            amount.append(status);
+            header.append(main, amount);
+
+            const urlBox = createElement('div', 'invoice-url');
+            const link = createElement('a', '', invoice.url);
+            link.href = invoice.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            urlBox.append(link);
+
+            const actions = createElement('div', 'invoice-actions');
+            const copyButton = createElement('button', 'ghost-btn', ' Kopírovat');
+            copyButton.type = 'button';
+            copyButton.prepend(createIcon('fa-copy'));
+            copyButton.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(invoice.url);
+                    showToast('URL byla zkopírována.');
+                } catch (error) {
+                    showToast('Kopírování se nepodařilo.');
+                }
+            });
+
+            const checkButton = createElement('button', 'primary push-right', ' Zkontrolovat stav');
+            checkButton.type = 'button';
+            checkButton.prepend(createIcon('fa-rotate'));
+            checkButton.addEventListener('click', () => checkStatusByToken(invoice.token, checkButton));
+
+            const deleteButton = createElement('button', 'danger-btn');
+            deleteButton.type = 'button';
+            deleteButton.title = 'Smazat fakturu';
+            deleteButton.setAttribute('aria-label', `Smazat fakturu ${invoice.desc}`);
+            deleteButton.append(createIcon('fa-trash'));
+            deleteButton.addEventListener('click', () => {
+                if (!window.confirm('Opravdu smazat tuto fakturu z historie?')) return;
+                const current = getInvoices();
+                current.splice(index, 1);
+                saveInvoices(current);
+                renderInvoices();
+                showToast('Faktura byla smazána.');
+            });
+            actions.append(copyButton, checkButton, deleteButton);
+            item.append(header, urlBox, actions);
+            invoiceList.append(item);
+        });
+    };
+
+    createForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = document.getElementById('btnCreate');
+        setButtonState(button, true, 'Zpracovávám', 'fa-spinner fa-spin');
+        const formData = new URLSearchParams({
+            wallet: document.getElementById('walletSelect')?.value || '',
+            amount: document.getElementById('amount')?.value || '',
+            description: document.getElementById('desc')?.value || '',
+            order_id: document.getElementById('order_id')?.value || '',
+            expiration_minutes: document.getElementById('expiration_minutes')?.value || '15'
+        });
+        try {
+            const data = await apiCall('create', formData);
+            if (data.status !== 'ok') throw new Error(String(data.message || 'Fakturu se nepodařilo vytvořit.'));
+            const invoice = normalizeInvoice({
                 token: data.token,
                 url: data.url,
                 amount: data.amount,
@@ -144,224 +413,93 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
                 time: data.time,
                 lastStatus: 'unknown'
             });
+            if (!invoice) throw new Error('Server vrátil neplatná data faktury.');
+            const invoices = getInvoices();
+            invoices.unshift(invoice);
             saveInvoices(invoices);
             renderInvoices();
-            showToast('Faktura vygenerována a uložena.');
-            e.target.reset();
-        } else { 
-            alert('Chyba serveru: ' + data.message); 
+            showToast('Faktura byla vygenerována a uložena.');
+            createForm.reset();
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Fakturu se nepodařilo vytvořit.');
+        } finally {
+            setButtonState(button, false, 'Vygenerovat zabezpečený odkaz', 'fa-wand-magic-sparkles');
         }
-    } catch (err) { 
-        alert(err.message); 
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-magic"></i> Vygenerovat zabezpečený odkaz';
-    }
-});
+    });
 
-// OVĚŘOVÁNÍ CIZÍCH ODKAZŮ A AUTO-DETEKCE
-document.getElementById('verifyForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btnVerify');
-    const resDiv = document.getElementById('verifyResult');
-    const inputVal = document.getElementById('verifyInput').value;
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ověřuji...';
-    resDiv.style.display = 'none';
-
-    let token = inputVal;
-    if (inputVal.includes('inv=')) {
-        const urlParams = new URLSearchParams(inputVal.substring(inputVal.indexOf('?')));
-        token = urlParams.get('inv') || inputVal;
-    }
-
-    const formData = new URLSearchParams();
-    formData.append('token', token);
-
-    try {
-        const data = await apiCall('check_status', formData);
-        
-        if (data.status === 'ok') {
-            const missingText = data.payment_status === 'underpaid' ? `<div style="color:#d97706; font-weight:700; margin-top:5px;">Chybí doplatit: ${data.missing_amount} BTC</div>` : '';
-            resDiv.innerHTML = `
-                <div style="margin-bottom:12px;">${getStatusBadge(data.payment_status)}</div>
-                <div style="font-size: 13px; color: #17201a; line-height: 1.6;">
-                    <strong>Popis:</strong> ${data.desc}<br>
-                    <strong>Částka:</strong> ${data.amount} BTC<br>
-                    ${data.order_id ? `<strong>Interní ID:</strong> ${data.order_id}<br>` : ''}
-                    <strong>Peněženka:</strong> 📁 ${data.wallet}<br>
-                    ${missingText}
-                </div>
-                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="ghost-btn" onclick="saveVerifiedToHistory('${data.token}', '${data.url}', '${data.amount}', '${data.desc}', '${data.order_id}', '${data.wallet}', ${data.time}, '${data.payment_status}')"><i class="fa-solid fa-floppy-disk"></i> Uložit do historie</button>
-                    <a href="${data.url}" target="_blank" class="ghost-btn" style="text-decoration:none;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Otevřít fakturu</a>
-                </div>
-            `;
-        } else {
-            resDiv.innerHTML = `<span style="color:#ef4d4d; font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> ${data.message}</span>`;
+    verifyForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = document.getElementById('btnVerify');
+        const input = document.getElementById('verifyInput')?.value || '';
+        let token = input;
+        try {
+            const candidate = new URL(input);
+            token = candidate.searchParams.get('inv') || input;
+        } catch (error) {
+            token = input;
         }
-    } catch (err) {
-        resDiv.innerHTML = `<span style="color:#ef4d4d; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
-    } finally {
-        resDiv.style.display = 'block';
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-radar"></i> Ověřit a detekovat peněženku';
-    }
-});
-
-// ULOŽENÍ OVĚŘENÉ FAKTURY DO HISTORIE
-window.saveVerifiedToHistory = function(token, url, amount, desc, order_id, wallet, time, lastStatus) {
-    const invoices = getInvoices();
-    const exists = invoices.find(i => i.token === token);
-    if (!exists) {
-        invoices.unshift({ token, url, amount, desc, order_id, wallet, time, lastStatus });
-        saveInvoices(invoices);
-        renderInvoices();
-        showToast('Faktura uložena do historie.');
-    } else {
-        showToast('Tato faktura již v historii je.');
-    }
-}
-
-// KONTROLA HISTORICKÝCH FAKTUR
-window.checkStatusByToken = async function(token, btnId) {
-    const invoices = getInvoices();
-    const index = invoices.findIndex(i => i.token === token);
-    if (index === -1) return;
-    
-    const inv = invoices[index];
-    const btn = document.getElementById(btnId);
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-    const formData = new URLSearchParams();
-    formData.append('token', inv.token);
-
-    try {
-        const data = await apiCall('check_status', formData);
-        if (data.status === 'ok') {
-            inv.lastStatus = data.payment_status;
-            invoices[index] = inv;
-            saveInvoices(invoices);
-            renderInvoices();
-            showToast('Stav faktury aktualizován.');
-        } else { 
-            alert('Chyba: ' + data.message); 
-            btn.innerHTML = originalText; 
+        setButtonState(button, true, 'Ověřuji', 'fa-spinner fa-spin');
+        if (verifyResult) {
+            verifyResult.style.display = 'none';
+            verifyResult.replaceChildren();
         }
-    } catch (err) { 
-        alert(err.message); 
-        btn.innerHTML = originalText; 
-    }
-}
+        try {
+            renderVerification(await apiCall('check_status', new URLSearchParams({ token })));
+        } catch (error) {
+            renderVerification({ status: 'error', message: error instanceof Error ? error.message : 'Ověření se nezdařilo.' });
+        } finally {
+            setButtonState(button, false, 'Ověřit fakturu', 'fa-shield-halved');
+        }
+    });
 
-// Smazání faktury
-window.deleteInvoice = function(index) {
-    if(confirm('Opravdu smazat tuto fakturu z historie?')) {
-        const invoices = getInvoices();
-        invoices.splice(index, 1);
-        saveInvoices(invoices);
-        renderInvoices();
-        showToast('Faktura smazána.');
-    }
-}
+    document.querySelector('[data-history-import]')?.addEventListener('click', () => importFile?.click());
 
-// Smazání celé historie
-function clearHistory() {
-    if(confirm('Tato akce smaže historii lokálních faktur z vašeho prohlížeče. Pokračovat?')) {
-        localStorage.removeItem(STORAGE_KEY);
+    document.querySelector('[data-history-clear]')?.addEventListener('click', () => {
+        if (!window.confirm('Smazat lokální historii URL faktur z tohoto prohlížeče?')) return;
+        window.localStorage.removeItem(STORAGE_KEY);
         renderInvoices();
         showToast('Paměť prohlížeče byla vymazána.');
-    }
-}
-
-// Export
-function exportData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(localStorage.getItem(STORAGE_KEY) || '[]');
-    const a = document.createElement('a');
-    a.href = dataStr;
-    a.download = "url_invoices_backup.json";
-    a.click();
-}
-
-// Import
-function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const imported = JSON.parse(e.target.result);
-            if (Array.isArray(imported)) {
-                saveInvoices(imported);
-                renderInvoices();
-                showToast('Záloha faktur byla úspěšně nahrána.');
-            } else { 
-                alert('Neplatný formát dat v souboru.'); 
-            }
-        } catch(err) { 
-            alert('Nastala chyba při čtení souboru.'); 
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-}
-
-function getStatusBadge(status) {
-    const sMap = {
-        'paid': 'Zaplaceno',
-        'paid_late': 'Zaplaceno (Zpožděně)',
-        'pending_mempool': 'V Síti',
-        'unpaid': 'Nezaplaceno',
-        'expired': 'Vypršela',
-        'underpaid': 'Nedoplatek'
-    };
-    return `<span class="status-badge s-${status}">${sMap[status] || 'Neznámý stav'}</span>`;
-}
-
-function renderInvoices() {
-    const list = document.getElementById('invoiceList');
-    const invoices = getInvoices();
-
-    if (invoices.length === 0) {
-        list.innerHTML = '<div style="text-align:center; padding:30px; color:#748078;"><i class="fa-solid fa-inbox" style="font-size:30px; margin-bottom:10px; color:#e5eae7;"></i><br>Zatím nemáte uložené žádné URL faktury.</div>';
-        return;
-    }
-
-    let html = '';
-    invoices.forEach((inv, index) => {
-        const d = new Date(inv.time * 1000);
-        const orderIdHtml = inv.order_id ? ` &nbsp;&bull;&nbsp; <strong style="color:#17201a;">ID: ${inv.order_id}</strong>` : '';
-        html += `
-            <div class="invoice-item">
-                <div class="invoice-header">
-                    <div>
-                        <strong style="font-size:15px;">${inv.desc}</strong>
-                        <div style="font-size:11px; color:#748078; margin-top:4px;">
-                            <i class="fa-regular fa-clock"></i> ${d.toLocaleString('cs-CZ')} &nbsp;&bull;&nbsp; 📁 ${inv.wallet}${orderIdHtml}
-                        </div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="invoice-amount">${inv.amount} BTC</div>
-                        <div style="margin-top:4px;">${getStatusBadge(inv.lastStatus)}</div>
-                    </div>
-                </div>
-                <div style="font-size:11px; background:#ffffff; padding:10px; border:1px solid #e5eae7; border-radius:6px; word-break:break-all; font-family:ui-monospace, monospace;">
-                    <a href="${inv.url}" target="_blank" style="color:#17201a; text-decoration:underline; font-weight:600;">${inv.url}</a>
-                </div>
-                <div class="invoice-actions">
-                    <button class="ghost-btn" onclick="navigator.clipboard.writeText('${inv.url}'); showToast('URL zkopírována');"><i class="fa-regular fa-copy"></i> Kopírovat</button>
-                    <button class="primary" id="btn-check-${index}" onclick="checkStatusByToken('${inv.token}', 'btn-check-${index}')" style="margin-left:auto;"><i class="fa-solid fa-rotate"></i> Zkontrolovat stav</button>
-                    <button class="ghost-btn" onclick="deleteInvoice(${index})" style="color:#ef4d4d; border-color:#fee2e2; background:#fff0f0;" title="Smazat fakturu"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>
-        `;
     });
-    list.innerHTML = html;
-}
 
-renderInvoices();
+    document.querySelector('[data-history-export]')?.addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(getInvoices(), null, 2)], { type: 'application/json' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = 'url_invoices_backup.json';
+        link.click();
+        URL.revokeObjectURL(downloadUrl);
+    });
+
+    importFile?.addEventListener('change', () => {
+        const file = importFile.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            showToast('Soubor je příliš velký.');
+            importFile.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+            try {
+                const parsed = JSON.parse(String(reader.result || '[]'));
+                if (!Array.isArray(parsed)) throw new Error('Neplatný formát.');
+                const invoices = parsed.map(normalizeInvoice).filter(Boolean).slice(0, 500);
+                if (parsed.length > 0 && invoices.length === 0) throw new Error('Záloha neobsahuje platné faktury.');
+                saveInvoices(invoices);
+                renderInvoices();
+                showToast('Záloha faktur byla importována.');
+            } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Soubor se nepodařilo načíst.');
+            } finally {
+                importFile.value = '';
+            }
+        });
+        reader.readAsText(file);
+    });
+
+    renderInvoices();
+})();
 </script>
 
 <?php require __DIR__ . '/layout/footer.php'; ?>
