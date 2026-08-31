@@ -26,6 +26,6 @@ FROM (
     HAVING COUNT(*) > 1
 ) AS duplicates;
 
-SELECT 'auth_login_attempts_already_present' AS check_name, COUNT(*) AS issue_count
+SELECT 'auth_attempts_already_present' AS check_name, COUNT(*) AS issue_count
 FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_login_attempts';
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_attempts';
