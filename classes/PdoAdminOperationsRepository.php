@@ -1,0 +1,183 @@
+<?php
+
+declare(strict_types=1);
+
+namespace BtcPayLite;
+
+use PDO;
+use RuntimeException;
+
+final class PdoAdminOperationsRepository implements AdminOperationsRepository
+{
+    private Database $database;
+
+    public function __construct(Database $database)
+    {
+        $this->database = $database;
+    }
+
+    public function fetchStores(): array
+    {
+        $statement = $this->database->getPdo()->query(
+            'SELECT id, name, api_key, wallet_path FROM stores ORDER BY name, id'
+        );
+
+        return array_map(
+            fn (array $row): array => $this->store($row),
+            $this->rows($statement->fetchAll(PDO::FETCH_ASSOC))
+        );
+    }
+
+    public function fetchDefaultStore(): ?array
+    {
+        $statement = $this->database->getPdo()->query(
+            'SELECT id, wallet_path FROM stores ORDER BY id LIMIT 1'
+        );
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+        if (!is_array($row)) {
+            throw new RuntimeException('Default store query returned an invalid row.');
+        }
+
+        return [
+            'id' => $this->requiredString($row['id'] ?? null, 'store id'),
+            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'wallet path'),
+        ];
+    }
+
+    public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, NULL)'
+        );
+        $statement->execute([$id, $name, $apiKey, $walletPath]);
+    }
+
+    public function storeExists(string $storeId): bool
+    {
+        $statement = $this->database->getPdo()->prepare('SELECT 1 FROM stores WHERE id = ? LIMIT 1');
+        $statement->execute([$storeId]);
+
+        return $statement->fetchColumn() !== false;
+    }
+
+    public function fetchWebhooks(): array
+    {
+        $statement = $this->database->getPdo()->query(
+            'SELECT w.id, w.store_id, s.name AS store_name, w.url, w.secret, w.created_at
+             FROM webhooks w
+             INNER JOIN stores s ON s.id = w.store_id
+             ORDER BY w.created_at DESC, w.id DESC'
+        );
+
+        return array_map(
+            fn (array $row): array => [
+                'id' => $this->requiredString($row['id'] ?? null, 'webhook id'),
+                'store_id' => $this->requiredString($row['store_id'] ?? null, 'webhook store id'),
+                'store_name' => $this->requiredString($row['store_name'] ?? null, 'webhook store name'),
+                'url' => $this->requiredString($row['url'] ?? null, 'webhook URL'),
+                'secret' => $this->requiredString($row['secret'] ?? null, 'webhook secret'),
+                'created_at' => $this->nonNegativeInt($row['created_at'] ?? null),
+            ],
+            $this->rows($statement->fetchAll(PDO::FETCH_ASSOC))
+        );
+    }
+
+    public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array
+    {
+        return $this->database->transactional(function (PDO $pdo) use ($storeId, $url, $createdAt): array {
+            $statement = $pdo->prepare(
+                'SELECT id, url, secret FROM webhooks
+                 WHERE store_id = ? AND url = ? LIMIT 1 FOR UPDATE'
+            );
+            $statement->execute([$storeId, $url]);
+            $existing = $statement->fetch(PDO::FETCH_ASSOC);
+            if (is_array($existing)) {
+                return [
+                    'id' => $this->requiredString($existing['id'] ?? null, 'webhook id'),
+                    'url' => $this->requiredString($existing['url'] ?? null, 'webhook URL'),
+                    'secret' => $this->requiredString($existing['secret'] ?? null, 'webhook secret'),
+                ];
+            }
+
+            $webhook = [
+                'id' => 'wh_' . bin2hex(random_bytes(16)),
+                'url' => $url,
+                'secret' => bin2hex(random_bytes(32)),
+            ];
+            $statement = $pdo->prepare(
+                'INSERT INTO webhooks (id, store_id, url, secret, created_at) VALUES (?, ?, ?, ?, ?)'
+            );
+            $statement->execute([
+                $webhook['id'],
+                $storeId,
+                $webhook['url'],
+                $webhook['secret'],
+                $createdAt,
+            ]);
+
+            return $webhook;
+        });
+    }
+
+    public function deleteWebhook(string $webhookId): bool
+    {
+        $statement = $this->database->getPdo()->prepare('DELETE FROM webhooks WHERE id = ?');
+        $statement->execute([$webhookId]);
+
+        return $statement->rowCount() === 1;
+    }
+
+    /** @return array{id:string,name:string,api_key:string,wallet_path:string} */
+    private function store(array $row): array
+    {
+        return [
+            'id' => $this->requiredString($row['id'] ?? null, 'store id'),
+            'name' => $this->requiredString($row['name'] ?? null, 'store name'),
+            'api_key' => $this->requiredString($row['api_key'] ?? null, 'store API key'),
+            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'store wallet path'),
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function rows(mixed $rows): array
+    {
+        if (!is_array($rows)) {
+            throw new RuntimeException('Admin operations returned an invalid row set.');
+        }
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                throw new RuntimeException('Admin operations returned an invalid row.');
+            }
+        }
+
+        return $rows;
+    }
+
+    private function requiredString(mixed $value, string $field): string
+    {
+        if (!is_string($value) || $value === '') {
+            throw new RuntimeException('Admin operations returned an invalid ' . $field . '.');
+        }
+
+        return $value;
+    }
+
+    private function nonNegativeInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            $number = $value;
+        } elseif (is_string($value) && ctype_digit($value)) {
+            $number = (int) $value;
+        } else {
+            throw new RuntimeException('Admin operations returned an invalid integer.');
+        }
+        if ($number < 0) {
+            throw new RuntimeException('Admin operations returned a negative integer.');
+        }
+
+        return $number;
+    }
+}
