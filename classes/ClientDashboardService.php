@@ -74,6 +74,13 @@ final class ClientDashboardService
                 $store['wallet_path']
             );
         } catch (Throwable $exception) {
+            if ($store['wallet_path'] !== '') {
+                try {
+                    $this->walletProvisioner->discard($store['wallet_path']);
+                } catch (Throwable $cleanupException) {
+                    error_log('Unused client wallet cleanup failed: ' . $cleanupException::class);
+                }
+            }
             throw new ClientDashboardException(
                 'Obchod se nyní nepodařilo vytvořit. Zkuste to prosím později.',
                 503,
