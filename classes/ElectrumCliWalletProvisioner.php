@@ -145,4 +145,38 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
 
         return $resolvedWallet;
     }
+
+    public function discard(string $walletPath): void
+    {
+        if ($walletPath === '' || str_contains($walletPath, "\0")) {
+            throw new RuntimeException('Discarded wallet path is invalid.');
+        }
+
+        $resolvedWalletDirectory = realpath($this->walletDirectory);
+        if ($resolvedWalletDirectory === false || !is_dir($resolvedWalletDirectory)) {
+            throw new RuntimeException('Configured wallet directory is unavailable.');
+        }
+        if (is_link($walletPath)) {
+            throw new RuntimeException('Refusing to discard a wallet symlink.');
+        }
+
+        $resolvedWallet = realpath($walletPath);
+        if ($resolvedWallet === false) {
+            if (file_exists($walletPath)) {
+                throw new RuntimeException('Discarded wallet path cannot be resolved.');
+            }
+            return;
+        }
+
+        if (
+            !is_file($resolvedWallet)
+            || dirname($resolvedWallet) !== $resolvedWalletDirectory
+            || !preg_match('/\Astore_[a-f0-9]{32}_wallet\z/D', basename($resolvedWallet))
+        ) {
+            throw new RuntimeException('Refusing to discard a wallet outside the managed directory.');
+        }
+        if (!unlink($resolvedWallet)) {
+            throw new RuntimeException('Unused wallet could not be discarded.');
+        }
+    }
 }
