@@ -37,6 +37,11 @@ routeSame(true, $alias->isRedirect(), 'Dashboard alias is not a redirect');
 routeSame('/client', $alias->getRedirectPath(), 'Dashboard redirect target mismatch');
 $passes[] = 'uses explicit canonical redirects for legacy aliases';
 
+$registrationAlias = $router->match('/registrace.php', 'GET');
+routeSame(true, $registrationAlias->isRedirect(), 'Legacy registration path is not a redirect');
+routeSame('/registrace', $registrationAlias->getRedirectPath(), 'Registration redirect target mismatch');
+$passes[] = 'redirects the removed registration entry point';
+
 try {
     $router->match('/admin/wallet/extra', 'GET');
     throw new RuntimeException('Unknown nested route was accepted');
@@ -71,8 +76,6 @@ $handlerCases = [
     ['/admin/invoices', 'GET'],
     ['/admin/webhooks', 'GET'],
     ['/admin/url_invoices', 'GET'],
-    ['/admin/test_shop', 'GET'],
-    ['/admin/test_api_webhook', 'GET'],
 ];
 foreach ($handlerCases as [$path, $method]) {
     $handler = $router->match($path, $method)->getHandler();
