@@ -99,12 +99,7 @@ class AuthManager
         ];
     }
 
-    public function registerUser(
-        string $email,
-        string $password,
-        string $passwordConfirm,
-        string $clientIdentity = ''
-    ): int
+    public function registerUser(string $email, string $password, string $passwordConfirm): int
     {
         $email = $this->normalizeEmail($email);
         $passwordLength = strlen($password);
@@ -115,19 +110,6 @@ class AuthManager
             throw new AuthException('Zadaná hesla se neshodují.');
         }
 
-        if ($clientIdentity !== '') {
-            $now = time();
-            $registrationHash = hash('sha256', "registration\0" . $clientIdentity);
-            if ($this->users->countRecentAttempts(
-                $registrationHash,
-                $now - self::REGISTRATION_WINDOW_SECONDS
-            ) >= self::MAX_REGISTRATIONS) {
-                throw new AuthException(
-                    'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
-                );
-            }
-            $this->users->recordAttempt($registrationHash, $now);
-        }
         if ($this->users->findByEmail($email) !== null) {
             throw new AuthException('Registraci s těmito údaji nelze dokončit.');
         }
@@ -138,6 +120,25 @@ class AuthManager
         }
 
         return $this->users->createClient($email, $passwordHash);
+    }
+
+    public function recordRegistrationAttempt(string $clientIdentity): void
+    {
+        if ($clientIdentity === '') {
+            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
+        }
+
+        $now = time();
+        $registrationHash = hash('sha256', "registration\0" . $clientIdentity);
+        if ($this->users->countRecentAttempts(
+            $registrationHash,
+            $now - self::REGISTRATION_WINDOW_SECONDS
+        ) >= self::MAX_REGISTRATIONS) {
+            throw new AuthException(
+                'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
+            );
+        }
+        $this->users->recordAttempt($registrationHash, $now);
     }
 
     public function logout(): void
