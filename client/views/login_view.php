@@ -62,7 +62,7 @@ declare(strict_types=1);
             <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Vstoupit</button>
         </form>
         
-       <a href="registrace" class="footer-link">Nemáte účet? Zaregistrujte se</a>
+       <a href="<?php echo htmlspecialchars($urlManager->url('/registrace'), ENT_QUOTES, 'UTF-8'); ?>" class="footer-link">Nemáte účet? Zaregistrujte se</a>
     </div>
 </body>
 </html>
