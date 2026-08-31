@@ -73,4 +73,14 @@ if (
 }
 echo "[PASS] provisions wallets without invoking a command shell\n";
 
-echo "7 client UI boundary tests passed.\n";
+if (
+    !str_contains($sources['provisioner'], 'public function discard(string $walletPath): void')
+    || !str_contains($sources['provisioner'], 'Refusing to discard a wallet symlink.')
+    || !str_contains($sources['provisioner'], "store_[a-f0-9]{32}_wallet")
+    || !str_contains($sources['provisioner'], 'dirname($resolvedWallet) !== $resolvedWalletDirectory')
+) {
+    throw new RuntimeException('Wallet cleanup is not restricted to managed store wallet files.');
+}
+echo "[PASS] restricts wallet cleanup to managed store wallets\n";
+
+echo "8 client UI boundary tests passed.\n";
