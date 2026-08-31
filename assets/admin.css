@@ -147,6 +147,8 @@ a { color: inherit; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 26px; }
 .stat-card { position: relative; overflow: hidden; min-height: 142px; padding: 23px; border: 0; border-radius: var(--admin-radius); background: var(--admin-surface); box-shadow: var(--admin-shadow-sm); }
 .stat-card::after { position: absolute; right: -28px; bottom: -38px; width: 110px; height: 110px; border-radius: 50%; background: var(--stat-glow, rgba(22, 163, 74, 0.08)); content: ""; }
+.stat-card-blue { --stat-glow: rgba(37, 99, 235, 0.08); }
+.stat-card-amber { --stat-glow: rgba(245, 158, 11, 0.09); }
 .stat-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .stat-icon { display: grid; width: 39px; height: 39px; place-items: center; border-radius: 12px; background: var(--admin-accent-soft); color: var(--admin-accent-dark); }
 .stat-label { margin-top: 20px; color: var(--admin-muted); font-size: 11px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
@@ -169,6 +171,7 @@ a { color: inherit; }
 .code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 12px; }
 .muted { color: var(--admin-muted); }
 .truncate { display: block; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 
 .badge, .status-badge { display: inline-flex; align-items: center; gap: 6px; min-height: 25px; padding: 4px 10px; border: 0; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.035em; text-transform: uppercase; }
 .badge-New, .s-unpaid { background: #fff7db; color: #9a6700; }
