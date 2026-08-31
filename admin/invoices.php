@@ -1,91 +1,128 @@
 <?php
-// admin/invoices.php
+
 declare(strict_types=1);
 
-ini_set('display_errors', '0'); // Na produkci skrýváme chyby
+use BtcPayLite\AdminInvoiceService;
+use BtcPayLite\AdminOperationsException;
+use BtcPayLite\AuthException;
+use BtcPayLite\AuthManager;
+use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\Database;
+use BtcPayLite\ElectrumRPC;
+use BtcPayLite\ElectrumWallet;
+use BtcPayLite\PdoAdminOperationsRepository;
+use BtcPayLite\UrlManager;
+
+ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
+$urlManager = new UrlManager(
+    $_SERVER,
+    is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+);
+AuthManager::requireRole('admin', $urlManager->url('/login'));
 
-use BtcPayLite\Database;
-use BtcPayLite\ElectrumRPC;
-use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcInvoiceManager;
-use BtcPayLite\AuthManager;
+header('Cache-Control: no-store, private');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 
-// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
-AuthManager::requireRole('admin', '../client/login.php');
-
+$csrfToken = AuthManager::csrfToken();
 $toastMsg = '';
+$pageError = null;
 $newInvoiceUrl = '';
+$service = null;
 
 try {
-    // 1. Připojení k DB a inicializace motoru
-    $db = new Database($config['db_host'], $config['db_name'], $config['db_user'], $config['db_pass']);
-    $rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-    $wallet = new ElectrumWallet($rpc);
-    
-    // Získání prvního obchodu z DB pro tuto administraci
-    $stmt = $db->getPdo()->query("SELECT id, wallet_path FROM stores LIMIT 1");
-    $store = $stmt->fetch();
-    
-    if (!$store) {
-        throw new \Exception("V databázi chybí obchod. Vytvoř ho přes phpMyAdmin v tabulce 'stores'.");
-    }
-    
-    $storeId = $store['id'];
-    $wallet->loadWallet($store['wallet_path']);
-    
-    // 2. Správce faktur v databázovém režimu
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], $db);
+    $database = new Database(
+        $config['db_host'],
+        $config['db_name'],
+        $config['db_user'],
+        $config['db_pass'],
+        (int) ($config['db_port'] ?? 3306)
+    );
+    $repository = new PdoAdminOperationsRepository($database);
+    $service = new AdminInvoiceService(
+        $repository,
+        static function (array $store, string $amount, array $metadata) use ($config, $database): array {
+            $rpc = new ElectrumRPC(
+                $config['rpc_host'],
+                (int) $config['rpc_port'],
+                $config['rpc_user'],
+                $config['rpc_pass']
+            );
+            $wallet = new ElectrumWallet($rpc);
+            $wallet->loadWallet($store['wallet_path']);
+            $manager = new BtcInvoiceManager($wallet, $config['secret_key'], $database);
 
-    // 3. Zpracování formuláře z View
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-        
-        if ($_POST['action'] === 'create') {
-            $amount = (float)str_replace(',', '.', $_POST['amount'] ?? '0');
-            $desc = trim($_POST['description'] ?? '');
-            $orderId = trim($_POST['order_id'] ?? '');
-
-            if ($amount <= 0 || empty($desc)) {
-                throw new \Exception("Vyplň platnou částku a popis faktury.");
-            }
-
-            // Vytvoření DATABÁZOVÉ faktury
-            $metadata = ['orderId' => $orderId, 'itemDesc' => $desc];
-            $inv = $invoiceManager->createDatabaseInvoice($storeId, $amount, $metadata, 15);
-            
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-            $host = $_SERVER['HTTP_HOST'];
-            $baseDir = dirname(dirname($_SERVER['SCRIPT_NAME'])); 
-            if ($baseDir === '/' || $baseDir === '\\') $baseDir = '';
-            
-            // Odkaz na databázovou platební bránu
-            $newInvoiceUrl = $protocol . $host . $baseDir . '/checkout/pay.php?id=' . $inv['id'];
-
-            // Uložení do session pro dočasný výpis v administraci
-            $_SESSION['created_invoices'][] = [
-                'url' => $newInvoiceUrl,
-                'amount' => $inv['amount'],
-                'desc' => $desc,
-                'time' => $inv['created_at']
-            ];
-
-            $toastMsg = "Faktura byla úspěšně uložena do databáze.";
-        } 
-        elseif ($_POST['action'] === 'clear_history') {
-            $_SESSION['created_invoices'] = [];
-            $toastMsg = "Historie zobrazení vymazána.";
+            return $manager->createDatabaseInvoice($store['id'], $amount, $metadata, 15);
         }
-    }
-} catch (\Throwable $e) {
-    // Zachytí všechny výjimky i fatální chyby
-    $toastMsg = "Chyba: " . $e->getMessage();
+    );
+} catch (Throwable $exception) {
+    error_log(sprintf('Admin invoices initialization failed: %s (%s)', $exception->getMessage(), $exception::class));
+    http_response_code(500);
+    $pageError = 'Správa faktur nyní není dostupná.';
 }
 
-// 4. Extrakce dat pro View
-$invoicesHistory = $_SESSION['created_invoices'] ?? [];
+if ($service instanceof AdminInvoiceService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    try {
+        AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
+        $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
-// 5. Zavolání šablony
+        if ($action === 'create') {
+            $amount = is_string($_POST['amount'] ?? null) ? $_POST['amount'] : '';
+            $description = is_string($_POST['description'] ?? null) ? $_POST['description'] : '';
+            $orderId = is_string($_POST['order_id'] ?? null) ? $_POST['order_id'] : '';
+            $invoice = $service->create($amount, $description, $orderId);
+            $newInvoiceUrl = $urlManager->url('/checkout/pay.php', ['id' => $invoice['id']]);
+
+            $history = is_array($_SESSION['created_invoices'] ?? null)
+                ? $_SESSION['created_invoices']
+                : [];
+            $history[] = [
+                'url' => $newInvoiceUrl,
+                'amount' => $invoice['amount'],
+                'desc' => $invoice['description'],
+                'time' => $invoice['created_at'],
+            ];
+            $_SESSION['created_invoices'] = array_slice($history, -20);
+            $toastMsg = 'Faktura byla vytvořena a bezpečně uložena.';
+        } elseif ($action === 'clear_history') {
+            $_SESSION['created_invoices'] = [];
+            $toastMsg = 'Lokální náhled historie byl vymazán.';
+        } else {
+            throw new AdminOperationsException('Neznámá operace správy faktur.');
+        }
+    } catch (AuthException $exception) {
+        http_response_code(403);
+        $pageError = 'Platnost formuláře vypršela. Obnovte stránku a zkuste akci znovu.';
+        error_log('Admin invoices CSRF validation failed.');
+    } catch (AdminOperationsException $exception) {
+        http_response_code($exception->getHttpStatus());
+        $pageError = $exception->getMessage();
+        error_log('Admin invoice operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+    } catch (Throwable $exception) {
+        http_response_code(500);
+        $pageError = 'Operaci se nyní nepodařilo dokončit.';
+        error_log(sprintf('Unexpected admin invoice failure: %s (%s)', $exception->getMessage(), $exception::class));
+    }
+}
+
+$invoicesHistory = [];
+$rawHistory = $_SESSION['created_invoices'] ?? [];
+if (is_array($rawHistory)) {
+    foreach (array_reverse(array_slice($rawHistory, -20)) as $item) {
+        if (
+            is_array($item)
+            && is_string($item['url'] ?? null)
+            && is_string($item['amount'] ?? null)
+            && is_string($item['desc'] ?? null)
+            && is_int($item['time'] ?? null)
+        ) {
+            $invoicesHistory[] = $item;
+        }
+    }
+}
+
 require __DIR__ . '/views/invoices_view.php';
