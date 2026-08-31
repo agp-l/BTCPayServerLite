@@ -76,6 +76,7 @@ class WebhookDeliveryRepository
                    FROM invoices AS invoice
                    JOIN stores AS store ON store.id = invoice.store_id
                    JOIN webhooks AS webhook ON webhook.store_id = invoice.store_id
+                    AND webhook.created_at <= invoice.created_at
               LEFT JOIN webhook_deliveries AS delivery
                      ON delivery.webhook_id = webhook.id
                     AND delivery.invoice_id = invoice.id
@@ -124,9 +125,16 @@ class WebhookDeliveryRepository
             return $this->database->transactional(
                 function (PDO $pdo) use ($invoiceId, $storeId, $eventType, $timestamp): int {
                     $statement = $pdo->prepare(
-                        'SELECT id FROM webhooks WHERE store_id = ? ORDER BY id'
+                        'SELECT webhook.id
+                           FROM webhooks AS webhook
+                           JOIN invoices AS invoice
+                             ON invoice.id = ?
+                            AND invoice.store_id = webhook.store_id
+                          WHERE webhook.store_id = ?
+                            AND webhook.created_at <= invoice.created_at
+                       ORDER BY webhook.id'
                     );
-                    $statement->execute([$storeId]);
+                    $statement->execute([$invoiceId, $storeId]);
                     $webhookIds = $statement->fetchAll(PDO::FETCH_COLUMN);
                     $created = 0;
 
