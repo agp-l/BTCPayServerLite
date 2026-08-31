@@ -180,7 +180,13 @@ final class UrlManager
         }
 
         $parts = parse_url($requestUri);
-        if (!is_array($parts)) {
+        if (!is_array($parts)
+            || isset($parts['scheme'])
+            || isset($parts['host'])
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['fragment'])
+        ) {
             throw new InvalidArgumentException('Invalid request URI.');
         }
         $rawPath = (string) ($parts['path'] ?? '/');
@@ -226,6 +232,9 @@ final class UrlManager
 
     private function normalizeApplicationPath(string $path): string
     {
+        if (preg_match('/%(?![0-9A-Fa-f]{2})/', $path) === 1) {
+            throw new InvalidArgumentException('Invalid application path encoding.');
+        }
         $path = '/' . trim($path, '/');
         if ($path === '/') {
             return '/';
@@ -233,10 +242,14 @@ final class UrlManager
 
         $encoded = [];
         foreach (explode('/', trim($path, '/')) as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..') {
+            $decoded = rawurldecode($segment);
+            if ($segment === '' || $decoded === '.' || $decoded === '..'
+                || str_contains($decoded, '/') || str_contains($decoded, '\\')
+                || preg_match('/[\x00-\x1F\x7F]/', $decoded) === 1
+            ) {
                 throw new InvalidArgumentException('Invalid application path.');
             }
-            $encoded[] = rawurlencode(rawurldecode($segment));
+            $encoded[] = rawurlencode($decoded);
         }
 
         return '/' . implode('/', $encoded);
