@@ -59,6 +59,10 @@ final class AdminWalletProvisionerFixture implements StoreWalletProvisioner
     {
         return '/wallets/' . $storeId . '_wallet';
     }
+
+    public function discard(string $walletPath): void
+    {
+    }
 }
 
 $repository = new AdminOperationsRepositoryFixture();
