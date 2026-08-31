@@ -57,6 +57,7 @@ td { padding: 14px 10px; border-bottom: 1px solid #f0f4f1; vertical-align: middl
         <h3 style="margin: 0 0 15px 0; font-size: 14px;">Založit nový e-shop / projekt</h3>
         <form method="POST" style="margin: 0; display: flex; flex-direction: column; gap: 15px; max-width: 400px;">
             <input type="hidden" name="action" value="create_store">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="field" style="margin:0;">
                 <label>Název projektu (např. Alza.cz)</label>
                 <div class="input-wrap"><input type="text" name="store_name" placeholder="Název vašeho e-shopu" required></div>
@@ -93,6 +94,7 @@ td { padding: 14px 10px; border-bottom: 1px solid #f0f4f1; vertical-align: middl
         <h3 style="margin: 0 0 15px 0; font-size: 14px;">Přidat nový Webhook</h3>
         <form method="POST" style="margin: 0; display: flex; flex-direction: column; gap: 15px; max-width: 400px;">
             <input type="hidden" name="action" value="create_webhook">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="field" style="margin:0;">
                 <label>Vyberte obchod</label>
                 <div class="input-wrap">
@@ -131,6 +133,7 @@ td { padding: 14px 10px; border-bottom: 1px solid #f0f4f1; vertical-align: middl
                 </div>
                 <form method="POST" style="margin:0;" onsubmit="return confirm('Opravdu smazat tento webhook?');">
                     <input type="hidden" name="action" value="delete_webhook">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($w['id']); ?>">
                     <button type="submit" class="danger-btn"><i class="fa-solid fa-trash"></i> Smazat</button>
                 </form>
