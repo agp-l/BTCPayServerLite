@@ -1,7 +1,7 @@
 <?php
 // admin/url_pay.php
 declare(strict_types=1);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 // 1. Načtení závislostí o složku výše
@@ -12,6 +12,7 @@ use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\BtcDashboard;
+use BtcPayLite\BitcoinAmount;
 use BtcPayLite\AuthManager;
 
 // Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
@@ -45,12 +46,18 @@ try {
     $secondsRemaining = $statusData['seconds_remaining'] ?? 0;
     $bip21Uri = $statusData['bip21_uri'] ?? "bitcoin:{$invoice['a']}?amount={$invoice['v']}";
 
-    // Přepočet na CZK pro lepší orientaci zákazníka
-    $fiatRate = $dashboard->getFiatPrice('CZK');
-    $fiatAmount = $fiatRate > 0 ? number_format((float)$invoice['v'] * $fiatRate, 2, ',', ' ') : '0,00';
+    // Přepočet do fiat je pouze orientační; BTC částka zůstává přesná v satoshi.
+    $invoiceAmount = BitcoinAmount::fromBtc((string) ($invoice['v'] ?? ''));
+    $market = $dashboard->marketSnapshot('CZK');
+    $fiatRate = $market['fiat_price'];
+    $fiatAmount = $fiatRate !== null
+        ? number_format(($invoiceAmount->satoshis() / 100_000_000) * $fiatRate, 2, ',', ' ')
+        : null;
 
-} catch (Exception $e) {
-    die("<div style='text-align:center; padding:50px; color:#ef4d4d; font-family:sans-serif;'><h1>Chyba faktury</h1><p>" . htmlspecialchars($e->getMessage()) . "</p></div>");
+} catch (Throwable $exception) {
+    error_log(sprintf('Admin URL payment page failed: %s (%s)', $exception->getMessage(), $exception::class));
+    http_response_code(400);
+    $pageError = 'Fakturu se nepodařilo bezpečně načíst.';
 }
 ?>
 <!doctype html>
@@ -114,6 +121,9 @@ try {
   </style>
 </head>
 <body>
+<?php if (isset($pageError)): ?>
+<div class="pay-card" role="alert"><h2>Faktura není dostupná</h2><p class="desc"><?php echo htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8'); ?></p></div>
+<?php else: ?>
 <div class="pay-card" id="payCard">
     <div id="badgeContainer">
         <?php if ($currentStatus === 'paid'): ?>
@@ -132,8 +142,8 @@ try {
         <?php echo isset($invoice['p']['order_id']) && $invoice['p']['order_id'] !== '' ? 'ID Objednávky: ' . htmlspecialchars($invoice['p']['order_id']) : 'Platba objednávky'; ?>
     </div>
 
-    <div class="amount-box"><?php echo htmlspecialchars(number_format((float)$invoice['v'], 8, '.', '')); ?> BTC</div>
-    <div class="fiat-amount">~ <?php echo htmlspecialchars($fiatAmount); ?> CZK</div>
+    <div class="amount-box"><?php echo htmlspecialchars($invoiceAmount->toBtcString(), ENT_QUOTES, 'UTF-8'); ?> BTC</div>
+    <div class="fiat-amount"><?php echo $fiatAmount === null ? 'Kurz CZK není dostupný' : '~ ' . htmlspecialchars($fiatAmount, ENT_QUOTES, 'UTF-8') . ' CZK'; ?></div>
     
     <div class="timer" id="timer">
         <?php echo $currentStatus === 'expired' ? 'Čas vypršel' : 'Načítání času...'; ?>
@@ -157,7 +167,7 @@ try {
 </div>
 <script>
   let secondsRemaining = <?php echo (int)$secondsRemaining; ?>;
-  const token = "<?php echo htmlspecialchars($token); ?>";
+  const token = <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
   const timerEl = document.getElementById('timer');
   const interactiveArea = document.getElementById('interactiveArea');
   const badgeContainer = document.getElementById('badgeContainer');
@@ -237,5 +247,6 @@ try {
       }, 5000);
   }
 </script>
+<?php endif; ?>
 </body>
 </html>
