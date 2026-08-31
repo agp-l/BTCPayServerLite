@@ -11,6 +11,7 @@ foreach ([
     'stores_view' => 'admin/views/stores_view.php',
     'webhooks_view' => 'admin/views/webhooks_view.php',
     'invoices_view' => 'admin/views/invoices_view.php',
+    'operations_factory' => 'classes/AdminOperationsFactory.php',
 ] as $name => $path) {
     $source = file_get_contents($root . '/' . $path);
     if (!is_string($source)) {
@@ -61,4 +62,13 @@ if (str_contains($sources['invoices_controller'], '(float)') || !str_contains($s
 }
 echo "[PASS] keeps exact invoice amounts and trusted checkout URLs\n";
 
-echo "7 admin management boundary tests passed.\n";
+if (
+    !str_contains($sources['operations_factory'], "['electrum_cli_path', 'electrum_cli']")
+    || !str_contains($sources['operations_factory'], "['electrum_data_dir', 'electrum_data_directory']")
+    || !str_contains($sources['operations_factory'], "['store_wallets_dir', 'wallet_directory']")
+) {
+    throw new RuntimeException('Admin operations factory dropped compatibility with installed configuration keys.');
+}
+echo "[PASS] keeps admin wallet configuration backward compatible\n";
+
+echo "8 admin management boundary tests passed.\n";
