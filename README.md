@@ -26,7 +26,7 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - sdílený responzivní design systém pro administraci a klientský portál,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 53 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
+V adresáři `classes/` je 59 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
 
 ### Hlavní soubory mimo `classes/`
 
@@ -37,7 +37,7 @@ V adresáři `classes/` je 53 tříd a rozhraní. Původní velké UI třídy a 
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
 | `admin/stores.php`, `admin/invoices.php`, `admin/webhooks.php` | Přepracováno a auditováno | Tenké controllery, jednotná oprávnění a CSRF, validované služby, přesné BTC částky a společná webhook URL policy. |
-| `checkout/pay.php` | Čeká | Veřejná platební stránka a její výstupní/HTTP hranice nebyly samostatně auditovány. |
+| `checkout/pay.php`, `checkout/views/`, `assets/checkout.*` | Přepracováno a auditováno | Tenký veřejný controller pro databázové faktury, bezpečný JSON status endpoint, přesné částky, lokální BIP21 odkaz, responzivní design a žádné předávání platebních dat externí QR službě. |
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
 | `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený responzivní design systém dashboardu, peněženky, obchodů, faktur a webhooků bez starých inline stylů; citlivé wallet hodnoty se neposílají externím QR službám. |
@@ -106,6 +106,12 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 |---|---|---|
 | `BtcInvoiceManager` | Vytváří a načítá databázové faktury, vytváří stateless faktury a bezpečně mění stavy `New`, `Processing`, `Settled`, `Expired`. | Auditováno |
 | `BtcInvoiceManagerException` | Strukturovaná chyba životního cyklu faktury. | Auditováno |
+| `CheckoutRepository` | Read-only rozhraní pro nalezení peněženky vlastnící databázovou fakturu. | Auditováno |
+| `PdoCheckoutRepository` | Parametrizovaný omezený JOIN faktury a obchodu bez načítání nepotřebných nebo citlivých sloupců. | Auditováno |
+| `DatabaseCheckoutService` | Validuje invoice ID, normalizuje přesný platební stav a skládá prezentačně neutrální checkout view model. | Auditováno |
+| `DatabaseCheckoutFactory` | Sestavuje checkout z validované konfigurace a spouští kontrolu Electrumu pod sdíleným databázovým zámkem. | Auditováno |
+| `DatabaseCheckoutController` | HTTP hranice veřejného checkoutu pro HTML a minimální JSON status odpověď; povoluje pouze `GET` a `HEAD`. | Auditováno |
+| `CheckoutException` | Veřejně bezpečná checkout chyba s HTTP statusem a stabilním názvem operace. | Auditováno |
 | `BtcStatelessTokenCodec` | Podepisuje a ověřuje časově omezené stateless tokeny a odmítá změněný nebo prošlý obsah. | Auditováno |
 | `BtcStatelessService` | Aplikační logika stateless API a platební stránky; ověřuje klienta, wallet mapping, vstupy a stav platby. | Auditováno |
 | `BtcStatelessServiceException` | Chyba stateless operace s bezpečným HTTP statusem a názvem operace. | Auditováno |
@@ -173,6 +179,12 @@ Hlavní `index.php` používá přesné route bez prefixového porovnávání. A
 `app_url` je důvěryhodný origin aplikace a má zahrnovat i instalační podadresář, například `http://localhost/BTCPayLite`. Je-li nastavený, odkazy ani redirecty nepoužívají klientský Host header. Routovací segmenty zůstávají daty a HTML escapování se provádí až ve view.
 
 ## HTTP vstupní body
+
+### `checkout/pay.php` – databázový checkout
+
+Veřejná cesta `GET /pay?id={invoiceId}` zobrazuje zákazníkovi částku, bitcoinovou adresu, zbývající čas a aktuální stav databázové faktury. Stav se obnovuje přes `GET /pay?id={invoiceId}&action=check`; JSON odpověď obsahuje pouze dynamické platební údaje potřebné pro UI.
+
+Checkout používá přesné osmidesetinné BTC řetězce, společný databázový zámek pro Electrum a bezpečné chybové odpovědi. Tlačítko „Otevřít Bitcoin peněženku“ používá lokálně sestavené BIP21 URI. Původní vzdálený generátor QR byl odstraněn, aby adresa, částka a invoice ID neopouštěly aplikaci.
 
 ### `api.php` – databázové API
 
@@ -268,6 +280,9 @@ Kontraktní testy jsou samostatné PHP skripty:
 php tests/BitcoinAmountTest.php
 php tests/ElectrumWalletTest.php
 php tests/BtcInvoiceManagerTest.php
+php tests/DatabaseCheckoutServiceTest.php
+php tests/CheckoutRepositoryQueryTest.php
+php tests/CheckoutHttpBoundaryTest.php
 php tests/BtcStatelessServiceTest.php
 php tests/DatabaseTest.php
 php tests/GreenfieldApiTest.php
@@ -314,10 +329,9 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 
 ## Doporučené pořadí dalšího auditu
 
-1. `checkout/pay.php` a související AJAX/status endpointy.
-2. Zachování a modernizace alternativních stateless URL faktur (`admin/url_invoices.php`, `admin/url_pay.php`).
-3. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
-4. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
-5. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
+1. Zachování a modernizace alternativních stateless URL faktur (`admin/url_invoices.php`, `admin/url_pay.php`).
+2. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
+3. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
+4. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
