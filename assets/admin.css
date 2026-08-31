@@ -429,6 +429,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .danger-text { color: var(--admin-danger) !important; }
 .verification-summary { margin-bottom: 12px; }
 .verification-data { color: var(--admin-text-soft); font-size: 13px; line-height: 1.75; }
+.verification-row { display: grid; grid-template-columns: minmax(92px, 0.35fr) minmax(0, 1fr); gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.045); }
+.verification-row:last-child { border-bottom: 0; }
+.verification-row strong { color: var(--admin-muted); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+.verification-row span { overflow-wrap: anywhere; }
 .verification-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 .underpaid-note { margin-top: 6px; color: var(--admin-warning); font-weight: 750; }
 .error-text { display: inline-flex; align-items: center; gap: 8px; color: #fda4af; font-weight: 650; }
