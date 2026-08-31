@@ -60,10 +60,4 @@ try {
     $pageError = 'Aktuální provozní data se nepodařilo načíst. Zkuste stránku obnovit později.';
 }
 
-// Temporary aliases keep the existing view compatible until the UI checkpoint.
-$totalStores = $dashboardSummary['total_stores'];
-$totalInvoices = $dashboardSummary['total_invoices'];
-$settledInvoices = $dashboardSummary['settled_invoices'];
-$totalBtcVolume = $dashboardSummary['total_btc_volume'];
-
 require __DIR__ . '/views/index_view.php';
