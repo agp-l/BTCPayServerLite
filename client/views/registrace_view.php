@@ -51,9 +51,10 @@ declare(strict_types=1);
 
         <?php if (!empty($successMsg)): ?>
             <div class="success"><i class="fa-solid fa-circle-check"></i> <?php echo htmlspecialchars($successMsg); ?></div>
-            <a href="login.php" class="primary" style="text-decoration:none; display:block; margin-top:15px; padding:12px; background:#2fd35a; color:#fff; border-radius:10px; font-weight:700;">Přihlásit se do účtu</a>
+            <a href="login" class="primary" style="text-decoration:none; display:block; margin-top:15px; padding:12px; background:#2fd35a; color:#fff; border-radius:10px; font-weight:700;">Přihlásit se do účtu</a>
         <?php else: ?>
-            <form method="POST" action="registrace.php">
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="input-wrap">
                     <i class="fa-solid fa-envelope"></i>
                     <input type="email" name="email" placeholder="E-mailová adresa" value="<?php echo htmlspecialchars($email); ?>" required>
@@ -69,7 +70,7 @@ declare(strict_types=1);
                 <button type="submit"><i class="fa-solid fa-check"></i> Dokončit registraci</button>
             </form>
             
-            <a href="login.php" class="footer-link">Už máte účet? Přihlaste se</a>
+            <a href="login" class="footer-link">Už máte účet? Přihlaste se</a>
         <?php endif; ?>
     </div>
 </body>
