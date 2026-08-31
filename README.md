@@ -2,7 +2,7 @@
 
 Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
-> Stav dokumentace: `main` po auditu webhooků, commit `0d81dc6`, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou, kontraktními testy a provozním smoke testem tam, kde byl potřeba. Neznamená to, že je dokončený audit celého webového projektu.
+> Stav dokumentace: větev `audit/auth-session` po dokončeném auditu autentizace, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou, kontraktními testy a provozním smoke testem tam, kde byl potřeba. Neznamená to, že je dokončený audit celého webového projektu.
 
 ## Aktuální stav auditu
 
@@ -17,11 +17,11 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - stateless HTTP API,
 - persistentní webhook outbox, retry/backoff, HMAC podpisy a ochrana proti SSRF/DNS rebindingu,
 - autentizace `webhook_cron.php`,
+- přihlášení, registrace, session/cookie politika, CSRF, role a persistentní throttling,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 28 tříd a jedno rozhraní. Fokusovaným auditem prošlo 26 komponent. Zbývají tři původní pomocné/UI třídy:
+V adresáři `classes/` je 30 tříd a dvě rozhraní. Fokusovaným auditem prošlo 30 komponent. Zbývají dvě pomocné/UI třídy:
 
-- `AuthManager`,
 - `BtcDashboard`,
 - `UrlManager`.
 
@@ -33,11 +33,12 @@ V adresáři `classes/` je 28 tříd a jedno rozhraní. Fokusovaným auditem pro
 | `api_stateless.php` | Auditováno | Stateless API, omezení vstupu, autentizace, zámek Electrumu a bezpečné HTTP odpovědi. |
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
-| `admin/webhooks.php` | Částečně auditováno | Registrace používá společnou URL policy; celý admin formulář a CSRF ochrana ještě čekají. |
+| `admin/webhooks.php` | Částečně auditováno | Vstup vyžaduje admin roli a registrace používá společnou URL policy; audit celého formuláře a jeho mutací ještě čeká. |
 | `checkout/pay.php` | Čeká | Veřejná platební stránka a její výstupní/HTTP hranice nebyly samostatně auditovány. |
-| `index.php` | Čeká | Front controller, routing, chybové režimy a produkční nastavení `display_errors`. |
-| `admin/*.php`, `admin/views/` | Čeká | Autorizace jednotlivých akcí, CSRF, XSS, validace formulářů a práce s citlivými daty. |
-| `client/*.php`, `client/views/` | Čeká | Přihlášení, registrace, session/cookie politika a výstupní escapování. |
+| `index.php` | Částečně auditováno | Bezpečné spuštění session a skryté PHP chyby jsou hotové; routing, Host header a redirecty ještě čekají. |
+| `admin/*.php`, `admin/views/` | Částečně auditováno | Přímé vstupy do kontrolovaných admin stránek vyžadují admin roli; CSRF, XSS, validace formulářů a citlivá data ještě čekají. |
+| `client/login.php`, `client/registrace.php` a session | Auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID a POST logout. |
+| `client/index.php`, ostatní client views | Částečně auditováno | Role a CSRF hranice mutací jsou hotové; širší audit dashboardu, objektové autorizace a výstupů ještě čeká. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
 | `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
 | testovací a pomocné skripty | Čeká | Staré `test_*.php`, simulátory a případné veřejné diagnostické soubory je nutné inventarizovat a odstranit nebo uzamknout. |
@@ -132,7 +133,10 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 
 | Komponenta | Odpovědnost | Stav auditu |
 |---|---|---|
-| `AuthManager` | Přihlášení, registrace, odhlášení, session a kontrola rolí. | Čeká na fokusovaný audit |
+| `AuthManager` | Přihlášení, registrace, odhlášení, bezpečné session/cookies, CSRF, časové limity, role a throttling. | Auditováno |
+| `AuthUserRepository` | Rozhraní úzké persistence uživatelů a autentizačních pokusů. | Auditováno |
+| `PdoAuthUserRepository` | PDO implementace explicitních auth dotazů, binárních identit throttlingu a omezeného úklidu pokusů. | Auditováno |
+| `AuthException` | Bezpečná doménová chyba autentizace bez úniku interních detailů. | Auditováno |
 | `BtcDashboard` | Připravuje peněženku, adresy, transakce, poplatky, fiat ceny a export klíčů pro administrační UI. | Čeká na fokusovaný audit |
 | `UrlManager` | Parsuje cestu, skládá základní URL a pomáhá routeru/UI. | Čeká na fokusovaný audit |
 
@@ -190,7 +194,7 @@ Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Elec
 
 ## Databáze a migrace
 
-Produkční schéma používá tabulky `stores`, `invoices`, `webhooks` a `webhook_deliveries` s indexy a cizími klíči.
+Produkční schéma používá tabulky `users`, `auth_attempts`, `stores`, `invoices`, `webhooks` a `webhook_deliveries` s indexy a cizími klíči.
 
 Audit přidal tyto jednorázové migrace a read-only kontroly:
 
@@ -198,6 +202,8 @@ Audit přidal tyto jednorázové migrace a read-only kontroly:
 - `migrations/20260830_harden_database_schema.sql`
 - `migrations/20260831_webhook_delivery_preflight.sql`
 - `migrations/20260830_add_webhook_deliveries.sql`
+- `migrations/20260831_auth_preflight.sql`
+- `migrations/20260831_add_auth_attempts.sql`
 
 Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Preflight musí skončit bez problémů. Migrační soubory nejsou obecný idempotentní instalační skript.
 
@@ -232,6 +238,9 @@ php tests/WebhookEndpointPolicyTest.php
 php tests/WebhookCronControllerTest.php
 php tests/WebhookProcessorTest.php
 php tests/WebhookDeliveryRepositoryQueryTest.php
+php tests/AuthManagerTest.php
+php tests/AuthRepositoryQueryTest.php
+php tests/AuthHttpBoundaryTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
@@ -245,15 +254,16 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 - Cron nespouštějte přes URL query parametr; používejte CLI nebo Bearer hlavičku.
 - Před migrací vždy vytvořte a ověřte obnovitelnou databázovou zálohu.
 - Neošetřené výjimky a odpovědi Electrumu neposílejte klientům.
+- Přihlášení a registrace musí používat CSRF token; odhlášení je pouze přes `POST`.
+- Session cookie je `HttpOnly`, `SameSite=Lax` a na HTTPS také `Secure`; session má idle i absolutní limit.
 
 ## Doporučené pořadí dalšího auditu
 
-1. `AuthManager` společně s `client/login.php`, `client/registrace.php`, session a cookie nastavením.
-2. `UrlManager` a `index.php`, včetně Host headeru, routingu, redirectů a produkčních chybových režimů.
-3. `BtcDashboard` a `admin/wallet.php`, zejména přesnost částek, vzdálené cenové API, export seed/xprv a CSRF.
-4. `checkout/pay.php` a související AJAX/status endpointy.
-5. Zbytek `admin/` a `client/` formulářů a views: CSRF, XSS, autorizace objektů a bezpečné mazání.
-6. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
-7. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
+1. `UrlManager` a `index.php`, včetně Host headeru, routingu, redirectů a produkčních chybových režimů.
+2. `BtcDashboard` a `admin/wallet.php`, zejména přesnost částek, vzdálené cenové API, export seed/xprv a CSRF.
+3. `checkout/pay.php` a související AJAX/status endpointy.
+4. Zbytek `admin/` a `client/` formulářů a views: CSRF, XSS, autorizace objektů a bezpečné mazání.
+5. Inventura a odstranění nebo uzamčení starých testovacích/diagnostických skriptů.
+6. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
