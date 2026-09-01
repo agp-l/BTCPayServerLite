@@ -11,6 +11,8 @@
         statusUrl: app.dataset.statusUrl || '',
         initialStatus: app.dataset.initialStatus || 'Expired',
         secondsRemaining: Number.isSafeInteger(parsedSeconds) ? parsedSeconds : 0,
+        redirectUrl: app.dataset.redirectUrl || '',
+        redirectAutomatically: app.dataset.redirectAutomatically === 'true',
     };
 
     const statusMeta = {
@@ -41,6 +43,7 @@
     let toastTimeout = 0;
     let pollTimeout = 0;
     let pollFailures = 0;
+    let redirectScheduled = false;
 
     const formatTime = (seconds) => {
         const hours = Math.floor(seconds / 3600);
@@ -70,6 +73,28 @@
         timer.textContent = currentStatus === 'Expired' || secondsRemaining <= 0
             ? 'Čas pro platbu vypršel.'
             : 'Zbývající čas: ' + formatTime(secondsRemaining);
+    };
+
+    const scheduleMerchantRedirect = () => {
+        if (redirectScheduled || currentStatus !== 'Settled'
+            || !config.redirectAutomatically || config.redirectUrl === ''
+        ) {
+            return;
+        }
+
+        try {
+            const destination = new URL(config.redirectUrl);
+            if (destination.protocol !== 'http:' && destination.protocol !== 'https:') {
+                return;
+            }
+
+            redirectScheduled = true;
+            window.setTimeout(() => {
+                window.location.assign(destination.href);
+            }, 1800);
+        } catch (_error) {
+            // The server validates this URL; silently keep the success page as a safe fallback.
+        }
     };
 
     const renderStatus = (data) => {
@@ -119,6 +144,7 @@
         }
 
         renderTimer();
+        scheduleMerchantRedirect();
         return true;
     };
 
