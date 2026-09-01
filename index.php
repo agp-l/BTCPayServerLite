@@ -14,6 +14,28 @@ use BtcPayLite\UrlManager;
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
+if (!is_file(__DIR__ . '/config.php')) {
+    $scriptName = is_string($_SERVER['SCRIPT_NAME'] ?? null)
+        ? str_replace('\\', '/', $_SERVER['SCRIPT_NAME'])
+        : '/index.php';
+    $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+    $installUrl = ($basePath === '' ? '' : $basePath) . '/install.php';
+    $method = is_string($_SERVER['REQUEST_METHOD'] ?? null)
+        ? strtoupper($_SERVER['REQUEST_METHOD'])
+        : 'GET';
+    if (in_array($method, ['GET', 'HEAD'], true)) {
+        header('Location: ' . $installUrl, true, 302);
+    } else {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=UTF-8');
+        header('Retry-After: 300');
+        if ($method !== 'HEAD') {
+            echo 'BTCPay Server Lite is not installed.';
+        }
+    }
+    exit;
+}
+
 require_once __DIR__ . '/vendor/autoload.php';
 
 header('X-Content-Type-Options: nosniff');

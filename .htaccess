@@ -1,12 +1,20 @@
 RewriteEngine On
 
+# Configuration and installer temporary files contain secrets and must never be served.
+<FilesMatch "^(config\.php|\.install\.lock|\.btcpay-config-.*)$">
+    Require all denied
+</FilesMatch>
+
 # Apache may consume the Authorization header before PHP populates $_SERVER.
 # Preserve it for API Bearer authentication (PHP may expose the value as
 # HTTP_AUTHORIZATION or REDIRECT_HTTP_AUTHORIZATION after an internal rewrite).
 RewriteCond %{HTTP:Authorization} ^(.+)$
 RewriteRule ^ - [E=HTTP_AUTHORIZATION:%1]
 
-# Greenfield API namespace goes to the dedicated exact API controller.\nRewriteRule ^api/v1(?:/.*)?$ api.php [QSA,L]\n\n# Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
+# Greenfield API namespace goes to the dedicated exact API controller.
+RewriteRule ^api/v1(?:/.*)?$ api.php [QSA,L]
+
+# Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
 RewriteCond %{REQUEST_FILENAME} !-f
 
 # Všechno ostatní (včetně existujících složek jako /admin/) pošli do index.php
