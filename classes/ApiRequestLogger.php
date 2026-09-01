@@ -25,7 +25,9 @@ final class ApiRequestLogger
         $integrationName = $this->header($server, 'HTTP_X_BTCPAY_PLUGIN_NAME', 100);
         $integrationVersion = $this->header($server, 'HTTP_X_BTCPAY_PLUGIN_VERSION', 50);
         $shopOrigin = $this->shopOrigin($server['HTTP_X_BTCPAY_SHOP_URL'] ?? null);
-        $storeId = $httpStatus < 400 ? $this->existingStoreFromPath($path) : null;
+        $storeId = !in_array($httpStatus, [401, 403], true)
+            ? $this->existingStoreFromPath($path)
+            : null;
 
         $pdo = $this->database->getPdo();
         $statement = $pdo->prepare(
@@ -47,7 +49,11 @@ final class ApiRequestLogger
             $createdAt,
         ]);
 
-        if ($storeId !== null && ($integrationName !== null || $shopOrigin !== null)) {
+        if (
+            $storeId !== null
+            && $httpStatus < 400
+            && ($integrationName !== null || $shopOrigin !== null)
+        ) {
             $name = $integrationName ?? 'API klient';
             $integrationKey = hash(
                 'sha256',

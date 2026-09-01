@@ -29,6 +29,9 @@ final class ClientRepositoryFixture implements ClientDashboardRepository
         return [];
     }
     public function fetchWebhooks(int $userId): array { return []; }
+    public function fetchPayouts(int $userId, int $limit): array { return []; }
+    public function fetchIntegrations(int $userId): array { return []; }
+    public function fetchRequests(int $userId, int $limit): array { return []; }
     public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
     {
         if ($this->failStoreCreation) throw new RuntimeException('Simulated store persistence failure.');

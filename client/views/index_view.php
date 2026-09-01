@@ -45,6 +45,12 @@ $statusClasses = [
     <div class="stat-value"><?php echo number_format($clientStats['paid_invoices'], 0, ',', ' '); ?></div>
     <div class="stat-meta">Potvrzené platby</div>
   </article>
+  <article class="stat-card stat-card-amber">
+    <span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
+    <div class="stat-label">Zůstatek peněženky</div>
+    <div class="stat-value code"><?php echo is_array($walletBalance) ? htmlspecialchars(number_format((float) $walletBalance['confirmed'], 8, '.', ''), ENT_QUOTES, 'UTF-8') . ' BTC' : '—'; ?></div>
+    <div class="stat-meta"><?php echo htmlspecialchars($walletError ?? 'Živý potvrzený zůstatek', ENT_QUOTES, 'UTF-8'); ?></div>
+  </article>
 </section>
 
 <section class="card">
@@ -146,6 +152,41 @@ $statusClasses = [
       <?php $statusClass = $statusClasses[$invoice['status']] ?? 's-unknown'; ?>
       <tr><td><strong><?php echo htmlspecialchars($invoice['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td><td><code class="truncate" title="<?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars($invoice['amount'], ENT_QUOTES, 'UTF-8'); ?></code> BTC</td><td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($invoice['status'], ENT_QUOTES, 'UTF-8'); ?></span></td><td class="muted"><time datetime="<?php echo date('c', $invoice['created_at']); ?>"><?php echo date('d.m.Y H:i', $invoice['created_at']); ?></time></td></tr>
     <?php endforeach; ?>
+    </tbody></table></div>
+  <?php endif; ?>
+</section>
+
+<div class="merchant-grid">
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-plug" aria-hidden="true"></i> Moje integrace a e-shopy</span></div>
+    <p class="card-subtitle">Integrace se objeví po úspěšném API požadavku s identifikačními hlavičkami pluginu.</p>
+    <?php if ($integrations === []): ?>
+      <div class="empty-state"><p>Zatím nebyla rozpoznána žádná pojmenovaná integrace.</p></div>
+    <?php else: ?>
+      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Plugin</th><th>Verze</th><th>E-shop</th><th>Obchod</th><th>Naposledy</th></tr></thead><tbody>
+      <?php foreach ($integrations as $integration): ?><tr><td><strong><?php echo htmlspecialchars((string) $integration['name'], ENT_QUOTES, 'UTF-8'); ?></strong></td><td><?php echo htmlspecialchars((string) ($integration['version'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo htmlspecialchars((string) ($integration['shop_origin'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo htmlspecialchars((string) $integration['store_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo date('d.m.Y H:i:s', (int) $integration['last_seen_at']); ?></td></tr><?php endforeach; ?>
+      </tbody></table></div>
+    <?php endif; ?>
+  </section>
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> Poslední API požadavky</span></div>
+    <?php if ($requests === []): ?>
+      <div class="empty-state"><p>Zatím nejsou zaznamenány žádné požadavky obchodů.</p></div>
+    <?php else: ?>
+      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Čas</th><th>Obchod</th><th>Metoda</th><th>Cesta</th><th>Stav</th><th>Trvání</th></tr></thead><tbody>
+      <?php foreach ($requests as $request): ?><tr><td><?php echo date('d.m.Y H:i:s', (int) $request['created_at']); ?></td><td><?php echo htmlspecialchars((string) $request['store_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><code><?php echo htmlspecialchars((string) $request['method'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars((string) $request['request_path'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><?php echo (int) $request['http_status']; ?></td><td><?php echo (int) $request['duration_ms']; ?> ms</td></tr><?php endforeach; ?>
+      </tbody></table></div>
+    <?php endif; ?>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> Moje výběry</span></div>
+  <?php if ($payouts === []): ?>
+    <div class="empty-state"><p>Zatím nebyl vytvořen žádný výběr.</p></div>
+  <?php else: ?>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Čas</th><th>Obchod</th><th>ID</th><th>Cíl</th><th>Částka</th><th>Poplatek</th><th>Stav</th><th>TXID</th></tr></thead><tbody>
+    <?php foreach ($payouts as $payout): ?><tr><td><?php echo date('d.m.Y H:i:s', (int) $payout['created_at']); ?></td><td><?php echo htmlspecialchars((string) $payout['store_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><code><?php echo htmlspecialchars((string) $payout['id'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars((string) $payout['destination'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars((string) $payout['payout_amount'], ENT_QUOTES, 'UTF-8'); ?> BTC</code></td><td><code><?php echo htmlspecialchars((string) $payout['exchange_fee'], ENT_QUOTES, 'UTF-8'); ?> BTC</code></td><td><?php echo htmlspecialchars((string) $payout['state'], ENT_QUOTES, 'UTF-8'); ?></td><td><code><?php echo htmlspecialchars((string) ($payout['txid'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></code></td></tr><?php endforeach; ?>
     </tbody></table></div>
   <?php endif; ?>
 </section>

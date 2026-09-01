@@ -22,6 +22,15 @@ interface ClientDashboardRepository
     /** @return list<array{id:string,store_id:string,store_name:string,url:string,secret:string,created_at:int}> */
     public function fetchWebhooks(int $userId): array;
 
+    /** @return list<array<string,mixed>> */
+    public function fetchPayouts(int $userId, int $limit): array;
+
+    /** @return list<array<string,mixed>> */
+    public function fetchIntegrations(int $userId): array;
+
+    /** @return list<array<string,mixed>> */
+    public function fetchRequests(int $userId, int $limit): array;
+
     public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void;
 
     public function ownsStore(int $userId, string $storeId): bool;

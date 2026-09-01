@@ -139,6 +139,60 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
         );
     }
 
+    public function fetchPayouts(int $userId, int $limit): array
+    {
+        if ($limit < 1 || $limit > 100) {
+            throw new RuntimeException('Client payout limit is outside the allowed range.');
+        }
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT p.id, p.destination, p.payout_amount, p.exchange_fee, p.state, p.txid,
+                    p.created_at, p.updated_at, s.id AS store_id, s.name AS store_name
+             FROM payouts p
+             INNER JOIN stores s ON s.id = p.store_id
+             WHERE s.user_id = :user_id
+             ORDER BY p.created_at DESC, p.id DESC
+             LIMIT :payout_limit'
+        );
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->bindValue(':payout_limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+        return $this->rows($statement->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function fetchIntegrations(int $userId): array
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT si.name, si.version, si.shop_origin, si.first_seen_at, si.last_seen_at,
+                    s.id AS store_id, s.name AS store_name
+             FROM store_integrations si
+             INNER JOIN stores s ON s.id = si.store_id
+             WHERE s.user_id = ?
+             ORDER BY si.last_seen_at DESC, si.id DESC'
+        );
+        $statement->execute([$userId]);
+        return $this->rows($statement->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function fetchRequests(int $userId, int $limit): array
+    {
+        if ($limit < 1 || $limit > 100) {
+            throw new RuntimeException('Client request limit is outside the allowed range.');
+        }
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT ar.method, ar.request_path, ar.http_status, ar.duration_ms, ar.created_at,
+                    s.id AS store_id, s.name AS store_name
+             FROM api_request_log ar
+             INNER JOIN stores s ON s.id = ar.store_id
+             WHERE s.user_id = :user_id
+             ORDER BY ar.created_at DESC, ar.id DESC
+             LIMIT :request_limit'
+        );
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->bindValue(':request_limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+        return $this->rows($statement->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
     {
         $statement = $this->database->getPdo()->prepare(

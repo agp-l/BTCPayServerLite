@@ -10,6 +10,8 @@ use Throwable;
 final class ClientDashboardService
 {
     private const INVOICE_LIMIT = 30;
+    private const PAYOUT_LIMIT = 30;
+    private const REQUEST_LIMIT = 50;
 
     private ClientDashboardRepository $repository;
     private WebhookEndpointPolicy $webhookPolicy;
@@ -30,7 +32,10 @@ final class ClientDashboardService
      *   summary:array{total_stores:int,total_invoices:int,paid_invoices:int},
      *   stores:list<array{id:string,name:string,api_key:string,wallet_path:string}>,
      *   invoices:list<array{id:string,store_id:string,store_name:string,amount:string,status:string,created_at:int}>,
-     *   webhooks:list<array{id:string,store_id:string,store_name:string,url:string,secret:string,created_at:int}>
+     *   webhooks:list<array{id:string,store_id:string,store_name:string,url:string,secret:string,created_at:int}>,
+     *   payouts:list<array<string,mixed>>,
+     *   integrations:list<array<string,mixed>>,
+     *   requests:list<array<string,mixed>>
      * }
      */
     public function load(int $userId): array
@@ -42,6 +47,9 @@ final class ClientDashboardService
             'stores' => $this->repository->fetchStores($userId),
             'invoices' => $this->repository->fetchInvoices($userId, self::INVOICE_LIMIT),
             'webhooks' => $this->repository->fetchWebhooks($userId),
+            'payouts' => $this->repository->fetchPayouts($userId, self::PAYOUT_LIMIT),
+            'integrations' => $this->repository->fetchIntegrations($userId),
+            'requests' => $this->repository->fetchRequests($userId, self::REQUEST_LIMIT),
         ];
     }
 

@@ -7,6 +7,8 @@ use BtcPayLite\AuthManager;
 use BtcPayLite\ClientDashboardException;
 use BtcPayLite\ClientDashboardService;
 use BtcPayLite\Database;
+use BtcPayLite\ElectrumRPC;
+use BtcPayLite\ElectrumWallet;
 use BtcPayLite\PdoClientDashboardRepository;
 use BtcPayLite\UrlManager;
 use BtcPayLite\WebhookEndpointPolicy;
@@ -44,9 +46,15 @@ $clientStats = ['total_stores' => 0, 'total_invoices' => 0, 'paid_invoices' => 0
 $stores = [];
 $invoices = [];
 $webhooks = [];
+$payouts = [];
+$integrations = [];
+$requests = [];
+$walletBalance = null;
+$walletError = null;
 $toastMsg = '';
 $pageError = null;
 $service = null;
+$repository = null;
 
 try {
     $database = new Database(
@@ -56,8 +64,9 @@ try {
         $config['db_pass'],
         (int) ($config['db_port'] ?? 3306)
     );
+    $repository = new PdoClientDashboardRepository($database);
     $service = new ClientDashboardService(
-        new PdoClientDashboardRepository($database),
+        $repository,
         new WebhookEndpointPolicy(
             null,
             ($config['allow_local_webhooks'] ?? false) === true
@@ -120,6 +129,27 @@ if ($service instanceof ClientDashboardService) {
         $stores = $dashboard['stores'];
         $invoices = $dashboard['invoices'];
         $webhooks = $dashboard['webhooks'];
+        $payouts = $dashboard['payouts'];
+        $integrations = $dashboard['integrations'];
+        $requests = $dashboard['requests'];
+        $walletPath = $repository?->findAssignedWallet($userId);
+        if ($walletPath === null) {
+            $walletError = 'Účet nemá jednoznačně přiřazenou peněženku.';
+        } else {
+            try {
+                $wallet = new ElectrumWallet(new ElectrumRPC(
+                    $config['rpc_host'] ?? '',
+                    (int) ($config['rpc_port'] ?? 0),
+                    is_string($config['rpc_user'] ?? null) ? $config['rpc_user'] : null,
+                    is_string($config['rpc_pass'] ?? null) ? $config['rpc_pass'] : null
+                ));
+                $wallet->loadWallet($walletPath);
+                $walletBalance = $wallet->getWalletBalance();
+            } catch (Throwable $exception) {
+                error_log('Client wallet balance load failed: ' . $exception::class);
+                $walletError = 'Zůstatek peněženky nyní nelze načíst.';
+            }
+        }
     } catch (Throwable $exception) {
         error_log(sprintf(
             'Client dashboard data load failed: %s (%s)',
