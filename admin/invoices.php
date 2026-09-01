@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use BtcPayLite\AdminInvoiceService;
+use BtcPayLite\AdminManagementService;
 use BtcPayLite\AdminOperationsException;
 use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
@@ -11,6 +12,7 @@ use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\PdoAdminOperationsRepository;
+use BtcPayLite\PdoAdminManagementRepository;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -32,7 +34,24 @@ $csrfToken = AuthManager::csrfToken();
 $toastMsg = '';
 $pageError = null;
 $newInvoiceUrl = '';
+$databaseInvoices = [];
+$clients = [];
+$filterStores = [];
+$invoiceStatuses = [];
+$selectedUserId = null;
+$selectedStoreId = is_string($_GET['store_id'] ?? null) && $_GET['store_id'] !== ''
+    ? $_GET['store_id']
+    : null;
+$selectedStatus = is_string($_GET['status'] ?? null) && $_GET['status'] !== ''
+    ? $_GET['status']
+    : null;
 $service = null;
+$management = null;
+
+$rawUserId = is_string($_GET['user_id'] ?? null) ? $_GET['user_id'] : '';
+if ($rawUserId === '0' || ctype_digit($rawUserId)) {
+    $selectedUserId = (int) $rawUserId;
+}
 
 try {
     $database = new Database(
@@ -43,6 +62,9 @@ try {
         (int) ($config['db_port'] ?? 3306)
     );
     $repository = new PdoAdminOperationsRepository($database);
+    $management = new AdminManagementService(
+        new PdoAdminManagementRepository($database->getPdo())
+    );
     $service = new AdminInvoiceService(
         $repository,
         static function (array $store, string $amount, array $metadata) use ($config, $database): array {
@@ -63,6 +85,25 @@ try {
     error_log(sprintf('Admin invoices initialization failed: %s (%s)', $exception->getMessage(), $exception::class));
     http_response_code(500);
     $pageError = 'Správa faktur nyní není dostupná.';
+}
+
+if ($management instanceof AdminManagementService) {
+    try {
+        $clients = $management->clients();
+        $filterStores = $management->stores($selectedUserId);
+        $invoiceStatuses = $management->invoiceStatuses();
+        $databaseInvoices = $management->invoices(
+            $selectedUserId,
+            $selectedStoreId,
+            $selectedStatus
+        );
+    } catch (AdminOperationsException $exception) {
+        http_response_code($exception->getHttpStatus());
+        $pageError = $exception->getMessage();
+    } catch (Throwable $exception) {
+        error_log(sprintf('Admin invoice list failed: %s (%s)', $exception->getMessage(), $exception::class));
+        $pageError = 'Seznam faktur nyní není dostupný.';
+    }
 }
 
 if ($service instanceof AdminInvoiceService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {

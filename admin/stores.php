@@ -5,8 +5,11 @@ declare(strict_types=1);
 use BtcPayLite\AdminOperationsException;
 use BtcPayLite\AdminOperationsFactory;
 use BtcPayLite\AdminOperationsService;
+use BtcPayLite\AdminManagementService;
 use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
+use BtcPayLite\Database;
+use BtcPayLite\PdoAdminManagementRepository;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -28,10 +31,28 @@ $csrfToken = AuthManager::csrfToken();
 $toastMsg = '';
 $pageError = null;
 $stores = [];
+$clients = [];
+$selectedUserId = null;
 $service = null;
+$management = null;
+
+$rawUserId = is_string($_GET['user_id'] ?? null) ? $_GET['user_id'] : '';
+if ($rawUserId === '0' || ctype_digit($rawUserId)) {
+    $selectedUserId = (int) $rawUserId;
+}
 
 try {
     $service = AdminOperationsFactory::fromConfig($config);
+    $database = new Database(
+        $config['db_host'],
+        $config['db_name'],
+        $config['db_user'],
+        $config['db_pass'],
+        (int) ($config['db_port'] ?? 3306)
+    );
+    $management = new AdminManagementService(
+        new PdoAdminManagementRepository($database->getPdo())
+    );
 } catch (Throwable $exception) {
     error_log(sprintf('Admin stores initialization failed: %s (%s)', $exception->getMessage(), $exception::class));
     http_response_code(500);
@@ -64,9 +85,10 @@ if ($service instanceof AdminOperationsService && ($_SERVER['REQUEST_METHOD'] ??
     }
 }
 
-if ($service instanceof AdminOperationsService) {
+if ($service instanceof AdminOperationsService && $management instanceof AdminManagementService) {
     try {
-        $stores = $service->stores();
+        $clients = $management->clients();
+        $stores = $management->stores($selectedUserId);
     } catch (Throwable $exception) {
         error_log(sprintf('Admin stores data load failed: %s (%s)', $exception->getMessage(), $exception::class));
         http_response_code(500);

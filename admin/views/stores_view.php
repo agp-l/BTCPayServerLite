@@ -26,6 +26,17 @@ $storesUrl = $routeUrl('/admin/stores');
   <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><?php echo htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8'); ?></span></div>
 <?php endif; ?>
 
+<section class="card filter-card">
+  <form method="get" action="<?php echo $storesUrl; ?>" class="filter-bar">
+    <div class="field"><label for="storesClient">Zákazník</label><div class="input-wrap"><select id="storesClient" name="user_id">
+      <option value="">Všichni zákazníci</option>
+      <option value="0" <?php echo $selectedUserId === 0 ? 'selected' : ''; ?>>Systém / bez klienta</option>
+      <?php foreach ($clients as $client): ?><option value="<?php echo (int) $client['id']; ?>" <?php echo $selectedUserId === (int) $client['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['email'], ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?>
+    </select></div></div>
+    <div class="filter-actions"><button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button><?php if ($selectedUserId !== null): ?><a class="ghost-btn" href="<?php echo $storesUrl; ?>">Zrušit filtr</a><?php endif; ?></div>
+  </form>
+</section>
+
 <div class="management-grid">
   <section class="card">
     <div class="card-title">
@@ -45,6 +56,10 @@ $storesUrl = $routeUrl('/admin/stores');
             <span class="badge s-paid">Aktivní</span>
           </div>
           <div class="credential">
+            <span class="credential-label">Zákazník</span>
+            <div class="credential-value"><strong><?php echo htmlspecialchars((string) $store['client_email'], ENT_QUOTES, 'UTF-8'); ?></strong></div>
+          </div>
+          <div class="credential">
             <span class="credential-label">Store ID</span>
             <div class="credential-value">
               <code><?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?></code>
@@ -62,6 +77,9 @@ $storesUrl = $routeUrl('/admin/stores');
           <div class="credential">
             <span class="credential-label">Soubor peněženky</span>
             <div class="credential-value"><code><?php echo htmlspecialchars(basename($store['wallet_path']), ENT_QUOTES, 'UTF-8'); ?></code></div>
+          </div>
+          <div class="store-metrics muted">
+            Faktury: <?php echo (int) $store['invoice_count']; ?> · Webhooky: <?php echo (int) $store['webhook_count']; ?> · Výběry: <?php echo (int) $store['payout_count']; ?>
           </div>
         </article>
       <?php endforeach; ?>

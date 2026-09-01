@@ -31,6 +31,25 @@ $statusClasses = [
   </div>
 </section>
 
+<section class="card filter-card" aria-label="Filtr dashboardu">
+  <form method="get" action="<?php echo $routeUrl('/admin/dashboard'); ?>" class="filter-bar">
+    <div class="field">
+      <label for="dashboardClient">Zákazník</label>
+      <div class="input-wrap"><select id="dashboardClient" name="user_id">
+        <option value="">Všichni zákazníci</option>
+        <option value="0" <?php echo $selectedUserId === 0 ? 'selected' : ''; ?>>Systém / bez klienta</option>
+        <?php foreach ($clients as $client): ?>
+          <option value="<?php echo (int) $client['id']; ?>" <?php echo $selectedUserId === (int) $client['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['email'], ENT_QUOTES, 'UTF-8'); ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="primary"><i class="fa-solid fa-filter" aria-hidden="true"></i> Filtrovat</button>
+      <?php if ($selectedUserId !== null): ?><a class="ghost-btn" href="<?php echo $routeUrl('/admin/dashboard'); ?>">Zrušit filtr</a><?php endif; ?>
+    </div>
+  </form>
+</section>
+
 <?php if ($pageError !== null): ?>
   <div class="alert alert-error" role="alert">
     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
@@ -94,6 +113,7 @@ $statusClasses = [
           <thead>
             <tr>
               <th>Faktura</th>
+              <th>Zákazník</th>
               <th>Obchod</th>
               <th>Částka</th>
               <th>Stav</th>
@@ -114,6 +134,7 @@ $statusClasses = [
             ?>
             <tr>
               <td><span class="code truncate" title="<?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($invoice['id'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+              <td><?php echo htmlspecialchars((string) $invoice['client_email'], ENT_QUOTES, 'UTF-8'); ?></td>
               <td><strong><?php echo htmlspecialchars($invoice['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
               <td><span class="code"><?php echo htmlspecialchars($invoice['amount'], ENT_QUOTES, 'UTF-8'); ?></span> BTC</td>
               <td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?></span></td>

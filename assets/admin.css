@@ -429,6 +429,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .form-grid-wide { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .result-panel { display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--admin-line); border-radius: 14px; background: rgba(7, 8, 12, 0.4); }
 .history-toolbar { display: flex; gap: 9px; flex-wrap: wrap; }
+.filter-card { padding-block: 18px; }
+.filter-bar { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; }
+.filter-bar .field { flex: 1 1 240px; margin: 0; }
+.filter-bar-wide .field { flex-basis: 190px; }
+.filter-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding-bottom: 1px; }
+.store-metrics { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--admin-border); font-size: 0.82rem; }
 .invoice-url { margin-top: 14px; padding: 11px 12px; border: 1px solid var(--admin-line); border-radius: 10px; background: rgba(7, 8, 12, 0.48); word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; }
 .invoice-url a { color: var(--admin-accent-light); text-decoration: none; }
 .invoice-url a:hover { text-decoration: underline; }

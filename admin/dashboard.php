@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use BtcPayLite\AdminDashboardService;
+use BtcPayLite\AdminManagementService;
 use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
-use BtcPayLite\PdoAdminDashboardRepository;
+use BtcPayLite\PdoAdminManagementRepository;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -35,7 +35,14 @@ $dashboardSummary = [
     'settlement_rate' => 0,
 ];
 $invoices = [];
+$clients = [];
+$selectedUserId = null;
 $pageError = null;
+
+$rawUserId = is_string($_GET['user_id'] ?? null) ? $_GET['user_id'] : '';
+if ($rawUserId === '0' || ctype_digit($rawUserId)) {
+    $selectedUserId = (int) $rawUserId;
+}
 
 try {
     $database = new Database(
@@ -45,9 +52,11 @@ try {
         $config['db_pass'],
         (int) ($config['db_port'] ?? 3306)
     );
-    $dashboard = (new AdminDashboardService(
-        new PdoAdminDashboardRepository($database->getPdo())
-    ))->load();
+    $management = new AdminManagementService(
+        new PdoAdminManagementRepository($database->getPdo())
+    );
+    $clients = $management->clients();
+    $dashboard = $management->dashboard($selectedUserId);
 
     $dashboardSummary = $dashboard['summary'];
     $invoices = $dashboard['invoices'];
