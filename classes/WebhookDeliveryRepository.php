@@ -149,6 +149,7 @@ class WebhookDeliveryRepository
                         $deliveryId = 'wd_' . bin2hex(random_bytes(16));
                         $payload = $this->encodePayload([
                             'deliveryId' => $deliveryId,
+                            'webhookId' => $webhookId,
                             'storeId' => $storeId,
                             'invoiceId' => $invoiceId,
                             'type' => $eventType,
