@@ -11,11 +11,12 @@ use LogicException;
 use Throwable;
 
 /**
- * Creates and evaluates database-backed and signed stateless Bitcoin invoices.
+ * Creates and evaluates database-backed Bitcoin invoices.
  *
- * All monetary comparisons are performed in integer satoshis. New invoices
- * reserve their address through an Electrum payment request; legacy invoices
- * without a request ID remain readable through the address-balance fallback.
+ * All monetary comparisons are performed in integer satoshis. The three
+ * stateless methods remain as a backwards-compatible facade and delegate to
+ * BtcStatelessInvoiceManager; new standalone integrations should use that
+ * database-free class directly.
  */
 class BtcInvoiceManager implements BtcStatelessInvoiceGateway
 {
