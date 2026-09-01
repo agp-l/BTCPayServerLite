@@ -403,7 +403,7 @@ final class PayoutService
         if ($value === null) {
             return [];
         }
-        if (!is_array($value) || $this->isList($value)) {
+        if (!is_array($value) || ($value !== [] && $this->isList($value))) {
             throw new PayoutException('Payout metadata must be an object.', 'create_payout', 400);
         }
         try {
