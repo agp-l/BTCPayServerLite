@@ -1,58 +1,132 @@
 <?php
-// admin/url_invoices.php
+
 declare(strict_types=1);
+
+use BtcPayLite\AuthManager;
+use BtcPayLite\BtcDashboard;
+use BtcPayLite\BtcStatelessAjaxController;
+use BtcPayLite\BtcStatelessFactory;
+use BtcPayLite\BtcStatelessServiceException;
+use BtcPayLite\UrlManager;
+
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config.php';
 
-use BtcPayLite\ElectrumRPC;
-use BtcPayLite\ElectrumWallet;
-use BtcPayLite\BtcDashboard;
-use BtcPayLite\BtcInvoiceManager;
-use BtcPayLite\BtcStatelessService;
-use BtcPayLite\BtcStatelessAjaxController;
-use BtcPayLite\AuthManager;
+AuthManager::requireRole('admin', '../client/login');
 
-// Zavoláme statickou metodu. Pokud to není admin, metoda ho automaticky vyhodí na login.
-AuthManager::requireRole('admin', '../client/login.php');
+header('Cache-Control: no-store, max-age=0');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 
-// 1. Dependency Injection / Inicializace
-$rpc = new ElectrumRPC($config['rpc_host'], $config['rpc_port'], $config['rpc_user'], $config['rpc_pass']);
-$wallet = new ElectrumWallet($rpc);
-$invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key'], null);
-$service = new BtcStatelessService($config, $wallet, $invoiceManager);
+$urlManager = new UrlManager(
+    $_SERVER,
+    is_string($config['app_url'] ?? null) ? $config['app_url'] : null
+);
+$factory = new BtcStatelessFactory($config);
+$defaultWalletName = $factory->defaultWalletName();
+$paymentPageUrl = $urlManager->getBaseUrl() . '/url-invoice';
 
-$defaultWalletName = basename($config['wallet_path']);
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-$baseUri = $protocol . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']);
+$requestMethod = is_string($_SERVER['REQUEST_METHOD'] ?? null)
+    ? strtoupper($_SERVER['REQUEST_METHOD'])
+    : '';
 
-// 2. Kontroler pro AJAX (Tvorba a ověřování faktur)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api_action'])) {
+if ($requestMethod === 'POST' && isset($_POST['api_action'])) {
+    $lockHandle = null;
     ob_start();
+
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
-        $controller = new BtcStatelessAjaxController($service, $defaultWalletName, $baseUri);
-        $response = $controller->handleRequest($_POST);
-        
+
+        $lockHandle = fopen(
+            sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'btcpay_electrum_stateless.lock',
+            'c'
+        );
+        if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            throw new BtcStatelessServiceException(
+                'Server is busy. Please retry shortly.',
+                'acquire_invoice_lock',
+                503
+            );
+        }
+
+        $controller = new BtcStatelessAjaxController(
+            $factory->service(),
+            $defaultWalletName,
+            $paymentPageUrl
+        );
+        $response = $controller->handleRequest(is_array($_POST) ? $_POST : []);
+
         ob_end_clean();
-        header('Content-Type: application/json');
-        echo json_encode($response);
-    } catch (\Throwable $e) { 
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(
+            $response,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+    } catch (BtcStatelessServiceException $exception) {
         ob_end_clean();
-        header('Content-Type: application/json');
-        $code = $e->getCode();
-        http_response_code(($code >= 400 && $code < 600) ? $code : 400);
-        echo json_encode(['status' => 'error', 'message' => 'Chyba: ' . $e->getMessage()]);
+        $code = $exception->getCode();
+        $httpCode = $code >= 400 && $code < 600 ? $code : 500;
+        if ($httpCode >= 500) {
+            error_log(sprintf(
+                'Admin stateless invoice %s failed: %s',
+                $exception->getOperation(),
+                $exception->getMessage()
+            ));
+        }
+
+        http_response_code($httpCode);
+        if ($httpCode === 503) {
+            header('Retry-After: 1');
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(
+            [
+                'status' => 'error',
+                'message' => $httpCode >= 500
+                    ? 'Požadavek nyní nelze dokončit.'
+                    : $exception->getMessage(),
+            ],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+    } catch (Throwable $exception) {
+        ob_end_clean();
+        error_log(sprintf(
+            'Unexpected admin stateless invoice failure: %s (%s)',
+            $exception->getMessage(),
+            $exception::class
+        ));
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(
+            ['status' => 'error', 'message' => 'Požadavek nyní nelze dokončit.'],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+    } finally {
+        if (is_resource($lockHandle)) {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+        }
     }
     exit;
 }
 
-// 3. Kontroler pro View (Příprava proměnných pro HTML šablonu)
-$dashboard = new BtcDashboard($wallet, dirname($config['wallet_path']));
-$availableWallets = $dashboard->getAvailableWallets();
-$defaultWallet = $defaultWalletName;
+if (!in_array($requestMethod, ['GET', 'HEAD'], true)) {
+    header('Allow: GET, HEAD, POST');
+    http_response_code(405);
+    exit;
+}
 
-// 4. Vykreslení šablony (Zde se vloží ten čistý HTML soubor, co jsme vytvořili)
-require_once __DIR__ . '/views/url_invoices_view.php';
+$dashboard = new BtcDashboard($factory->wallet(), $factory->walletDirectory());
+$availableWallets = $dashboard->getAvailableWallets();
+if (!in_array($defaultWalletName, $availableWallets, true)) {
+    array_unshift($availableWallets, $defaultWalletName);
+}
+$availableWallets = array_values(array_unique($availableWallets));
+$defaultWallet = $defaultWalletName;
+$csrfToken = AuthManager::csrfToken();
+
+require __DIR__ . '/views/url_invoices_view.php';
+
