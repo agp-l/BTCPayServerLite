@@ -50,7 +50,9 @@ final class DatabaseCheckoutService
      *   expires_at:int,
      *   seconds_remaining:int,
      *   total_received:string,
-     *   missing_amount:string
+     *   missing_amount:string,
+     *   redirect_url:?string,
+     *   redirect_automatically:bool
      * }
      */
     public function load(string $invoiceId): array
