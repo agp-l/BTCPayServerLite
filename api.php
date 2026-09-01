@@ -12,6 +12,8 @@ use BtcPayLite\GreenfieldApiException;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\GreenfieldApiService;
 use BtcPayLite\HttpBitcoinMarketDataProvider;
+use BtcPayLite\PayoutRepository;
+use BtcPayLite\PayoutService;
 use BtcPayLite\UrlManager;
 use BtcPayLite\WebhookEndpointPolicy;
 
@@ -73,7 +75,32 @@ try {
     if (!is_int($exchangeFeeBps)) {
         throw new GreenfieldApiException('Exchange fee configuration is invalid.', 'configure_api');
     }
+    $payoutApiKeys = $config['payout_api_keys'] ?? [];
+    $payoutWalletPasswords = $config['payout_wallet_passwords'] ?? [];
+    $payoutMaxBtc = $config['payout_max_btc'] ?? '0.01000000';
+    $payoutDailyLimitBtc = $config['payout_daily_limit_btc'] ?? '0.05000000';
+    if (!is_array($payoutApiKeys)
+        || !is_array($payoutWalletPasswords)
+        || !is_string($payoutMaxBtc)
+        || !is_string($payoutDailyLimitBtc)
+    ) {
+        throw new GreenfieldApiException('Payout configuration is invalid.', 'configure_api');
+    }
+
     $marketData = new HttpBitcoinMarketDataProvider();
+    $exchangeQuotes = new ExchangeQuoteService($marketData, $exchangeFeeBps);
+    $payoutService = new PayoutService(
+        $repository,
+        new PayoutRepository($database),
+        $database,
+        $wallet,
+        $exchangeQuotes,
+        $payoutApiKeys,
+        $payoutWalletPasswords,
+        $payoutMaxBtc,
+        $payoutDailyLimitBtc,
+        ($config['payout_api_enabled'] ?? false) === true
+    );
 
     $service = new GreenfieldApiService(
         $repository,
@@ -87,7 +114,8 @@ try {
             ($config['allow_local_webhooks'] ?? false) === true
         ),
         $marketData,
-        new ExchangeQuoteService($marketData, $exchangeFeeBps)
+        $exchangeQuotes,
+        $payoutService
     );
     $controller = new GreenfieldApiController($service);
 
@@ -106,20 +134,23 @@ try {
 
     $requestServer = $_SERVER;
     if (
-        !isset($requestServer['HTTP_AUTHORIZATION'])
-        && !isset($requestServer['REDIRECT_HTTP_AUTHORIZATION'])
+        (
+            (!isset($requestServer['HTTP_AUTHORIZATION'])
+                && !isset($requestServer['REDIRECT_HTTP_AUTHORIZATION']))
+            || !isset($requestServer['HTTP_IDEMPOTENCY_KEY'])
+        )
         && function_exists('getallheaders')
     ) {
         $requestHeaders = getallheaders();
         if (is_array($requestHeaders)) {
             foreach ($requestHeaders as $headerName => $headerValue) {
-                if (
-                    is_string($headerName)
-                    && strcasecmp($headerName, 'Authorization') === 0
-                    && is_string($headerValue)
-                ) {
+                if (!is_string($headerName) || !is_string($headerValue)) {
+                    continue;
+                }
+                if (strcasecmp($headerName, 'Authorization') === 0) {
                     $requestServer['HTTP_AUTHORIZATION'] = $headerValue;
-                    break;
+                } elseif (strcasecmp($headerName, 'Idempotency-Key') === 0) {
+                    $requestServer['HTTP_IDEMPOTENCY_KEY'] = $headerValue;
                 }
             }
         }
