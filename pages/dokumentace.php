@@ -63,8 +63,8 @@ $schema = [
             --white: #fff;
             --muted: #617269;
             --line: #d8e0da;
-            --orange: #f7931a;
-            --orange-soft: #fff0dc;
+            --brand: #20c875;
+            --brand-soft: #e4f8ed;
             --mint: #6cf0a7;
             --blue: #72a7ff;
             --red: #ff746c;
@@ -84,7 +84,7 @@ $schema = [
         }
         a { color: inherit; }
         button { font: inherit; }
-        :focus-visible { outline: 3px solid var(--orange); outline-offset: 3px; }
+        :focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
         .skip-link { position: fixed; top: -5rem; left: 1rem; z-index: 100; padding: .7rem 1rem; border-radius: 10px; background: var(--white); }
         .skip-link:focus { top: 1rem; }
         .wrap { width: min(1420px, calc(100% - 40px)); margin-inline: auto; }
@@ -99,7 +99,7 @@ $schema = [
         }
         .topbar-inner { display: flex; align-items: center; justify-content: space-between; min-height: 70px; gap: 1.5rem; }
         .brand { display: inline-flex; align-items: center; gap: .7rem; font-weight: 850; letter-spacing: -.03em; text-decoration: none; }
-        .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: var(--white); background: var(--orange); font-size: 1.18rem; }
+        .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: var(--white); background: var(--brand); font-size: 1.18rem; }
         .docs-label { margin-left: .45rem; padding-left: .8rem; border-left: 1px solid var(--line); color: var(--muted); font-size: .82rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
         .top-links { display: flex; align-items: center; gap: 1.2rem; }
         .top-links a { color: var(--muted); font-size: .9rem; font-weight: 700; text-decoration: none; }
@@ -111,13 +111,13 @@ $schema = [
         .side-title { margin: 0 0 .7rem; color: var(--muted); font-size: .72rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
         .side-nav { display: grid; gap: .14rem; margin-bottom: 1.6rem; }
         .side-nav a { padding: .38rem .7rem; border-left: 2px solid transparent; color: var(--muted); font-size: .88rem; font-weight: 650; text-decoration: none; }
-        .side-nav a:hover { border-left-color: var(--orange); color: var(--ink); background: rgba(255, 255, 255, .55); }
+        .side-nav a:hover { border-left-color: var(--brand); color: var(--ink); background: rgba(255, 255, 255, .55); }
         .version { display: inline-flex; gap: .4rem; align-items: center; padding: .35rem .65rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--white); font-size: .72rem; }
         .version::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
 
         .content { min-width: 0; }
         .hero { padding: 1.2rem 0 4.5rem; }
-        .eyebrow { margin: 0 0 .8rem; color: var(--orange); font-size: .78rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
+        .eyebrow { margin: 0 0 .8rem; color: var(--brand); font-size: .78rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
         h1, h2, h3, h4 { line-height: 1.16; letter-spacing: -.03em; }
         h1 { max-width: 760px; margin: 0 0 1.2rem; font-size: clamp(2.8rem, 6vw, 5.3rem); }
         h2 { margin: 0 0 1rem; font-size: clamp(2rem, 3.6vw, 3.1rem); }
@@ -130,10 +130,10 @@ $schema = [
 
         .doc-section { padding: 4.2rem 0; border-top: 1px solid var(--line); scroll-margin-top: 5.5rem; }
         .section-intro { max-width: 700px; color: var(--muted); }
-        .note { display: grid; grid-template-columns: 34px 1fr; gap: .8rem; margin: 1.5rem 0; padding: 1.15rem; border: 1px solid #ffd39c; border-radius: 14px; background: var(--orange-soft); }
+        .note { display: grid; grid-template-columns: 34px 1fr; gap: .8rem; margin: 1.5rem 0; padding: 1.15rem; border: 1px solid #a6e7c5; border-radius: 14px; background: var(--brand-soft); }
         .note.info { border-color: #c6d8fa; background: #edf4ff; }
         .note.danger { border-color: #ffc5c1; background: #fff0ef; }
-        .note-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--orange); font-weight: 900; }
+        .note-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--brand); font-weight: 900; }
         .note.info .note-icon { background: var(--blue); }
         .note.danger .note-icon { background: var(--red); }
         .note strong { display: block; margin-bottom: .15rem; }
@@ -141,7 +141,7 @@ $schema = [
 
         .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin: 1.8rem 0; }
         .quick-step { padding: 1.15rem; border: 1px solid var(--line); border-radius: 14px; background: var(--white); }
-        .quick-step span { display: inline-grid; place-items: center; width: 27px; height: 27px; margin-bottom: .8rem; border-radius: 8px; background: var(--orange-soft); color: #9c5200; font-size: .78rem; font-weight: 900; }
+        .quick-step span { display: inline-grid; place-items: center; width: 27px; height: 27px; margin-bottom: .8rem; border-radius: 8px; background: var(--brand-soft); color: #08713c; font-size: .78rem; font-weight: 900; }
         .quick-step strong { display: block; font-size: .92rem; }
         .quick-step p { margin: .35rem 0 0; color: var(--muted); font-size: .82rem; }
 
@@ -153,12 +153,12 @@ $schema = [
         .token-key { color: #90b8ff; }
         .token-string { color: #8cf0b4; }
         .token-number { color: #ffbf6e; }
-        code.inline { padding: .14rem .34rem; border: 1px solid var(--line); border-radius: 5px; color: #803e00; background: var(--orange-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em; }
+        code.inline { padding: .14rem .34rem; border: 1px solid var(--line); border-radius: 5px; color: #075c34; background: var(--brand-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em; }
 
         .endpoint { margin: 2.2rem 0 3.4rem; }
         .endpoint-title { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .8rem; }
         .method { display: inline-flex; align-items: center; justify-content: center; min-width: 54px; padding: .28rem .5rem; border-radius: 7px; color: #07361e; background: #baf5d2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; font-weight: 900; }
-        .method.post { color: #4f2b00; background: #ffd7a6; }
+        .method.post { color: #075c34; background: #ccebdc; }
         .endpoint-path { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92rem; font-weight: 750; }
         .endpoint p { color: var(--muted); }
 
@@ -177,7 +177,7 @@ $schema = [
         .param { display: grid; grid-template-columns: 170px 1fr; gap: 1.2rem; padding: .9rem 0; border-bottom: 1px solid var(--line); }
         .param dt { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .84rem; font-weight: 800; }
         .param dd { margin: 0; color: var(--muted); font-size: .88rem; }
-        .required { color: #9c5200; font-size: .68rem; font-weight: 850; text-transform: uppercase; }
+        .required { color: #08713c; font-size: .68rem; font-weight: 850; text-transform: uppercase; }
 
         .rail { position: sticky; top: 96px; }
         .rail-card { padding: 1.2rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow); }
@@ -187,7 +187,7 @@ $schema = [
         .rail-list { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: .82rem; }
         .rail-list li { display: flex; gap: .5rem; }
         .rail-list li::before { content: "✓"; color: #0d9c4f; font-weight: 900; }
-        .rail-link { display: block; margin-top: .9rem; color: #9c5200; font-size: .82rem; font-weight: 800; text-decoration: none; }
+        .rail-link { display: block; margin-top: .9rem; color: #08713c; font-size: .82rem; font-weight: 800; text-decoration: none; }
         .rail-link:hover { text-decoration: underline; }
 
         .check-list { display: grid; gap: .75rem; margin: 1.3rem 0; padding: 0; list-style: none; }
