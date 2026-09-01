@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../classes/AuthException.php';
 require_once __DIR__ . '/../classes/AuthUserRepository.php';
+require_once __DIR__ . '/../classes/LoginTelemetryRepository.php';
 require_once __DIR__ . '/../classes/AuthManager.php';
 
 use BtcPayLite\AuthException;
@@ -123,6 +124,24 @@ expectAuthException(
 );
 $passes[] = 'uses one error for missing users and bad passwords';
 
+$repository->users['suspended@example.test'] = [
+    'id' => 2,
+    'email' => 'suspended@example.test',
+    'password_hash' => password_hash('correct horse battery staple', PASSWORD_DEFAULT),
+    'role' => 'client',
+    'status' => 'suspended',
+    'session_version' => 2,
+];
+expectAuthException(
+    static fn () => $auth->login(
+        'suspended@example.test',
+        'correct horse battery staple',
+        '127.0.0.1'
+    ),
+    'Tento účet je pozastaven. Kontaktujte administrátora.'
+);
+$passes[] = 'rejects a suspended account';
+
 $throttledRepository = new FakeAuthUserRepository();
 $throttledAuth = new AuthManager($throttledRepository);
 for ($attempt = 0; $attempt < 5; $attempt++) {
@@ -165,6 +184,7 @@ assertSameValue(
     'Login returned an unsafe or incomplete user'
 );
 assertSameValue(1, $_SESSION['user_id'] ?? null, 'Session user was not established');
+assertSameValue(1, $_SESSION['session_version'] ?? null, 'Session version was not established');
 assertSameValue(true, AuthManager::hasRole('client'), 'Valid role was rejected');
 assertSameValue('BTCPAYLITESESSID', session_name(), 'Session cookie name was not isolated');
 assertSameValue('Lax', session_get_cookie_params()['samesite'], 'SameSite cookie policy is missing');

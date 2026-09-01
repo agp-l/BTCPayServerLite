@@ -8,7 +8,9 @@ use BtcPayLite\ClientRegistrationService;
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumCliWalletProvisioner;
 use BtcPayLite\PdoClientDashboardRepository;
+use BtcPayLite\PdoUserAccountRepository;
 use BtcPayLite\UrlManager;
+use BtcPayLite\UserAccountService;
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -28,23 +30,28 @@ $urlManager = isset($urlManager) && $urlManager instanceof UrlManager
 $error = '';
 $successMsg = '';
 $email = '';
+$database = new Database(
+    $config['db_host'],
+    $config['db_name'],
+    $config['db_user'],
+    $config['db_pass'],
+    (int) ($config['db_port'] ?? 3306)
+);
+$accountService = new UserAccountService(new PdoUserAccountRepository($database));
+$registrationEnabled = $accountService->isRegistrationEnabled();
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
+        if (!$registrationEnabled) {
+            throw new AuthException('Registrace nových účtů je administrátorem vypnuta.');
+        }
         $email = is_string($_POST['email'] ?? null) ? trim($_POST['email']) : '';
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $passwordConfirm = is_string($_POST['password_confirm'] ?? null)
             ? $_POST['password_confirm']
             : '';
 
-        $database = new Database(
-            $config['db_host'],
-            $config['db_name'],
-            $config['db_user'],
-            $config['db_pass'],
-            (int) ($config['db_port'] ?? 3306)
-        );
         $walletPath = is_string($config['wallet_path'] ?? null) ? $config['wallet_path'] : '';
         if (
             trim($walletPath) === ''

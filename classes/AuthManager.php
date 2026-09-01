@@ -70,6 +70,15 @@ class AuthManager
         if (!in_array($user['role'], ['admin', 'client'], true)) {
             throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
         }
+        if (($user['status'] ?? 'active') !== 'active') {
+            throw new AuthException('Tento účet je pozastaven. Kontaktujte administrátora.');
+        }
+        $sessionVersion = is_int($user['session_version'] ?? null)
+            ? $user['session_version']
+            : 1;
+        if ($sessionVersion < 1) {
+            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+        }
 
         $this->users->clearAttempts($identityHash);
         if (password_needs_rehash($passwordHash, PASSWORD_DEFAULT)) {
@@ -77,6 +86,12 @@ class AuthManager
             if (is_string($newHash)) {
                 $this->users->updatePasswordHash($user['id'], $newHash);
             }
+        }
+        if ($this->users instanceof LoginTelemetryRepository) {
+            $ipAddress = filter_var($clientIdentity, FILTER_VALIDATE_IP) !== false
+                ? $clientIdentity
+                : null;
+            $this->users->recordSuccessfulLogin($user['id'], $ipAddress, $now);
         }
 
         self::startSession();
@@ -88,6 +103,8 @@ class AuthManager
             'user_id' => $user['id'],
             'role' => $user['role'],
             'email' => $user['email'],
+            'session_version' => $sessionVersion,
+            'auth_seen_recorded_at' => $now,
             'auth_issued_at' => $now,
             'auth_last_activity' => $now,
         ];

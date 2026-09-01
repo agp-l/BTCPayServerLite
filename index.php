@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 use BtcPayLite\ApplicationRouter;
+use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
+use BtcPayLite\Database;
+use BtcPayLite\PdoUserAccountRepository;
 use BtcPayLite\RouterException;
+use BtcPayLite\UserAccountService;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -46,6 +50,28 @@ try {
     $requiredRole = $route->getRequiredRole();
     if ($requiredRole !== null) {
         AuthManager::requireRole($requiredRole, $urlManager->url('/login'));
+        $database = new Database(
+            $config['db_host'],
+            $config['db_name'],
+            $config['db_user'],
+            $config['db_pass'],
+            (int) ($config['db_port'] ?? 3306)
+        );
+        $accounts = new UserAccountService(new PdoUserAccountRepository($database));
+        try {
+            $recordedAt = $accounts->validateSession(
+                (int) ($_SESSION['user_id'] ?? 0),
+                is_string($_SESSION['role'] ?? null) ? $_SESSION['role'] : '',
+                (int) ($_SESSION['session_version'] ?? 0),
+                is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : null,
+                (int) ($_SESSION['auth_seen_recorded_at'] ?? 0)
+            );
+            $_SESSION['auth_seen_recorded_at'] = $recordedAt;
+        } catch (AuthException $exception) {
+            (new AuthManager($database))->logout();
+            header('Location: ' . $urlManager->url('/login'), true, 303);
+            exit;
+        }
     }
 
     $handler = $route->getHandler();

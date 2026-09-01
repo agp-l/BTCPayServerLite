@@ -6,7 +6,12 @@ namespace BtcPayLite;
 
 interface AuthUserRepository
 {
-    /** @return array{id:int,email:string,password_hash:string,role:string}|null */
+    /**
+     * @return array{
+     *   id:int,email:string,password_hash:string,role:string,
+     *   status?:string,session_version?:int
+     * }|null
+     */
     public function findByEmail(string $email): ?array;
 
     public function createClient(string $email, string $passwordHash): int;

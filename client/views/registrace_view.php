@@ -31,7 +31,10 @@ $authCssUrl = htmlspecialchars($urlManager->url('/assets/auth.css'), ENT_QUOTES,
       <?php if ($error !== ''): ?>
         <div class="auth-alert auth-alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><?php echo htmlspecialchars($error, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></div>
       <?php endif; ?>
-      <?php if ($successMsg !== ''): ?>
+      <?php if (!$registrationEnabled): ?>
+        <div class="auth-alert auth-alert-error" role="status"><i class="fa-solid fa-user-lock" aria-hidden="true"></i><span>Registrace nových účtů je administrátorem vypnuta.</span></div>
+        <div class="auth-footer">Máte účet? <a href="<?php echo $loginUrl; ?>">Přihlásit se</a></div>
+      <?php elseif ($successMsg !== ''): ?>
         <div class="auth-success-actions">
           <div class="auth-alert auth-alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><?php echo htmlspecialchars($successMsg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?></span></div>
           <a href="<?php echo $loginUrl; ?>" class="auth-primary-link"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Přihlásit se</a>

@@ -11,7 +11,7 @@ use Throwable;
 /**
  * Narrow PDO boundary for users and persistent login throttling.
  */
-class PdoAuthUserRepository implements AuthUserRepository
+class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryRepository
 {
     private PDO $pdo;
 
@@ -24,7 +24,8 @@ class PdoAuthUserRepository implements AuthUserRepository
     {
         try {
             $statement = $this->pdo->prepare(
-                'SELECT id, email, password_hash, role FROM users WHERE email = ? LIMIT 1'
+                'SELECT id, email, password_hash, role, status, session_version
+                 FROM users WHERE email = ? LIMIT 1'
             );
             $statement->execute([$email]);
             $user = $statement->fetch(PDO::FETCH_ASSOC);
@@ -52,7 +53,28 @@ class PdoAuthUserRepository implements AuthUserRepository
             'email' => $user['email'],
             'password_hash' => $user['password_hash'],
             'role' => $user['role'],
+            'status' => is_string($user['status'] ?? null) ? $user['status'] : 'active',
+            'session_version' => is_numeric($user['session_version'] ?? null)
+                ? (int) $user['session_version']
+                : 1,
         ];
+    }
+
+    public function recordSuccessfulLogin(int $userId, ?string $ipAddress, int $loggedInAt): void
+    {
+        try {
+            $statement = $this->pdo->prepare(
+                'UPDATE users
+                 SET last_login_at = ?, last_login_ip = ?, last_seen_at = ?, last_seen_ip = ?
+                 WHERE id = ?'
+            );
+            $statement->execute([$loggedInAt, $ipAddress, $loggedInAt, $ipAddress, $userId]);
+        } catch (Throwable $exception) {
+            throw new AuthException(
+                'Přihlášení nyní nelze dokončit. Zkuste to prosím později.',
+                previous: $exception
+            );
+        }
     }
 
     public function createClient(string $email, string $passwordHash): int
