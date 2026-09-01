@@ -73,7 +73,8 @@ Mazání je záměrně omezené. Webhook lze odstranit, ale obchod lze smazat po
 | `install.php`, `InstallationManager` | Implementováno | Jednorázový webový instalátor kontroluje prostředí, vytvoří prázdnou databázi, nahraje schéma, založí admin účet a atomicky zapíše privátní konfiguraci. |
 | `config.php` a deployment | Částečně auditováno | Instalátor generuje náhodná tajemství a oprávnění `0600`; produkční proxy, zálohy a oddělení prostředí musí stále nastavit provozovatel. |
 | `sql.sql` | Auditováno pro čistou instalaci | Schéma není svázané s pevným názvem databáze a nevytváří ukázkové credentials. Upgrade historických instalací nadále používá ruční migrace. |
-| testovací a pomocné skripty | Částečně uklizeno | Veřejný debugger, stará registrace a zastaralé ruční testy byly odstraněny. `eshop_simulator.php` bude přepracován na univerzální integrační ukázku mimo web root v `tools/`. |
+| `examples/btcpay_lite_api_tester.php` | Implementováno | Samostatná ukázka pro e-shop, směnárnu a budoucí CMS plugin: všechny podporované API požadavky, JSON diagnostika, faktury, payouty a podepsaný webhook receiver. |
+| testovací a pomocné skripty | Uklizeno | Veřejný debugger, stará registrace, neautentizovaný simulátor a zastaralé ruční testy byly odstraněny. |
 
 ## Architektura
 
@@ -247,6 +248,24 @@ Pro pojmenovaný přehled integrací může e-shop posílat `X-BTCPay-Plugin-Nam
 Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency`. Pro `BTC` a `SAT` probíhá převod bez `float`; podporované fiat měny se převádějí přes nakonfigurovaný tržní provider. Volby `checkout.redirectURL`, `checkout.redirectAutomatically` a `checkout.expirationMinutes` jsou zachované. Výsledná odpověď obsahuje BTCPay kompatibilní `checkoutLink`, stav, metadata a on-chain payment method `BTC-CHAIN`.
 
 Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
+
+### Samostatný API tester a základ CMS pluginu
+
+Soubor `examples/btcpay_lite_api_tester.php` nemá žádnou závislost na třídách projektu ani na Composeru. Lze jej zkopírovat jako jediný soubor na jiné PHP 8.0+ HTTPS hostingové prostředí s rozšířením cURL. V horním bloku `$CONFIG` se nastaví:
+
+- URL BTCPay Server Lite a Store ID,
+- běžný store API klíč pro faktury, kurz a webhooky,
+- samostatný payout API klíč pro výběry,
+- volitelný stateless API klíč,
+- přístupové heslo k testeru, identita CMS pluginu a veřejná webhook URL.
+
+Po přihlášení přes HTTP Basic nabízí tester katalog všech podporovaných endpointů, společnou read-only diagnostiku a jednotlivá volání. Každá provedená akce vypíše formátovaný JSON s HTTP metodou, URL, hlavičkami, payloadem, použitelným cURL příkladem a kompletní odpovědí serveru. API klíče, webhook secret, wallet heslo a raw transakce jsou ve výpisu automaticky skryté.
+
+Třída `BtcPayLiteExampleClient` uvnitř souboru ukazuje přímo metody, které lze převést do WordPress/WooCommerce, PrestaShop, OpenCart, Magento nebo vlastního CMS pluginu. Část `request()` je společný transport; metody `createInvoice()`, `getInvoice()`, `createPayout()` a ostatní jsou konkrétní mapování endpointů a JSON schémat.
+
+Stejný soubor může fungovat jako testovací webhook receiver na URL `?webhook=1`. Podpis `Btcpay-Sig` ověřuje nad nezměněným raw JSON tělem a poslední platnou událost ukládá mimo veřejný adresář do dočasného systémového adresáře. Akce „Show last verified webhook“ ji zobrazí v testeru.
+
+Payout operace vždy používají jiný klíč než faktury. Vytvoření payoutu bez schválení pouze založí stav `AwaitingApproval`. Přímé vytvoření a odeslání i následné schválení jsou ve vzorovém souboru ve výchozím stavu zakázané; vyžadují současně `enable_live_payout_actions => true` a ručně zadanou potvrzovací frázi `SEND REAL BTC`. Nejdříve je ověřte na testnet/regtest.
 
 #### Směnárenské nabídky a odchozí BTC výplaty
 
@@ -514,6 +533,7 @@ php tests/AdminUserServiceTest.php
 php tests/WalletBalanceErrorTest.php
 php tests/InstallationManagerTest.php
 php tests/InstallerHttpBoundaryTest.php
+php tests/ApiTesterExampleTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
@@ -534,8 +554,8 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 
 ## Doporučené pořadí dalšího auditu
 
-1. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
-2. Přesun produkčních tajemství z `config.php` do prostředí nebo secret manageru a kontrola hlaviček na skutečné reverse proxy.
-3. Smoke test webového instalátoru na podporované MariaDB/MySQL a automatizovaná upgrade cesta pro historické databáze.
+1. Přesun produkčních tajemství z `config.php` do prostředí nebo secret manageru a kontrola hlaviček na skutečné reverse proxy.
+2. Smoke test webového instalátoru na podporované MariaDB/MySQL a automatizovaná upgrade cesta pro historické databáze.
+3. Samostatná verzovaná dokumentace a první konkrétní CMS plugin postavený nad `BtcPayLiteExampleClient`.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
