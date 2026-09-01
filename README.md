@@ -132,6 +132,10 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `GreenfieldApiService` | Autentizace admin/store klíče, deklarace oprávnění, store scoping, přesné BTC částky, převod podporované fiat měny, checkout volby, faktury a webhooky. | Přepracováno |
 | `GreenfieldApiRepository` | Úzká PDO hranice pro nalezení obchodu podle ID/API klíče, výpis webhooků a jejich idempotentní registraci s časem registrace. | Přepracováno |
 | `GreenfieldApiException` | Bezpečná API chyba s operací a HTTP statusem. | Auditováno |
+| `ExchangeQuoteService` | Počítá krátkodobé fiat/BTC nabídky v celých satoshi a odděleně vyčísluje směnárenský poplatek. | Nově implementováno |
+| `PayoutRepository` | Persistentní výplatní ledger, idempotence, optimistická revize a uchování podepsané transakce před broadcastem. | Nově implementováno |
+| `PayoutService` | Samostatně autentizovaná hranice odchozích BTC plateb s limitem jedné výplaty, denním limitem a dvoukrokovým schválením. | Nově implementováno |
+| `PayoutException` | Bezpečná doménová chyba výplatní operace s HTTP statusem. | Nově implementováno |
 
 ### Webhooky
 
@@ -202,6 +206,9 @@ Cílem není vydávat aplikaci za celý BTCPay Server, ale implementovat stabiln
 - `GET /api/v1/stores/{storeId}`
 - `GET /api/v1/stores/{storeId}/payment-methods`
 - `POST /api/v1/stores/{storeId}/invoices`
+- `POST /api/v1/stores/{storeId}/exchange/quotes`
+- `GET|POST /api/v1/stores/{storeId}/payouts` (volitelný výplatní modul)
+- `GET|POST /api/v1/payouts/{payoutId}` (detail a schválení výplaty)
 - `GET /api/v1/stores/{storeId}/invoices/{invoiceId}`
 - `GET /api/v1/stores/{storeId}/invoices/{invoiceId}/payment-methods`
 - `GET /api/v1/stores/{storeId}/webhooks`
@@ -213,11 +220,36 @@ Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency
 
 Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
 
+#### Směnárenské nabídky a odchozí BTC výplaty
+
+Kurzová cesta přijímá desetinnou částku jako JSON řetězec a vrací hrubou BTC částku, směnárenský poplatek a čistou výplatu. Fiat má nejvýše dvě desetinná místa; BTC výsledek se počítá v celých satoshi.
+
+```bash
+curl -X POST "$APP_URL/api.php/api/v1/stores/$STORE_ID/exchange/quotes" \
+  -H "Authorization: token $STORE_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"amount":"500.00","currency":"CZK"}'
+```
+
+Výplatní API je po instalaci vypnuté. Používá samostatný klíč pro každý obchod, který nesmí být shodný s běžným store API klíčem. Každé vytvoření vyžaduje unikátní `Idempotency-Key`; jeho bezpečné opakování vrátí tutéž výplatu a zabraňuje dvojímu odeslání při síťovém retry.
+
+```bash
+curl -X POST "$APP_URL/api.php/api/v1/stores/$STORE_ID/payouts" \
+  -H "Authorization: token $PAYOUT_API_KEY" \
+  -H "Idempotency-Key: exchange-order-2026-000001" \
+  -H "Content-Type: application/json" \
+  --data '{"destination":"bc1q...","amount":"500.00","currency":"CZK","approved":false}'
+```
+
+Výchozí stav je `AwaitingApproval`. Následné `POST /api/v1/payouts/{payoutId}` s tělem `{"revision":0}` výplatu schválí, podepíše a odešle. Před broadcastem se podepsaná raw transakce uloží do ledgeru; při dočasné chybě se má opakovat stejný požadavek, nikoli vytvářet výplata s novým idempotency klíčem. Volba `"approved":true` je určena pouze pro plně automatizované, silně omezené integrace.
+
+Aktuální stav `InProgress` znamená, že Electrum přijal broadcast. Automatický potvrzovací worker a přechod na `Completed` budou doplněny v další etapě spolu s pull payments a refundacemi.
+
 #### Aktuální hranice kompatibility
 
 - podporována je pouze Bitcoin on-chain platební metoda `BTC-CHAIN`,
 - hlavní kompatibilní režim pluginu je přesměrování na checkout; BTCPay modal skript zatím není implementován,
-- refundace, pull payments, Lightning Network a správa uživatelů nejsou vystavené,
+- přímé on-chain výplaty mají kompatibilní část Greenfield kontraktu; refundace, pull payments, potvrzovací worker, Lightning Network a správa výplatních klíčů přes UI zatím nejsou vystavené,
 - doručení webhooků vyžaduje pravidelné spouštění `webhook_cron.php`,
 - praktická kapacita závisí na MariaDB, Electrum RPC a frekvenci workeru; současná architektura je vhodná hlavně pro malé a středně zatížené obchody, rezervace a interní platební systémy,
 - konkrétní plugin je před produkčním použitím nutné ověřit integračním smoke testem, protože může používat další Greenfield endpointy.
@@ -287,11 +319,23 @@ return [
     'electrum_data_dir' => '/opt/electrum_config',
     'store_wallets_dir' => '/opt/btcpay_wallets',
     'allow_local_webhooks' => false,
+    'exchange_fee_bps' => 200, // 2,00 %
+    'payout_api_enabled' => false,
+    'payout_api_keys' => [
+        'store-id' => 'samostatny-nahodny-klic-alespon-32-znaku',
+    ],
+    'payout_wallet_passwords' => [
+        'store-id' => 'heslo-electrum-walletu',
+    ],
+    'payout_max_btc' => '0.01000000',
+    'payout_daily_limit_btc' => '0.05000000',
     'api_clients' => [
         'client-bearer-token' => 'wallet-id',
     ],
 ];
 ```
+
+`payout_api_enabled` ponechte `false`, dokud není provedena migrace, nastaven samostatný dlouhý náhodný klíč, ověřena záloha walletu a vyzkoušen testnet/regtest smoke test. Výplatní klíč uchovávejte pouze na serveru směnárny; klientský prohlížeč jej nikdy nesmí znát. Limity nastavujte jako přesné BTC řetězce.
 
 `app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Pro wallet nástroje jsou podporované nové klíče `electrum_cli_path`, `electrum_data_dir`, `store_wallets_dir` i kompatibilní starší názvy `electrum_cli`, `electrum_data_directory`, `wallet_directory`. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
@@ -299,7 +343,7 @@ Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Elec
 
 ## Databáze a migrace
 
-Produkční schéma používá tabulky `users`, `auth_attempts`, `stores`, `invoices`, `webhooks` a `webhook_deliveries` s indexy a cizími klíči.
+Produkční schéma používá tabulky `users`, `auth_attempts`, `stores`, `invoices`, `webhooks`, `webhook_deliveries` a volitelný výplatní ledger `payouts` s indexy a cizími klíči.
 
 Audit přidal tyto jednorázové migrace a read-only kontroly:
 
@@ -309,6 +353,7 @@ Audit přidal tyto jednorázové migrace a read-only kontroly:
 - `migrations/20260830_add_webhook_deliveries.sql`
 - `migrations/20260831_auth_preflight.sql`
 - `migrations/20260831_add_auth_attempts.sql`
+- `migrations/20260901_add_payouts.sql`
 
 Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Preflight musí skončit bez problémů. Migrační soubory nejsou obecný idempotentní instalační skript.
 
@@ -335,6 +380,7 @@ Kontraktní testy jsou samostatné PHP skripty:
 
 ```bash
 php tests/BitcoinAmountTest.php
+php tests/ExchangeQuoteServiceTest.php
 php tests/ElectrumWalletTest.php
 php tests/BtcInvoiceManagerTest.php
 php tests/BtcStatelessInvoiceManagerTest.php
@@ -385,6 +431,8 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 - Cron nespouštějte přes URL query parametr; používejte CLI nebo Bearer hlavičku.
 - Před migrací vždy vytvořte a ověřte obnovitelnou databázovou zálohu.
 - Neošetřené výjimky a odpovědi Electrumu neposílejte klientům.
+- Výplatní API aktivujte až po migraci a testnet/regtest ověření; používejte samostatný klíč, nízký limit jedné výplaty, denní limit a unikátní idempotency klíč každé obchodní objednávky.
+- Stav `InProgress` nepovažujte za potvrzenou transakci; potvrzení je nutné ověřit samostatným workerem nebo v peněžence.
 - Přihlášení a registrace musí používat CSRF token; odhlášení je pouze přes `POST`.
 - Session cookie je `HttpOnly`, `SameSite=Lax` a na HTTPS také `Secure`; session má idle i absolutní limit.
 
