@@ -2,18 +2,17 @@
 
 declare(strict_types=1);
 
-use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\BtcStatelessApiController;
-use BtcPayLite\BtcStatelessService;
+use BtcPayLite\BtcStatelessFactory;
 use BtcPayLite\BtcStatelessServiceException;
-use BtcPayLite\ElectrumRPC;
-use BtcPayLite\ElectrumWallet;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 
 require_once __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
@@ -59,23 +58,15 @@ try {
         );
     }
 
-    $rpc = new ElectrumRPC(
-        $config['rpc_host'],
-        $config['rpc_port'],
-        $config['rpc_user'],
-        $config['rpc_pass']
-    );
-    $wallet = new ElectrumWallet($rpc);
-    $invoiceManager = new BtcInvoiceManager($wallet, $config['secret_key']);
-    $service = new BtcStatelessService($config, $wallet, $invoiceManager);
+    $factory = new BtcStatelessFactory($config);
 
     $urlManager = new UrlManager(
         $_SERVER,
         is_string($config['app_url'] ?? null) ? $config['app_url'] : null
     );
     $controller = new BtcStatelessApiController(
-        $service,
-        $urlManager->getBaseUrl() . '/admin/url_pay.php'
+        $factory->service(),
+        $urlManager->getBaseUrl() . '/url-invoice'
     );
     $response = $controller->handleRequest(
         $requestMethod,
