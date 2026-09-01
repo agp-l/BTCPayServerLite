@@ -14,7 +14,8 @@ ALTER TABLE `users`
 CREATE TABLE IF NOT EXISTS `app_settings` (
     `setting_key` VARCHAR(100) NOT NULL,
     `setting_value` VARCHAR(255) NOT NULL,
-    `updated_by` INT UNSIGNED DEFAULT NULL,
+    -- Existing installations created from main use a signed INT users.id.
+    `updated_by` INT DEFAULT NULL,
     `updated_at` BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (`setting_key`),
     KEY `idx_app_settings_updated_by` (`updated_by`),
@@ -30,7 +31,7 @@ VALUES ('registration_enabled', '1', NULL, UNIX_TIMESTAMP())
 ON DUPLICATE KEY UPDATE `setting_key` = VALUES(`setting_key`);
 
 CREATE TABLE IF NOT EXISTS `client_wallets` (
-    `user_id` INT UNSIGNED NOT NULL,
+    `user_id` INT NOT NULL,
     `wallet_path` VARCHAR(255) NOT NULL,
     `created_at` BIGINT UNSIGNED NOT NULL,
     `updated_at` BIGINT UNSIGNED NOT NULL,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `client_wallets` (
 
 CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id` INT UNSIGNED NOT NULL,
+    `user_id` INT NOT NULL,
     `token_hash` BINARY(32) NOT NULL,
     `expires_at` BIGINT UNSIGNED NOT NULL,
     `used_at` BIGINT UNSIGNED DEFAULT NULL,
