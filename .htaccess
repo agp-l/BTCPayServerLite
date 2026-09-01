@@ -6,7 +6,7 @@ RewriteEngine On
 RewriteCond %{HTTP:Authorization} ^(.+)$
 RewriteRule ^ - [E=HTTP_AUTHORIZATION:%1]
 
-# Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
+# Greenfield API namespace goes to the dedicated exact API controller.\nRewriteRule ^api/v1(?:/.*)?$ api.php [QSA,L]\n\n# Ignoruj existující soubory (obrázky, CSS, JS) - ty ať se normálně načtou
 RewriteCond %{REQUEST_FILENAME} !-f
 
 # Všechno ostatní (včetně existujících složek jako /admin/) pošli do index.php
