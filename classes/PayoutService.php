@@ -40,7 +40,8 @@ final class PayoutService
         array $walletPasswords,
         string $maxPerPayout,
         string $dailyLimit,
-        bool $enabled
+        bool $enabled,
+        string $adminApiKey = ''
     ) {
         $this->stores = $stores;
         $this->payouts = $payouts;
@@ -49,6 +50,16 @@ final class PayoutService
         $this->quotes = $quotes;
         $this->apiKeys = $this->stringMap($apiKeys, 'payout API key');
         $this->walletPasswords = $this->stringMap($walletPasswords, 'wallet password', true);
+        $adminApiKey = trim($adminApiKey);
+        foreach ($this->apiKeys as $payoutApiKey) {
+            if (($adminApiKey !== '' && hash_equals($adminApiKey, $payoutApiKey))
+                || $this->stores->findStoreByApiKey($payoutApiKey) !== null
+            ) {
+                throw new InvalidArgumentException(
+                    'Payout API keys must be separate from administrator and store API keys.'
+                );
+            }
+        }
         $this->maxPerPayout = BitcoinAmount::fromBtc($maxPerPayout);
         $this->dailyLimit = BitcoinAmount::fromBtc($dailyLimit);
         if (!$this->maxPerPayout->isPositive() || !$this->dailyLimit->isPositive()
