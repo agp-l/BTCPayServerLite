@@ -49,7 +49,7 @@ final class BtcStatelessApiController
             throw new BtcStatelessServiceException('Invoice service returned an invalid token.', 'handle_api_request');
         }
 
-        $result['url'] = $this->paymentPageUrl . '?inv=' . rawurlencode($token);
+        $result['url'] = $this->paymentPageUrl . '?token=' . rawurlencode($token);
 
         return ['status' => 'success', 'data' => $result];
     }
