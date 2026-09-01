@@ -27,6 +27,7 @@ class GreenfieldApiService
     private WebhookEndpointPolicy $webhookEndpointPolicy;
     private BitcoinMarketDataProvider $marketData;
     private ExchangeQuoteService $exchangeQuotes;
+    private ?PayoutService $payoutService;
 
     public function __construct(
         GreenfieldApiRepository $repository,
@@ -37,7 +38,8 @@ class GreenfieldApiService
         string $checkoutBaseUrl,
         ?WebhookEndpointPolicy $webhookEndpointPolicy = null,
         ?BitcoinMarketDataProvider $marketData = null,
-        ?ExchangeQuoteService $exchangeQuotes = null
+        ?ExchangeQuoteService $exchangeQuotes = null,
+        ?PayoutService $payoutService = null
     ) {
         $checkoutBaseUrl = rtrim(trim($checkoutBaseUrl), '/');
         $parts = parse_url($checkoutBaseUrl);
@@ -65,6 +67,7 @@ class GreenfieldApiService
         $this->webhookEndpointPolicy = $webhookEndpointPolicy ?? new WebhookEndpointPolicy();
         $this->marketData = $marketData ?? new HttpBitcoinMarketDataProvider();
         $this->exchangeQuotes = $exchangeQuotes ?? new ExchangeQuoteService($this->marketData);
+        $this->payoutService = $payoutService;
     }
 
     /** @return array<string,mixed> */
@@ -158,6 +161,42 @@ class GreenfieldApiService
                 $exception
             );
         }
+    }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    public function createPayout(
+        string $storeId,
+        array $input,
+        string $apiKey,
+        string $idempotencyKey
+    ): array {
+        return $this->payoutCall(
+            fn (PayoutService $service): array => $service->create($storeId, $input, $apiKey, $idempotencyKey)
+        );
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function getPayouts(string $storeId, string $apiKey): array
+    {
+        return $this->payoutCall(
+            fn (PayoutService $service): array => $service->list($storeId, $apiKey)
+        );
+    }
+
+    /** @return array<string,mixed> */
+    public function getPayout(string $payoutId, string $apiKey): array
+    {
+        return $this->payoutCall(
+            fn (PayoutService $service): array => $service->get($payoutId, $apiKey)
+        );
+    }
+
+    /** @return array<string,mixed> */
+    public function approvePayout(string $payoutId, int $revision, string $apiKey): array
+    {
+        return $this->payoutCall(
+            fn (PayoutService $service): array => $service->approve($payoutId, $revision, $apiKey)
+        );
     }
 
     /** @return array<string,mixed> */
@@ -302,6 +341,24 @@ class GreenfieldApiService
             throw new GreenfieldApiException('Invalid API key or store.', 'authenticate', 401);
         }
         return $store;
+    }
+
+    /** @template T @param callable(PayoutService):T $callback @return T */
+    private function payoutCall(callable $callback): mixed
+    {
+        if ($this->payoutService === null) {
+            throw new GreenfieldApiException('Payout API is disabled.', 'payout_api', 503);
+        }
+        try {
+            return $callback($this->payoutService);
+        } catch (PayoutException $exception) {
+            throw new GreenfieldApiException(
+                $exception->getMessage(),
+                $exception->getOperation(),
+                $exception->getHttpStatus(),
+                $exception
+            );
+        }
     }
 
     private function authorizeApiKey(string $apiKey): void
