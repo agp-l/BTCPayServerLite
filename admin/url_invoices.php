@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use BtcPayLite\AuthManager;
 use BtcPayLite\AuthException;
-use BtcPayLite\BtcDashboard;
 use BtcPayLite\BtcInvoiceManagerException;
 use BtcPayLite\BtcStatelessAjaxController;
 use BtcPayLite\BtcStatelessFactory;
@@ -129,8 +128,7 @@ if (!in_array($requestMethod, ['GET', 'HEAD'], true)) {
     exit;
 }
 
-$dashboard = new BtcDashboard($factory->wallet(), $factory->walletDirectory());
-$availableWallets = $dashboard->getAvailableWallets();
+$availableWallets = $factory->availableWallets();
 if (!in_array($defaultWalletName, $availableWallets, true)) {
     array_unshift($availableWallets, $defaultWalletName);
 }
