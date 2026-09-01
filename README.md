@@ -70,8 +70,9 @@ Mazání je záměrně omezené. Webhook lze odstranit, ale obchod lze smazat po
 | `client/login.php`, registrace a obnova hesla | Přepracováno | CSRF, throttling, bezpečné session, změna hesla, jednorázový 30minutový reset token a jednotná odpověď bez zjišťování existence účtu. |
 | `client/index.php`, klientský dashboard | Přepracováno | Oddělené sekce a filtry; user-scoped obchody, přejmenování a výměna API klíče, jedna peněženka účtu, živý zůstatek, faktury, výběry, webhooky, integrace a API provoz. |
 | `admin/users.php`, `admin/settings.php` | Nově implementováno | Správa klientů, e-mailu a relací, pozastavení účtu, bezpečné přiřazení peněženky, přehled zůstatků/provozu a vypnutí veřejných registrací. |
-| `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
-| `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
+| `install.php`, `InstallationManager` | Implementováno | Jednorázový webový instalátor kontroluje prostředí, vytvoří prázdnou databázi, nahraje schéma, založí admin účet a atomicky zapíše privátní konfiguraci. |
+| `config.php` a deployment | Částečně auditováno | Instalátor generuje náhodná tajemství a oprávnění `0600`; produkční proxy, zálohy a oddělení prostředí musí stále nastavit provozovatel. |
+| `sql.sql` | Auditováno pro čistou instalaci | Schéma není svázané s pevným názvem databáze a nevytváří ukázkové credentials. Upgrade historických instalací nadále používá ruční migrace. |
 | testovací a pomocné skripty | Částečně uklizeno | Veřejný debugger, stará registrace a zastaralé ruční testy byly odstraněny. `eshop_simulator.php` bude přepracován na univerzální integrační ukázku mimo web root v `tools/`. |
 
 ## Architektura
@@ -426,9 +427,37 @@ WHERE setting_key = 'registration_enabled';
 
 ```bash
 composer install
-composer update endroid/qr-code --with-all-dependencies
 composer dump-autoload --optimize
 ```
+
+### Nová instalace přes web
+
+1. Naklonujte projekt, spusťte `composer install` a nastavte web root na adresář projektu.
+2. Webovému uživateli dočasně povolte vytvořit `config.php` v kořeni projektu. Adresáře peněženek ponechte mimo web root.
+3. Otevřete kořenovou URL aplikace. Pokud `config.php` neexistuje, aplikace vás přesměruje na `install.php`.
+4. Zadejte připojení k prázdné MySQL/MariaDB databázi, veřejnou URL, první admin účet a cesty k Electrumu. Volba „Vytvořit databázi“ vyžaduje oprávnění `CREATE`; jinak databázi vytvořte předem a volbu vypněte.
+5. Po úspěchu se přihlaste vytvořeným admin účtem. Instalátor je automaticky uzamčen existencí `config.php` a při dalším otevření přesměruje na přihlášení.
+
+Instalátor přijímá pouze prázdnou databázi. Nejde o upgrade nástroj a nikdy se nesmí spouštět nad existující produkční databází. Schéma vytvoří všechny tabulky, výchozí registrační politiku a přesně jeden aktivní účet s rolí `admin`; žádný ukázkový obchod ani veřejný API klíč se nevytváří. `admin_api_key`, podpisový `secret_key` a `cron_key` se generují kryptograficky na serveru.
+
+Pokud PHP nemůže zapsat do kořene projektu, vytvořte `config.php` ručně podle sekce Konfigurace nebo dočasně upravte vlastnictví adresáře. Po instalaci ponechte soubor čitelný pouze pro uživatele PHP; instalátor se pokusí nastavit režim `0600`. Soubor nikdy necommitujte – je zahrnutý v `.gitignore`.
+
+Apache ochranu tajných instalačních souborů obsahuje v `.htaccess`. U Nginx přidejte ekvivalentní zákaz a teprve potom obecné PHP pravidlo:
+
+```nginx
+location ~ /(?:config\.php|\.install\.lock|\.btcpay-config-) {
+    deny all;
+    return 404;
+}
+```
+
+Pro ruční čistou instalaci nejprve vytvořte databázi a spusťte schéma proti explicitně zvolenému názvu:
+
+```bash
+mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p "$DB_NAME" < sql.sql
+```
+
+Admin účet pak vytvořte pouze s hashem z `password_hash(..., PASSWORD_DEFAULT)`; webový instalátor je doporučená cesta, protože validaci a bezpečný zápis provede automaticky.
 
 Adresáře s peněženkami a zálohami databáze držte mimo `htdocs` a mimo Git.
 
@@ -481,6 +510,8 @@ php tests/UserAccountServiceTest.php
 php tests/PasswordResetMailerTest.php
 php tests/AdminUserServiceTest.php
 php tests/WalletBalanceErrorTest.php
+php tests/InstallationManagerTest.php
+php tests/InstallerHttpBoundaryTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.

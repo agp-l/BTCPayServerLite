@@ -327,7 +327,7 @@ final class InstallationManager
             throw new InstallerException('Uživatel databáze není platný.');
         }
         $dbPassword = is_string($input['db_pass'] ?? null) ? $input['db_pass'] : '';
-        if (str_contains($dbPassword, "\0")) {
+        if (strlen($dbPassword) > 4096 || str_contains($dbPassword, "\0")) {
             throw new InstallerException('Heslo databáze není platné.');
         }
 
@@ -357,8 +357,16 @@ final class InstallationManager
             is_string($input['password_reset_from'] ?? null) ? $input['password_reset_from'] : ''
         );
         if ($passwordResetFrom !== ''
-            && filter_var($passwordResetFrom, FILTER_VALIDATE_EMAIL) === false) {
+            && (strlen($passwordResetFrom) > 254
+                || filter_var($passwordResetFrom, FILTER_VALIDATE_EMAIL) === false)) {
             throw new InstallerException('Adresa odesílatele pro obnovu hesla není platná.');
+        }
+
+        $rpcUser = is_string($input['rpc_user'] ?? null) ? trim($input['rpc_user']) : '';
+        $rpcPassword = is_string($input['rpc_pass'] ?? null) ? $input['rpc_pass'] : '';
+        if (strlen($rpcUser) > 256 || str_contains($rpcUser, "\0")
+            || strlen($rpcPassword) > 4096 || str_contains($rpcPassword, "\0")) {
+            throw new InstallerException('Přihlašovací údaje Electrum RPC nejsou platné.');
         }
 
         return [
@@ -374,8 +382,8 @@ final class InstallationManager
             'app_url' => $appUrl,
             'rpc_host' => $rpcHost,
             'rpc_port' => $rpcPort,
-            'rpc_user' => is_string($input['rpc_user'] ?? null) ? trim($input['rpc_user']) : '',
-            'rpc_pass' => is_string($input['rpc_pass'] ?? null) ? $input['rpc_pass'] : '',
+            'rpc_user' => $rpcUser,
+            'rpc_pass' => $rpcPassword,
             'password_reset_from' => $passwordResetFrom,
             'wallet_path' => $this->absolutePath($input['wallet_path'] ?? null, 'Admin peněženka'),
             'electrum_cli_path' => $this->absolutePath(
@@ -572,7 +580,8 @@ final class InstallationManager
     private function appUrl(mixed $value): string
     {
         $url = rtrim(trim(is_string($value) ? $value : ''), '/');
-        if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        if ($url === '' || strlen($url) > 2048
+            || filter_var($url, FILTER_VALIDATE_URL) === false) {
             throw new InstallerException('Veřejná URL aplikace není platná.');
         }
         $parts = parse_url($url);
@@ -593,10 +602,15 @@ final class InstallationManager
     {
         $path = trim(is_string($value) ? $value : '');
         $windowsAbsolute = preg_match('/\A[A-Za-z]:[\\\\\/]/D', $path) === 1;
-        if ($path === '' || ($path[0] !== '/' && !$windowsAbsolute) || str_contains($path, "\0")) {
+        if ($path === '' || strlen($path) > 4096
+            || ($path[0] !== '/' && !$windowsAbsolute) || str_contains($path, "\0")) {
             throw new InstallerException($label . ' musí být absolutní cesta.');
         }
 
-        return rtrim($path, '/\\');
+        $trimmed = rtrim($path, '/\\');
+
+        return $trimmed === '' || preg_match('/\A[A-Za-z]:\z/D', $trimmed) === 1
+            ? $path
+            : $trimmed;
     }
 }
