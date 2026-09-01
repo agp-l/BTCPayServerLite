@@ -68,6 +68,15 @@ try {
 }
 $passes[] = 'keeps the public checkout read-only';
 
+$statelessCheckout = $router->match('/url-invoice', 'GET');
+routeSame('admin/url_pay.php', $statelessCheckout->getHandler(), 'Stateless checkout handler mismatch');
+routeSame(null, $statelessCheckout->getRequiredRole(), 'Stateless checkout must remain public');
+$passes[] = 'exposes signed stateless invoices without an admin session';
+
+$statelessApi = $router->match('/api/stateless/invoices', 'POST');
+routeSame('api_stateless.php', $statelessApi->getHandler(), 'Canonical stateless API mismatch');
+$passes[] = 'maps the canonical stateless API endpoint';
+
 $head = $router->match('/admin/dashboard', 'HEAD');
 routeSame('admin/dashboard.php', $head->getHandler(), 'HEAD did not reuse the GET page');
 $passes[] = 'supports HEAD on read-only pages';
@@ -79,6 +88,10 @@ $handlerCases = [
     ['/client', 'GET'],
     ['/api', 'POST'],
     ['/pay', 'GET'],
+    ['/url-invoice', 'GET'],
+    ['/url_pay', 'GET'],
+    ['/admin/url_pay', 'GET'],
+    ['/api/stateless/invoices', 'POST'],
     ['/admin/dashboard', 'GET'],
     ['/admin/wallet', 'GET'],
     ['/admin/stores', 'GET'],
