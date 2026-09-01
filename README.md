@@ -353,6 +353,7 @@ Audit přidal tyto jednorázové migrace a read-only kontroly:
 - `migrations/20260830_add_webhook_deliveries.sql`
 - `migrations/20260831_auth_preflight.sql`
 - `migrations/20260831_add_auth_attempts.sql`
+- `migrations/20260901_payout_preflight.sql`
 - `migrations/20260901_add_payouts.sql`
 
 Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Preflight musí skončit bez problémů. Migrační soubory nejsou obecný idempotentní instalační skript.
