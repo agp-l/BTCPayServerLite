@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BtcPayLite;
 
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Small dependency factory for the standalone stateless-invoice subsystem.
@@ -79,6 +80,36 @@ final class BtcStatelessFactory
     public function walletDirectory(): string
     {
         return dirname($this->requiredString('wallet_path'));
+    }
+
+    /** @return list<string> */
+    public function availableWallets(): array
+    {
+        $directory = realpath($this->walletDirectory());
+        if ($directory === false || !is_dir($directory) || !is_readable($directory)) {
+            throw new RuntimeException('The Electrum wallet directory is unavailable.');
+        }
+
+        $entries = scandir($directory);
+        if (!is_array($entries)) {
+            throw new RuntimeException('The Electrum wallet directory could not be read.');
+        }
+
+        $wallets = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            $path = $directory . DIRECTORY_SEPARATOR . $entry;
+            if (is_file($path) && !is_link($path)) {
+                $wallets[] = $entry;
+            }
+        }
+
+        natcasesort($wallets);
+
+        return array_values($wallets);
     }
 
     private function requiredString(
