@@ -59,7 +59,12 @@ class GreenfieldApiController
             throw new GreenfieldApiException('Authorization header is invalid.', 'authenticate', 401);
         }
 
-        return $this->handleRequest($method, $requestPath, $rawBody, $authorization);
+        $idempotencyKey = $server['HTTP_IDEMPOTENCY_KEY'] ?? '';
+        if (!is_string($idempotencyKey)) {
+            throw new GreenfieldApiException('Idempotency-Key header is invalid.', 'adapt_request', 400);
+        }
+
+        return $this->handleRequest($method, $requestPath, $rawBody, $authorization, $idempotencyKey);
     }
 
     /**
@@ -69,7 +74,8 @@ class GreenfieldApiController
         string $method,
         string $path,
         string $rawBody,
-        string $authorizationHeader
+        string $authorizationHeader,
+        string $idempotencyKey = ''
     ): array {
         $method = strtoupper(trim($method));
         $path = '/' . ltrim($path, '/');
@@ -139,6 +145,41 @@ class GreenfieldApiController
             return [
                 'status_code' => 200,
                 'body' => $this->service->createInvoice($matches[1], $this->decodeJsonObject($rawBody), $apiKey),
+            ];
+        }
+
+        if (preg_match('/\\A\\/api\\/v1\\/stores\\/([A-Za-z0-9_-]+)\\/payouts\\z/D', $path, $matches)) {
+            if ($method === 'GET') {
+                return ['status_code' => 200, 'body' => $this->service->getPayouts($matches[1], $apiKey)];
+            }
+            $this->requireMethod($method, 'POST');
+            return [
+                'status_code' => 200,
+                'body' => $this->service->createPayout(
+                    $matches[1],
+                    $this->decodeJsonObject($rawBody),
+                    $apiKey,
+                    $idempotencyKey
+                ),
+            ];
+        }
+
+        if (preg_match('/\\A\\/api\\/v1\\/payouts\\/(po_[0-9a-f]{32})\\z/D', $path, $matches)) {
+            if ($method === 'GET') {
+                return ['status_code' => 200, 'body' => $this->service->getPayout($matches[1], $apiKey)];
+            }
+            $this->requireMethod($method, 'POST');
+            $input = $this->decodeJsonObject($rawBody);
+            $revision = $input['revision'] ?? null;
+            if (is_string($revision) && ctype_digit($revision)) {
+                $revision = (int) $revision;
+            }
+            if (!is_int($revision) || $revision < 0) {
+                throw new GreenfieldApiException('Payout revision is invalid.', 'approve_payout', 400);
+            }
+            return [
+                'status_code' => 200,
+                'body' => $this->service->approvePayout($matches[1], $revision, $apiKey),
             ];
         }
 
