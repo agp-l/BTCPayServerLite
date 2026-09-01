@@ -418,7 +418,7 @@ $tests['requires an explicit opt-in for localhost webhooks'] = static function (
     greenfieldAssertSame([], $repository->webhookCalls, 'Rejected localhost webhook reached storage.');
 };
 
-$tests['routes an exact JSON invoice request'] = static function (): void {
+$tests['accepts the Greenfield token authorization scheme'] = static function (): void {
     $service = new GreenfieldControllerTestService();
     $controller = new GreenfieldApiController($service);
 
@@ -426,12 +426,12 @@ $tests['routes an exact JSON invoice request'] = static function (): void {
         'POST',
         '/api/v1/stores/store_test/invoices',
         '{"amount":"0.00000001"}',
-        'bearer store-api-key'
+        'token store-api-key'
     );
 
     greenfieldAssertSame(200, $response['status_code'], 'The controller returned the wrong status.');
     greenfieldAssertSame('0.00000001', $response['body']['amount'], 'The controller changed the JSON amount.');
-    greenfieldAssertSame('store-api-key', $service->calls[0]['api_key'], 'The Bearer token changed.');
+    greenfieldAssertSame('store-api-key', $service->calls[0]['api_key'], 'The Greenfield token changed.');
 };
 
 $tests['adapts an Apache PATH_INFO request without its query string'] = static function (): void {
@@ -490,10 +490,10 @@ $tests['requires an explicit authorization scheme'] = static function (): void {
             '',
             'store-api-key'
         ),
-        'A raw API key without Bearer was accepted.'
+        'A raw API key without an authorization scheme was accepted.'
     );
 
-    greenfieldAssertSame(401, $exception->getHttpStatus(), 'Missing Bearer returned the wrong status.');
+    greenfieldAssertSame(401, $exception->getHttpStatus(), 'Missing authorization scheme returned the wrong status.');
 };
 
 $passed = 0;
