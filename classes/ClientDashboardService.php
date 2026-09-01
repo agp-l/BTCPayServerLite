@@ -155,6 +155,71 @@ final class ClientDashboardService
         }
     }
 
+    public function renameStore(int $userId, string $storeId, string $name): void
+    {
+        $userId = $this->userId($userId);
+        $storeId = $this->identifier($storeId, 'Obchod');
+        $name = trim($name);
+        if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+            throw new ClientDashboardException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
+        }
+        if (!$this->repository->updateStoreName($userId, $storeId, $name)) {
+            throw new ClientDashboardException('Obchod nebyl nalezen.', 404);
+        }
+    }
+
+    public function rotateStoreApiKey(int $userId, string $storeId): void
+    {
+        $userId = $this->userId($userId);
+        $storeId = $this->identifier($storeId, 'Obchod');
+        if (!$this->repository->rotateStoreApiKey($userId, $storeId, bin2hex(random_bytes(32)))) {
+            throw new ClientDashboardException('Obchod nebyl nalezen.', 404);
+        }
+    }
+
+    public function deleteStore(int $userId, string $storeId): void
+    {
+        $userId = $this->userId($userId);
+        $storeId = $this->identifier($storeId, 'Obchod');
+        if (!$this->repository->deleteEmptyStore($userId, $storeId)) {
+            throw new ClientDashboardException(
+                'Obchod nelze odstranit. Obchod s fakturami nebo výběry musí zůstat v historii.',
+                409
+            );
+        }
+    }
+
+    public function updateWebhook(int $userId, string $webhookId, string $url): void
+    {
+        $userId = $this->userId($userId);
+        $webhookId = $this->identifier($webhookId, 'Webhook');
+        try {
+            $endpoint = $this->webhookPolicy->inspect($url);
+        } catch (Throwable $exception) {
+            throw new ClientDashboardException(
+                'Webhook URL není bezpečná nebo ji nyní nelze ověřit.',
+                400,
+                $exception
+            );
+        }
+        if (!$this->repository->updateWebhookUrl($userId, $webhookId, $endpoint['url'])) {
+            throw new ClientDashboardException('Webhook nebyl nalezen.', 404);
+        }
+    }
+
+    public function rotateWebhookSecret(int $userId, string $webhookId): void
+    {
+        $userId = $this->userId($userId);
+        $webhookId = $this->identifier($webhookId, 'Webhook');
+        if (!$this->repository->rotateWebhookSecret(
+            $userId,
+            $webhookId,
+            bin2hex(random_bytes(32))
+        )) {
+            throw new ClientDashboardException('Webhook nebyl nalezen.', 404);
+        }
+    }
+
     private function userId(int $userId): int
     {
         if ($userId < 1) {

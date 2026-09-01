@@ -33,6 +33,16 @@ header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 
 $csrfToken = AuthManager::csrfToken();
+$allowedSections = ['overview', 'stores', 'invoices', 'webhooks', 'payouts', 'activity'];
+$clientSection = is_string($_GET['section'] ?? null) && in_array($_GET['section'], $allowedSections, true)
+    ? $_GET['section']
+    : 'overview';
+$selectedStoreId = is_string($_GET['store_id'] ?? null) && $_GET['store_id'] !== ''
+    ? $_GET['store_id']
+    : null;
+$selectedInvoiceStatus = is_string($_GET['status'] ?? null) && $_GET['status'] !== ''
+    ? $_GET['status']
+    : null;
 $sessionUserId = $_SESSION['user_id'] ?? null;
 if (is_int($sessionUserId)) {
     $userId = $sessionUserId;
@@ -100,6 +110,38 @@ if ($service instanceof ClientDashboardService && ($_SERVER['REQUEST_METHOD'] ??
             $webhookId = is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : '';
             $service->deleteWebhook($userId, $webhookId);
             $toastMsg = 'Webhook byl odstraněn.';
+        } elseif ($action === 'rename_store') {
+            $service->renameStore(
+                $userId,
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '',
+                is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : ''
+            );
+            $toastMsg = 'Název obchodu byl změněn.';
+        } elseif ($action === 'rotate_store_key') {
+            $service->rotateStoreApiKey(
+                $userId,
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : ''
+            );
+            $toastMsg = 'API klíč byl vyměněn. Aktualizujte jej ve své integraci.';
+        } elseif ($action === 'delete_store') {
+            $service->deleteStore(
+                $userId,
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : ''
+            );
+            $toastMsg = 'Prázdný obchod byl odstraněn.';
+        } elseif ($action === 'update_webhook') {
+            $service->updateWebhook(
+                $userId,
+                is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : '',
+                is_string($_POST['url'] ?? null) ? $_POST['url'] : ''
+            );
+            $toastMsg = 'Webhook URL byla ověřena a změněna.';
+        } elseif ($action === 'rotate_webhook_secret') {
+            $service->rotateWebhookSecret(
+                $userId,
+                is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : ''
+            );
+            $toastMsg = 'Webhook secret byl vyměněn.';
         } else {
             throw new ClientDashboardException('Neznámá operace klientského panelu.');
         }
@@ -132,6 +174,27 @@ if ($service instanceof ClientDashboardService) {
         $payouts = $dashboard['payouts'];
         $integrations = $dashboard['integrations'];
         $requests = $dashboard['requests'];
+        $knownStoreIds = array_column($stores, 'id');
+        if ($selectedStoreId !== null && !in_array($selectedStoreId, $knownStoreIds, true)) {
+            $selectedStoreId = null;
+        }
+        if ($selectedStoreId !== null) {
+            $matchesStore = static fn (array $row): bool => ($row['store_id'] ?? null) === $selectedStoreId;
+            $invoices = array_values(array_filter($invoices, $matchesStore));
+            $webhooks = array_values(array_filter($webhooks, $matchesStore));
+            $payouts = array_values(array_filter($payouts, $matchesStore));
+            $integrations = array_values(array_filter($integrations, $matchesStore));
+            $requests = array_values(array_filter($requests, $matchesStore));
+        }
+        $allowedInvoiceStatuses = ['New', 'Processing', 'Settled', 'Expired', 'Invalid'];
+        if ($selectedInvoiceStatus !== null && in_array($selectedInvoiceStatus, $allowedInvoiceStatuses, true)) {
+            $invoices = array_values(array_filter(
+                $invoices,
+                static fn (array $invoice): bool => ($invoice['status'] ?? null) === $selectedInvoiceStatus
+            ));
+        } else {
+            $selectedInvoiceStatus = null;
+        }
         $walletPath = $repository?->findAssignedWallet($userId);
         if ($walletPath === null) {
             $walletError = 'Účet nemá jednoznačně přiřazenou peněženku.';

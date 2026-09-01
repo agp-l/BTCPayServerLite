@@ -43,7 +43,11 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
     public function fetchStores(int $userId): array
     {
         $statement = $this->database->getPdo()->prepare(
-            'SELECT id, name, api_key, wallet_path FROM stores WHERE user_id = ? ORDER BY name, id'
+            'SELECT id, name, api_key, wallet_path,
+                    (SELECT COUNT(*) FROM invoices i WHERE i.store_id = stores.id) AS invoice_count,
+                    (SELECT COUNT(*) FROM webhooks w WHERE w.store_id = stores.id) AS webhook_count,
+                    (SELECT COUNT(*) FROM payouts p WHERE p.store_id = stores.id) AS payout_count
+             FROM stores WHERE user_id = ? ORDER BY name, id'
         );
         $statement->execute([$userId]);
 
@@ -53,6 +57,9 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
                 'name' => $this->string($row['name'] ?? null, 'store name'),
                 'api_key' => $this->string($row['api_key'] ?? null, 'store API key'),
                 'wallet_path' => $this->string($row['wallet_path'] ?? null, 'store wallet path'),
+                'invoice_count' => $this->nonNegativeInt($row['invoice_count'] ?? null),
+                'webhook_count' => $this->nonNegativeInt($row['webhook_count'] ?? null),
+                'payout_count' => $this->nonNegativeInt($row['payout_count'] ?? null),
             ],
             $this->rows($statement->fetchAll(PDO::FETCH_ASSOC))
         );
@@ -264,6 +271,67 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
         $statement->execute([$webhookId, $userId]);
 
         return $statement->rowCount() === 1;
+    }
+
+    public function updateStoreName(int $userId, string $storeId, string $name): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'UPDATE stores SET name = ? WHERE id = ? AND user_id = ?'
+        );
+        $statement->execute([$name, $storeId, $userId]);
+        return $statement->rowCount() === 1 || $this->ownsStore($userId, $storeId);
+    }
+
+    public function rotateStoreApiKey(int $userId, string $storeId, string $apiKey): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'UPDATE stores SET api_key = ? WHERE id = ? AND user_id = ?'
+        );
+        $statement->execute([$apiKey, $storeId, $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function deleteEmptyStore(int $userId, string $storeId): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'DELETE FROM stores
+             WHERE id = ? AND user_id = ?
+               AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.store_id = stores.id)
+               AND NOT EXISTS (SELECT 1 FROM payouts p WHERE p.store_id = stores.id)'
+        );
+        $statement->execute([$storeId, $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function updateWebhookUrl(int $userId, string $webhookId, string $url): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'UPDATE webhooks SET url = ?
+             WHERE id = ? AND store_id IN (SELECT id FROM stores WHERE user_id = ?)'
+        );
+        $statement->execute([$url, $webhookId, $userId]);
+        return $statement->rowCount() === 1 || $this->ownsWebhook($userId, $webhookId);
+    }
+
+    public function rotateWebhookSecret(int $userId, string $webhookId, string $secret): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'UPDATE webhooks SET secret = ?
+             WHERE id = ? AND store_id IN (SELECT id FROM stores WHERE user_id = ?)'
+        );
+        $statement->execute([$secret, $webhookId, $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    private function ownsWebhook(int $userId, string $webhookId): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT 1 FROM webhooks w
+             INNER JOIN stores s ON s.id = w.store_id
+             WHERE w.id = ? AND s.user_id = ? LIMIT 1'
+        );
+        $statement->execute([$webhookId, $userId]);
+        return $statement->fetchColumn() !== false;
     }
 
     /** @return list<array<string,mixed>> */

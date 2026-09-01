@@ -17,7 +17,7 @@ final class ClientRepositoryFixture implements ClientDashboardRepository
     public ?string $assignedWallet = '/wallet';
 
     public function fetchSummary(int $userId): array { return ['total_stores' => 1, 'total_invoices' => 2, 'paid_invoices' => 1]; }
-    public function fetchStores(int $userId): array { return [['id' => 'store_owned', 'name' => 'Store', 'api_key' => 'secret', 'wallet_path' => '/wallet']]; }
+    public function fetchStores(int $userId): array { return [['id' => 'store_owned', 'name' => 'Store', 'api_key' => 'secret', 'wallet_path' => '/wallet', 'invoice_count' => 0, 'webhook_count' => 0, 'payout_count' => 0]]; }
     public function findAssignedWallet(int $userId): ?string { return $this->assignedWallet; }
     public function assignWallet(int $userId, string $walletPath, int $assignedAt): void
     {
@@ -48,6 +48,11 @@ final class ClientRepositoryFixture implements ClientDashboardRepository
         $this->deletedWebhook = $webhookId;
         return $userId === 7 && $webhookId === 'wh_test';
     }
+    public function updateStoreName(int $userId, string $storeId, string $name): bool { return $userId === 7 && $storeId === 'store_owned'; }
+    public function rotateStoreApiKey(int $userId, string $storeId, string $apiKey): bool { return $userId === 7 && $storeId === 'store_owned' && strlen($apiKey) === 64; }
+    public function deleteEmptyStore(int $userId, string $storeId): bool { return $userId === 7 && $storeId === 'store_owned'; }
+    public function updateWebhookUrl(int $userId, string $webhookId, string $url): bool { return $userId === 7 && $webhookId === 'wh_test'; }
+    public function rotateWebhookSecret(int $userId, string $webhookId, string $secret): bool { return $userId === 7 && $webhookId === 'wh_test' && strlen($secret) === 64; }
 }
 
 $repository = new ClientRepositoryFixture();
@@ -99,4 +104,11 @@ $service->deleteWebhook(7, 'wh_test');
 if ($repository->deletedWebhook !== 'wh_test') throw new RuntimeException('Webhook deletion was not scoped to the client.');
 echo "[PASS] deletes a webhook through the scoped repository\n";
 
-echo "6 client dashboard service tests passed.\n";
+$service->renameStore(7, 'store_owned', 'Nový obchod');
+$service->rotateStoreApiKey(7, 'store_owned');
+$service->deleteStore(7, 'store_owned');
+$service->updateWebhook(7, 'wh_test', 'https://example.com/new-hook');
+$service->rotateWebhookSecret(7, 'wh_test');
+echo "[PASS] scopes store and webhook management to the client\n";
+
+echo "7 client dashboard service tests passed.\n";

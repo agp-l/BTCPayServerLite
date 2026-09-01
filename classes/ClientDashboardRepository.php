@@ -39,4 +39,14 @@ interface ClientDashboardRepository
     public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array;
 
     public function deleteWebhook(int $userId, string $webhookId): bool;
+
+    public function updateStoreName(int $userId, string $storeId, string $name): bool;
+
+    public function rotateStoreApiKey(int $userId, string $storeId, string $apiKey): bool;
+
+    public function deleteEmptyStore(int $userId, string $storeId): bool;
+
+    public function updateWebhookUrl(int $userId, string $webhookId, string $url): bool;
+
+    public function rotateWebhookSecret(int $userId, string $webhookId, string $secret): bool;
 }

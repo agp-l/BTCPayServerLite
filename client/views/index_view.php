@@ -2,10 +2,19 @@
 
 declare(strict_types=1);
 
-$pageTitle = 'Můj účet - BTCPay Lite';
+$sectionTitles = [
+    'overview' => 'Přehled účtu',
+    'stores' => 'Moje obchody',
+    'invoices' => 'Moje faktury',
+    'webhooks' => 'Moje webhooky',
+    'payouts' => 'Moje výběry',
+    'activity' => 'Aktivita integrací',
+];
+$sectionTitle = $sectionTitles[$clientSection] ?? $sectionTitles['overview'];
+$pageTitle = $sectionTitle . ' - BTCPay Lite';
 require __DIR__ . '/layout/header.php';
 
-$clientUrl = htmlspecialchars($urlManager->url('/client'), ENT_QUOTES, 'UTF-8');
+$clientUrl = htmlspecialchars($urlManager->url('/client', ['section' => $clientSection]), ENT_QUOTES, 'UTF-8');
 $statusClasses = [
     'New' => 'badge-New',
     'Processing' => 'badge-Processing',
@@ -17,7 +26,7 @@ $statusClasses = [
 <section class="page-header">
   <div class="page-header-copy">
     <p class="page-eyebrow">Merchant portal</p>
-    <h1>Přehled účtu</h1>
+    <h1><?php echo htmlspecialchars($sectionTitle, ENT_QUOTES, 'UTF-8'); ?></h1>
     <p>Spravujte své obchody, integrační klíče, webhooky a poslední přijaté faktury.</p>
   </div>
 </section>
@@ -26,6 +35,7 @@ $statusClasses = [
   <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><?php echo htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8'); ?></span></div>
 <?php endif; ?>
 
+<?php if ($clientSection === 'overview'): ?>
 <section class="stats-grid" aria-label="Statistiky účtu">
   <article class="stat-card">
     <span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
@@ -52,7 +62,20 @@ $statusClasses = [
     <div class="stat-meta"><?php echo htmlspecialchars($walletError ?? 'Živý potvrzený zůstatek', ENT_QUOTES, 'UTF-8'); ?></div>
   </article>
 </section>
+<?php endif; ?>
 
+<?php if (in_array($clientSection, ['invoices', 'webhooks', 'payouts', 'activity'], true)): ?>
+<section class="card filter-card">
+  <form method="get" action="<?php echo htmlspecialchars($urlManager->url('/client'), ENT_QUOTES, 'UTF-8'); ?>" class="filter-bar">
+    <input type="hidden" name="section" value="<?php echo htmlspecialchars($clientSection, ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="field"><label for="clientStoreFilter">Obchod</label><div class="input-wrap"><select id="clientStoreFilter" name="store_id"><option value="">Všechny moje obchody</option><?php foreach ($stores as $store): ?><option value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" <?php echo $selectedStoreId === $store['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?></select></div></div>
+    <?php if ($clientSection === 'invoices'): ?><div class="field"><label for="clientStatusFilter">Stav</label><div class="input-wrap"><select id="clientStatusFilter" name="status"><option value="">Všechny stavy</option><?php foreach (['New', 'Processing', 'Settled', 'Expired', 'Invalid'] as $status): ?><option value="<?php echo $status; ?>" <?php echo $selectedInvoiceStatus === $status ? 'selected' : ''; ?>><?php echo $status; ?></option><?php endforeach; ?></select></div></div><?php endif; ?>
+    <div class="filter-actions"><button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button><a class="ghost-btn" href="<?php echo htmlspecialchars($urlManager->url('/client', ['section' => $clientSection]), ENT_QUOTES, 'UTF-8'); ?>">Zrušit</a></div>
+  </form>
+</section>
+<?php endif; ?>
+
+<?php if (in_array($clientSection, ['overview', 'stores'], true)): ?>
 <section class="card">
   <div class="card-title">
     <span class="card-title-group"><i class="fa-solid fa-store" aria-hidden="true"></i> Obchody a API přístup</span>
@@ -86,12 +109,20 @@ $statusClasses = [
           <span class="credential-label">API klíč</span>
           <div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="API klíč"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit API klíč"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat API klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div>
         </div>
+        <div class="store-metrics muted">Faktury: <?php echo (int) $store['invoice_count']; ?> · Webhooky: <?php echo (int) $store['webhook_count']; ?> · Výběry: <?php echo (int) $store['payout_count']; ?></div>
+        <details class="disclosure compact-disclosure"><summary><i class="fa-solid fa-pen"></i> Nastavení obchodu</summary><div class="disclosure-body form-stack">
+          <form method="post" action="<?php echo $clientUrl; ?>" class="form-stack"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rename_store"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><div class="field"><label>Název</label><div class="input-wrap"><input name="store_name" maxlength="100" value="<?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div><button class="ghost-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Uložit</button></form>
+          <form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Vyměnit API klíč? Starý klíč přestane okamžitě platit."><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_store_key"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="ghost-btn" type="submit"><i class="fa-solid fa-rotate"></i> Vyměnit API klíč</button></form>
+          <?php if ((int) $store['invoice_count'] === 0 && (int) $store['payout_count'] === 0): ?><form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Odstranit prázdný obchod a jeho webhooky?"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="delete_store"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="danger-btn" type="submit"><i class="fa-solid fa-trash"></i> Odstranit obchod</button></form><?php else: ?><div class="surface-note"><i class="fa-solid fa-lock"></i><span>Obchod s finanční historií nelze odstranit.</span></div><?php endif; ?>
+        </div></details>
       </article>
     <?php endforeach; ?>
     </div>
   <?php endif; ?>
 </section>
+<?php endif; ?>
 
+<?php if (in_array($clientSection, ['overview', 'webhooks'], true)): ?>
 <div class="merchant-grid">
   <section class="card">
     <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Webhooky</span></div>
@@ -123,6 +154,7 @@ $statusClasses = [
             <code title="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?></code>
             <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div></div>
           </div>
+          <details class="disclosure compact-disclosure webhook-actions"><summary><i class="fa-solid fa-pen"></i> Upravit</summary><div class="disclosure-body form-stack"><form method="post" action="<?php echo $clientUrl; ?>" class="form-stack"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="update_webhook"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>"><div class="field"><label>HTTPS URL</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div><button class="ghost-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Uložit URL</button></form><form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Vyměnit webhook secret?"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_webhook_secret"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="ghost-btn" type="submit"><i class="fa-solid fa-rotate"></i> Vyměnit secret</button></form></div></details>
           <form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Opravdu chcete webhook odstranit?">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="action" value="delete_webhook">
@@ -141,7 +173,9 @@ $statusClasses = [
     <div class="alert alert-warning"><i class="fa-solid fa-key" aria-hidden="true"></i><span>API klíče a webhook secrety ukládejte jako hesla. Nevkládejte je do veřejného zdrojového kódu.</span></div>
   </section>
 </div>
+<?php endif; ?>
 
+<?php if (in_array($clientSection, ['overview', 'invoices'], true)): ?>
 <section class="card">
   <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Poslední faktury</span></div>
   <?php if ($invoices === []): ?>
@@ -155,7 +189,9 @@ $statusClasses = [
     </tbody></table></div>
   <?php endif; ?>
 </section>
+<?php endif; ?>
 
+<?php if (in_array($clientSection, ['overview', 'activity'], true)): ?>
 <div class="merchant-grid">
   <section class="card">
     <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-plug" aria-hidden="true"></i> Moje integrace a e-shopy</span></div>
@@ -179,7 +215,9 @@ $statusClasses = [
     <?php endif; ?>
   </section>
 </div>
+<?php endif; ?>
 
+<?php if (in_array($clientSection, ['overview', 'payouts'], true)): ?>
 <section class="card">
   <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> Moje výběry</span></div>
   <?php if ($payouts === []): ?>
@@ -190,6 +228,7 @@ $statusClasses = [
     </tbody></table></div>
   <?php endif; ?>
 </section>
+<?php endif; ?>
 
 <script>
 (() => {

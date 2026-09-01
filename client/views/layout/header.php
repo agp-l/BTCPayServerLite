@@ -11,6 +11,12 @@ $routeUrl = static fn (string $path): string => htmlspecialchars(
     ENT_QUOTES,
     'UTF-8'
 );
+$clientSection = isset($clientSection) && is_string($clientSection) ? $clientSection : 'overview';
+$sectionUrl = static fn (string $section): string => htmlspecialchars(
+    $urlManager->url('/client', ['section' => $section]),
+    ENT_QUOTES,
+    'UTF-8'
+);
 ?>
 <!doctype html>
 <html lang="cs">
@@ -36,9 +42,14 @@ $routeUrl = static fn (string $path): string => htmlspecialchars(
     <nav class="admin-nav">
       <div class="admin-nav-group">
         <div class="admin-nav-label">Můj účet</div>
-        <a href="<?php echo $routeUrl('/client'); ?>" class="admin-nav-link<?php echo $activeMenu === 'client' ? ' is-active' : ''; ?>" <?php echo $activeMenu === 'client' ? 'aria-current="page"' : ''; ?>>
+        <a href="<?php echo $sectionUrl('overview'); ?>" class="admin-nav-link<?php echo $clientSection === 'overview' ? ' is-active' : ''; ?>" <?php echo $clientSection === 'overview' ? 'aria-current="page"' : ''; ?>>
           <i class="fa-solid fa-grid-2" aria-hidden="true"></i><span>Přehled</span>
         </a>
+        <a href="<?php echo $sectionUrl('stores'); ?>" class="admin-nav-link<?php echo $clientSection === 'stores' ? ' is-active' : ''; ?>"><i class="fa-solid fa-store"></i><span>Obchody</span></a>
+        <a href="<?php echo $sectionUrl('invoices'); ?>" class="admin-nav-link<?php echo $clientSection === 'invoices' ? ' is-active' : ''; ?>"><i class="fa-solid fa-file-invoice"></i><span>Faktury</span></a>
+        <a href="<?php echo $sectionUrl('webhooks'); ?>" class="admin-nav-link<?php echo $clientSection === 'webhooks' ? ' is-active' : ''; ?>"><i class="fa-solid fa-wave-square"></i><span>Webhooky</span></a>
+        <a href="<?php echo $sectionUrl('payouts'); ?>" class="admin-nav-link<?php echo $clientSection === 'payouts' ? ' is-active' : ''; ?>"><i class="fa-solid fa-money-bill-transfer"></i><span>Výběry</span></a>
+        <a href="<?php echo $sectionUrl('activity'); ?>" class="admin-nav-link<?php echo $clientSection === 'activity' ? ' is-active' : ''; ?>"><i class="fa-solid fa-chart-line"></i><span>Aktivita</span></a>
         <a href="<?php echo $routeUrl('/client/account'); ?>" class="admin-nav-link<?php echo $activeMenu === 'account' ? ' is-active' : ''; ?>" <?php echo $activeMenu === 'account' ? 'aria-current="page"' : ''; ?>>
           <i class="fa-solid fa-key" aria-hidden="true"></i><span>Změna hesla</span>
         </a>

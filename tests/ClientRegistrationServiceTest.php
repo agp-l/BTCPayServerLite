@@ -45,6 +45,11 @@ final class RegistrationStoreRepositoryFixture implements ClientDashboardReposit
     public function ownsStore(int $userId, string $storeId): bool { return false; }
     public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array { return []; }
     public function deleteWebhook(int $userId, string $webhookId): bool { return false; }
+    public function updateStoreName(int $userId, string $storeId, string $name): bool { return false; }
+    public function rotateStoreApiKey(int $userId, string $storeId, string $apiKey): bool { return false; }
+    public function deleteEmptyStore(int $userId, string $storeId): bool { return false; }
+    public function updateWebhookUrl(int $userId, string $webhookId, string $url): bool { return false; }
+    public function rotateWebhookSecret(int $userId, string $webhookId, string $secret): bool { return false; }
 }
 
 final class RegistrationWalletProvisionerFixture implements StoreWalletProvisioner
