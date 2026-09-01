@@ -5,6 +5,7 @@ declare(strict_types=1);
 $pageTitle = isset($pageTitle) && is_string($pageTitle) ? $pageTitle : 'Klientský panel';
 $clientEmail = is_string($_SESSION['email'] ?? null) ? $_SESSION['email'] : 'Klient';
 $clientInitial = strtoupper(substr($clientEmail, 0, 1));
+$activeMenu = isset($activeMenu) && is_string($activeMenu) ? $activeMenu : 'client';
 $routeUrl = static fn (string $path): string => htmlspecialchars(
     $urlManager->url($path),
     ENT_QUOTES,
@@ -35,8 +36,11 @@ $routeUrl = static fn (string $path): string => htmlspecialchars(
     <nav class="admin-nav">
       <div class="admin-nav-group">
         <div class="admin-nav-label">Můj účet</div>
-        <a href="<?php echo $routeUrl('/client'); ?>" class="admin-nav-link is-active" aria-current="page">
+        <a href="<?php echo $routeUrl('/client'); ?>" class="admin-nav-link<?php echo $activeMenu === 'client' ? ' is-active' : ''; ?>" <?php echo $activeMenu === 'client' ? 'aria-current="page"' : ''; ?>>
           <i class="fa-solid fa-grid-2" aria-hidden="true"></i><span>Přehled</span>
+        </a>
+        <a href="<?php echo $routeUrl('/client/account'); ?>" class="admin-nav-link<?php echo $activeMenu === 'account' ? ' is-active' : ''; ?>" <?php echo $activeMenu === 'account' ? 'aria-current="page"' : ''; ?>>
+          <i class="fa-solid fa-key" aria-hidden="true"></i><span>Změna hesla</span>
         </a>
       </div>
       <div class="admin-nav-group">

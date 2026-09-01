@@ -18,9 +18,18 @@ final class ApplicationRouter
             '/home' => $this->redirect('/'),
             '/prezentace' => $this->redirect('/'),
             '/login' => $this->page(['GET', 'HEAD', 'POST'], 'client/login.php', 'login'),
+            '/forgot-password' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'client/forgot_password.php', 'forgot_password'
+            ),
+            '/reset-password' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'client/reset_password.php', 'reset_password'
+            ),
             '/registrace' => $this->page(['GET', 'HEAD', 'POST'], 'client/registrace.php', 'registrace'),
             '/registrace.php' => $this->redirect('/registrace'),
             '/client' => $this->page(['GET', 'HEAD', 'POST'], 'client/index.php', 'client', 'client'),
+            '/client/account' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'pages/account.php', 'account', 'client'
+            ),
             '/dashboard' => $this->redirect('/client'),
             '/api' => $this->page(['POST'], 'api_stateless.php', 'api'),
             '/api/stateless/invoices' => $this->page(
@@ -40,6 +49,12 @@ final class ApplicationRouter
             '/admin' => $this->redirect('/admin/dashboard'),
             '/admin/dashboard' => $this->page(
                 ['GET', 'HEAD'], 'admin/dashboard.php', 'dashboard', 'admin'
+            ),
+            '/admin/account' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'pages/account.php', 'account', 'admin'
+            ),
+            '/admin/settings' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'admin/settings.php', 'settings', 'admin'
             ),
             '/admin/wallet' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/wallet.php', 'wallet', 'admin'

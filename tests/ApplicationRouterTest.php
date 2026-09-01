@@ -42,6 +42,15 @@ routeSame(true, $registrationAlias->isRedirect(), 'Legacy registration path is n
 routeSame('/registrace', $registrationAlias->getRedirectPath(), 'Registration redirect target mismatch');
 $passes[] = 'redirects the removed registration entry point';
 
+$forgotPassword = $router->match('/forgot-password', 'POST');
+routeSame('client/forgot_password.php', $forgotPassword->getHandler(), 'Forgot password handler mismatch');
+routeSame(null, $forgotPassword->getRequiredRole(), 'Forgot password route must remain public');
+$clientAccount = $router->match('/client/account', 'POST');
+routeSame('client', $clientAccount->getRequiredRole(), 'Client account role is missing');
+$adminSettings = $router->match('/admin/settings', 'POST');
+routeSame('admin', $adminSettings->getRequiredRole(), 'Admin settings role is missing');
+$passes[] = 'protects account settings while keeping password recovery public';
+
 try {
     $router->match('/admin/wallet/extra', 'GET');
     throw new RuntimeException('Unknown nested route was accepted');
@@ -84,8 +93,11 @@ $passes[] = 'supports HEAD on read-only pages';
 $handlerCases = [
     ['/', 'GET'],
     ['/login', 'GET'],
+    ['/forgot-password', 'GET'],
+    ['/reset-password', 'GET'],
     ['/registrace', 'GET'],
     ['/client', 'GET'],
+    ['/client/account', 'GET'],
     ['/api', 'POST'],
     ['/pay', 'GET'],
     ['/url-invoice', 'GET'],
@@ -93,6 +105,8 @@ $handlerCases = [
     ['/admin/url_pay', 'GET'],
     ['/api/stateless/invoices', 'POST'],
     ['/admin/dashboard', 'GET'],
+    ['/admin/account', 'GET'],
+    ['/admin/settings', 'GET'],
     ['/admin/wallet', 'GET'],
     ['/admin/stores', 'GET'],
     ['/admin/invoices', 'GET'],

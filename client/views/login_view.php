@@ -5,6 +5,7 @@ declare(strict_types=1);
 $homeUrl = htmlspecialchars($urlManager->url('/'), ENT_QUOTES, 'UTF-8');
 $loginUrl = htmlspecialchars($urlManager->url('/login'), ENT_QUOTES, 'UTF-8');
 $registrationUrl = htmlspecialchars($urlManager->url('/registrace'), ENT_QUOTES, 'UTF-8');
+$forgotPasswordUrl = htmlspecialchars($urlManager->url('/forgot-password'), ENT_QUOTES, 'UTF-8');
 $authCssUrl = htmlspecialchars($urlManager->url('/assets/auth.css'), ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
@@ -36,6 +37,7 @@ $authCssUrl = htmlspecialchars($urlManager->url('/assets/auth.css'), ENT_QUOTES,
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
         <div class="auth-field"><label for="loginEmail">E-mail</label><div class="auth-input"><i class="fa-solid fa-envelope" aria-hidden="true"></i><input id="loginEmail" type="email" name="email" autocomplete="username" required></div></div>
         <div class="auth-field"><label for="loginPassword">Heslo</label><div class="auth-input"><i class="fa-solid fa-lock" aria-hidden="true"></i><input id="loginPassword" type="password" name="password" autocomplete="current-password" required></div></div>
+        <div class="auth-footer"><a href="<?php echo $forgotPasswordUrl; ?>">Zapomenuté heslo</a></div>
         <button type="submit" class="auth-submit"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Přihlásit se</button>
       </form>
       <div class="auth-footer">Nemáte účet? <a href="<?php echo $registrationUrl; ?>">Vytvořit registraci</a></div>

@@ -28,6 +28,8 @@ $menuContext = [
     'invoices' => ['label' => 'Faktury', 'icon' => 'fa-file-invoice'],
     'webhooks' => ['label' => 'Webhooky', 'icon' => 'fa-wave-square'],
     'url_invoices' => ['label' => 'URL faktury', 'icon' => 'fa-link'],
+    'settings' => ['label' => 'Nastavení', 'icon' => 'fa-gear'],
+    'account' => ['label' => 'Účet', 'icon' => 'fa-user-shield'],
 ];
 $currentContext = $menuContext[$activeMenu] ?? ['label' => 'Administrace', 'icon' => 'fa-shield-halved'];
 $routeUrl = static fn (string $path): string => htmlspecialchars(
@@ -92,6 +94,8 @@ $navItem = static function (
       <div class="admin-nav-group">
         <div class="admin-nav-label">Nástroje</div>
         <?php $navItem('/admin/url_invoices', 'url_invoices', 'fa-link', 'URL faktury'); ?>
+        <?php $navItem('/admin/settings', 'settings', 'fa-gear', 'Nastavení'); ?>
+        <?php $navItem('/admin/account', 'account', 'fa-user-shield', 'Změna hesla'); ?>
         <a href="<?php echo $routeUrl('/'); ?>" class="admin-nav-link" target="_blank" rel="noopener">
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
           <span>Otevřít web</span>
