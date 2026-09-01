@@ -131,7 +131,8 @@ try {
 }
 
 if ($statusCode === 401) {
-    header('WWW-Authenticate: Bearer');
+    header('WWW-Authenticate: token');
+    header('WWW-Authenticate: Bearer', false);
 } elseif ($statusCode === 503) {
     header('Retry-After: 2');
 }
