@@ -177,8 +177,27 @@ final class DatabaseCheckoutService
         }
 
         $title = 'Faktura k úhradě';
+        $redirectUrl = null;
+        $redirectAutomatically = false;
         $metadata = $invoice['metadata'] ?? [];
         if (is_array($metadata)) {
+            $candidateRedirect = $metadata['_btcpaylite_redirect_url'] ?? null;
+            if (is_string($candidateRedirect)
+                && strlen($candidateRedirect) <= 2_048
+                && preg_match('/[\\x00-\\x1F\\x7F]/', $candidateRedirect) !== 1
+            ) {
+                $redirectParts = parse_url($candidateRedirect);
+                if (filter_var($candidateRedirect, FILTER_VALIDATE_URL) !== false
+                    && is_array($redirectParts)
+                    && in_array(strtolower((string) ($redirectParts['scheme'] ?? '')), ['http', 'https'], true)
+                    && is_string($redirectParts['host'] ?? null)
+                    && !isset($redirectParts['user'])
+                    && !isset($redirectParts['pass'])
+                ) {
+                    $redirectUrl = $candidateRedirect;
+                    $redirectAutomatically = ($metadata['_btcpaylite_redirect_automatic'] ?? false) === true;
+                }
+            }
             $orderId = $metadata['orderId'] ?? null;
             if (is_int($orderId)) {
                 $orderId = (string) $orderId;
@@ -205,6 +224,8 @@ final class DatabaseCheckoutService
             'seconds_remaining' => $status === 'Expired' ? 0 : max(0, $expiresAt - $now),
             'total_received' => $totalReceived,
             'missing_amount' => $missingAmount,
+            'redirect_url' => $redirectUrl,
+            'redirect_automatically' => $redirectAutomatically,
         ];
     }
 
