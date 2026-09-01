@@ -49,6 +49,11 @@ $securityChecks = [
     'keeps TLS verification and redirects disabled' =>
         str_contains($source, 'CURLOPT_SSL_VERIFYPEER => true')
         && str_contains($source, 'CURLOPT_FOLLOWLOCATION => false'),
+    'always produces JSON even for invalid response UTF-8' =>
+        str_contains($source, 'JSON_INVALID_UTF8_SUBSTITUTE')
+        && str_contains($source, 'JSON output could not be encoded.'),
+    'refuses placeholder payout, stateless and webhook credentials' =>
+        substr_count($source, "testerRequireConfiguredValue(\$config") >= 5,
 ];
 foreach ($securityChecks as $name => $passed) {
     if (!$passed) {

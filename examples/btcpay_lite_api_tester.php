@@ -403,10 +403,12 @@ function testerJson(array $payload, int $status = 200): void
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(
+    $json = json_encode(
         $payload,
         JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            | JSON_INVALID_UTF8_SUBSTITUTE
     );
+    echo is_string($json) ? $json : '{"ok":false,"message":"JSON output could not be encoded."}';
     exit;
 }
 
@@ -596,6 +598,11 @@ function testerRunAction(string $action, array $input, array $config): array
             if ($webhookSecret === '') {
                 $webhookSecret = (string) $config['webhook_secret'];
             }
+            if (strlen($webhookSecret) < 16 || str_contains($webhookSecret, 'replace-with-')) {
+                throw new RuntimeException(
+                    'Set a webhook secret of at least 16 characters in the form or CONFIG block.'
+                );
+            }
             return $client->createWebhook(
                 trim((string) ($input['webhook_url'] ?? $config['webhook_url'])),
                 $webhookSecret
@@ -608,10 +615,15 @@ function testerRunAction(string $action, array $input, array $config): array
                 'event' => is_string($stored) ? json_decode($stored, true) : null,
                 'message' => is_string($stored) ? 'Last verified webhook.' : 'No verified webhook received yet.',
             ];
-        case 'list_payouts': return $client->listPayouts();
-        case 'get_payout': return $client->getPayout($payoutId);
+        case 'list_payouts':
+            testerRequireConfiguredValue($config, 'payout_api_key');
+            return $client->listPayouts();
+        case 'get_payout':
+            testerRequireConfiguredValue($config, 'payout_api_key');
+            return $client->getPayout($payoutId);
         case 'create_payout':
         case 'create_and_send_payout':
+            testerRequireConfiguredValue($config, 'payout_api_key');
             $sendNow = $action === 'create_and_send_payout';
             testerRequireLivePayoutConfirmation($sendNow, $input, $config);
             $feeRate = trim((string) ($input['fee_rate'] ?? ''));
@@ -631,12 +643,14 @@ function testerRunAction(string $action, array $input, array $config): array
                 trim((string) ($input['idempotency_key'] ?? ''))
             );
         case 'approve_payout':
+            testerRequireConfiguredValue($config, 'payout_api_key');
             testerRequireLivePayoutConfirmation(true, $input, $config);
             if (!is_int($revision) || $revision < 0) {
                 throw new InvalidArgumentException('Payout revision must be a non-negative integer.');
             }
             return $client->approvePayout($payoutId, $revision);
         case 'stateless_invoice':
+            testerRequireConfiguredValue($config, 'stateless_api_key');
             return $client->createStatelessInvoice([
                 'amount' => $amount,
                 'description' => trim((string) ($input['description'] ?? 'Test stateless invoice')),
@@ -645,6 +659,15 @@ function testerRunAction(string $action, array $input, array $config): array
             ]);
         default:
             throw new InvalidArgumentException('Unknown tester action.');
+    }
+}
+
+/** @param array<string,mixed> $config */
+function testerRequireConfiguredValue(array $config, string $key): void
+{
+    $value = trim((string) ($config[$key] ?? ''));
+    if ($value === '' || str_contains($value, 'replace-with-')) {
+        throw new RuntimeException('Configure ' . $key . ' in the CONFIG block before this action.');
     }
 }
 
