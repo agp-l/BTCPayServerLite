@@ -41,8 +41,8 @@ V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a 
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
 | `admin/dashboard.php`, `admin/wallet.php` | Přepracováno a auditováno | Tenké controllery, explicitní oprávnění, validace, CSRF, bezpečné chyby a oddělené repository/service vrstvy. |
 | `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený široký a responzivní dark design systém dashboardu, peněženky, obchodů, faktur, webhooků a URL faktur; primární akce používají fialový akcent a provozní stavy vlastní sémantické barvy. |
-| `admin/url_invoices.php`, `admin/views/url_invoices_view.php` | Částečně přepracováno | Admin část stateless URL faktur používá CSRF, skryté PHP chyby a bezpečné DOM vykreslování importované historie bez inline HTML handlerů. |
-| `admin/url_pay.php` | Zachovat a přepracovat | Veřejná platební stránka alternativních stateless URL faktur bez databázových invoice záznamů; potřebuje oddělený controller/view a samostatné kontraktní testy. |
+| `admin/url_invoices.php`, `admin/views/url_invoices_view.php` | Přepracováno | Admin generátor používá samostatnou factory bez databáze, CSRF, procesní zámek, bezpečné JSON chyby a oddělený JavaScript pro lokální historii. |
+| `admin/url_pay.php`, `admin/views/url_pay_view.php` | Přepracováno | Veřejný checkout podepsaného tokenu bez admin session, databázového invoice záznamu a externích QR služeb; podporuje kanonické i starší odkazy. |
 | `client/login.php`, `client/registrace.php` a session | Přepracováno a auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID, POST logout a transakční registrace se samostatnou peněženkou. |
 | `client/index.php`, klientský dashboard | Přepracováno a auditováno | Tenký controller, user-scoped repository, bezpečný wallet provisioner, CSRF a escapované responzivní views. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
@@ -105,7 +105,7 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 
 | Komponenta | Odpovědnost | Stav auditu |
 |---|---|---|
-| `BtcInvoiceManager` | Vytváří a načítá databázové faktury, vytváří stateless faktury a bezpečně mění stavy `New`, `Processing`, `Settled`, `Expired`. | Auditováno |
+| `BtcInvoiceManager` | Vytváří a načítá databázové faktury a bezpečně mění stavy `New`, `Processing`, `Settled`, `Expired`; původní stateless metody zachovává jako kompatibilní delegující fasádu. | Auditováno |
 | `BtcInvoiceManagerException` | Strukturovaná chyba životního cyklu faktury. | Auditováno |
 | `CheckoutRepository` | Read-only rozhraní pro nalezení peněženky vlastnící databázovou fakturu. | Auditováno |
 | `PdoCheckoutRepository` | Parametrizovaný omezený JOIN faktury a obchodu bez načítání nepotřebných nebo citlivých sloupců. | Auditováno |
@@ -114,11 +114,15 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `DatabaseCheckoutController` | HTTP hranice veřejného checkoutu pro HTML a minimální JSON status odpověď; povoluje pouze `GET` a `HEAD`. | Auditováno |
 | `CheckoutException` | Veřejně bezpečná checkout chyba s HTTP statusem a stabilním názvem operace. | Auditováno |
 | `CheckoutQrCodeGenerator` | Lokálně generuje zelený SVG QR kód z validovaného BIP21 URI; při chybějící knihovně bezpečně zachová běžný wallet odkaz. | Auditováno |
-| `BtcStatelessTokenCodec` | Podepisuje a ověřuje časově omezené stateless tokeny a odmítá změněný nebo prošlý obsah. | Auditováno |
-| `BtcStatelessService` | Aplikační logika stateless API a platební stránky; ověřuje klienta, wallet mapping, vstupy a stav platby. | Auditováno |
+| `BtcStatelessInvoiceGateway` | Minimální kontrakt pro vytvoření, dekódování a kontrolu stateless faktury bez vazby na databázový manager. | Auditováno |
+| `BtcStatelessInvoiceManager` | Přenosné jádro bez `Database`/PDO: rezervuje Electrum request, vytváří BIP21, podepisuje token a vyhodnocuje přesné BTC platby. | Auditováno |
+| `BtcStatelessTokenCodec` | Podepisuje, ověřuje a verzuje omezené stateless tokeny; změněný obsah odmítá a čas platnosti předává stavové vrstvě. | Auditováno |
+| `BtcStatelessFactory` | Sestaví Electrum wallet, stateless manager a service pouze z konfigurace, bez připojení k databázi. | Auditováno |
+| `BtcStatelessService` | Aplikační logika stateless API a platební stránky; ověřuje klienta, wallet mapping, vstupy a stav platby. Závisí jen na stateless gateway. | Auditováno |
 | `BtcStatelessServiceException` | Chyba stateless operace s bezpečným HTTP statusem a názvem operace. | Auditováno |
 | `BtcStatelessApiController` | HTTP hranice stateless API: metoda, JSON/form data, Bearer token a normalizovaná odpověď. | Auditováno |
-| `BtcStatelessAjaxController` | HTTP/AJAX hranice pro kontrolu stavu stateless faktury. | Auditováno |
+| `BtcStatelessAjaxController` | Admin HTTP/AJAX hranice pro vytvoření a kontrolu stateless faktury; vrací kanonické veřejné URL. | Auditováno |
+| `BtcStatelessCheckoutController` | Read-only veřejná hranice pro platební view model a minimální polling odpověď. | Auditováno |
 
 ### Databázové Greenfield API
 
@@ -201,7 +205,36 @@ Autentizace používá `Authorization: Bearer ...`. Částka faktury musí být 
 
 ### `api_stateless.php`
 
-Vytváří stateless fakturu bez databázového invoice záznamu. Přístup je omezen konfigurovanými API klienty a operace s Electrumem používají lokální procesní zámek.
+Vytváří stateless fakturu bez databázového invoice záznamu. Přístup je omezen konfigurovanými API klienty a operace s Electrumem používají lokální procesní zámek. Kanonický endpoint je `POST /api/stateless/invoices`; starší `POST /api` zůstává kompatibilní. Veřejná výsledná URL má tvar `/url-invoice?token=...`.
+
+### Samostatné použití stateless jádra
+
+Pro lehkou instalaci není potřeba `Database`, PDO, databázové tabulky, webhook worker ani standardní checkout. Přenositelná vrstva používá tyto komponenty:
+
+- `BitcoinAmount`, `ElectrumRPC`, `ElectrumWallet` a jejich výjimky,
+- `BtcStatelessTokenCodec`, `BtcStatelessInvoiceGateway`, `BtcStatelessInvoiceManager`,
+- volitelně `BtcStatelessService`, `BtcStatelessFactory` a příslušné HTTP controllery,
+- `CheckoutQrCodeGenerator` a `endroid/qr-code` pouze pro lokální QR na platební stránce.
+
+Minimální vytvoření faktury přímo z jádra:
+
+```php
+$rpc = new BtcPayLite\ElectrumRPC($host, $port, $user, $password);
+$wallet = new BtcPayLite\ElectrumWallet($rpc);
+$wallet->loadWallet('/secure/wallets/merchant_wallet');
+
+$invoices = new BtcPayLite\BtcStatelessInvoiceManager($wallet, $secretKey);
+$result = $invoices->createStatelessInvoice(
+    '0.00100000',
+    'Ruční faktura e-mailem',
+    ['order_id' => 'MAIL-2026-001', 'wallet' => 'merchant_wallet'],
+    60
+);
+
+$paymentUrl = $publicBaseUrl . '/url-invoice?token=' . rawurlencode($result['token']);
+```
+
+`secretKey` musí být stabilní tajný řetězec o délce nejméně 16 bajtů. Jeho změna zneplatní všechny dříve vytvořené odkazy. Token obsahuje platební údaje a jejich podpis, nikoli seed, xprv nebo heslo peněženky.
 
 ### `webhook_cron.php`
 
@@ -283,11 +316,13 @@ Kontraktní testy jsou samostatné PHP skripty:
 php tests/BitcoinAmountTest.php
 php tests/ElectrumWalletTest.php
 php tests/BtcInvoiceManagerTest.php
+php tests/BtcStatelessInvoiceManagerTest.php
 php tests/DatabaseCheckoutServiceTest.php
 php tests/CheckoutRepositoryQueryTest.php
 php tests/CheckoutHttpBoundaryTest.php
 php tests/CheckoutQrCodeGeneratorTest.php
 php tests/BtcStatelessServiceTest.php
+php tests/StatelessCheckoutBoundaryTest.php
 php tests/DatabaseTest.php
 php tests/GreenfieldApiTest.php
 php tests/WebhookEndpointPolicyTest.php
@@ -333,9 +368,8 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 
 ## Doporučené pořadí dalšího auditu
 
-1. Zachování a modernizace alternativních stateless URL faktur (`admin/url_invoices.php`, `admin/url_pay.php`).
-2. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
-3. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
-4. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
+1. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
+2. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
+3. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
