@@ -55,6 +55,25 @@ $formatTime = static fn (?int $value): string => $value === null ? '—' : date(
     <article class="stat-card"><div class="stat-label">Webhooky / integrace</div><div class="stat-value"><?php echo (int) $client['webhook_count']; ?> / <?php echo (int) $client['integration_count']; ?></div><div class="stat-meta">Aktivní napojení obchodů</div></article>
   </section>
 
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-user-shield"></i> Účet a přístup</span></div>
+    <p class="card-subtitle">Změna e-mailu ukončí starší relace. Heslo klient mění sám nebo použije bezpečný odkaz pro zapomenuté heslo.</p>
+    <div class="management-grid">
+      <form method="post" action="<?php echo $routeUrl('/admin/users'); ?>" class="form-stack">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="action" value="update_email"><input type="hidden" name="user_id" value="<?php echo (int) $client['id']; ?>">
+        <div class="field"><label for="clientEmail">E-mail klienta</label><div class="input-wrap"><input id="clientEmail" type="email" name="email" maxlength="254" value="<?php echo htmlspecialchars((string) $client['email'], ENT_QUOTES, 'UTF-8'); ?>" required autocomplete="off"></div></div>
+        <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-floppy-disk"></i> Uložit e-mail</button></div>
+      </form>
+      <form method="post" action="<?php echo $routeUrl('/admin/users'); ?>" class="form-stack" data-confirm="Opravdu ukončit všechny relace tohoto klienta?">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="action" value="revoke_sessions"><input type="hidden" name="user_id" value="<?php echo (int) $client['id']; ?>">
+        <p>Klient bude na všech zařízeních odhlášen a musí se znovu přihlásit.</p>
+        <div class="form-actions"><button type="submit" class="danger-btn"><i class="fa-solid fa-right-from-bracket"></i> Ukončit všechny relace</button></div>
+      </form>
+    </div>
+  </section>
+
   <?php
   $walletOptions = [];
   foreach ($detail['stores'] as $store) {
@@ -100,4 +119,9 @@ $formatTime = static fn (?int $value): string => $value === null ? '—' : date(
   <?php foreach ($detail['payouts'] as $payout): ?><tr><td><?php echo htmlspecialchars($formatTime((int) $payout['created_at']), ENT_QUOTES, 'UTF-8'); ?></td><td><?php echo htmlspecialchars((string) $payout['store_name'], ENT_QUOTES, 'UTF-8'); ?></td><td><code><?php echo htmlspecialchars((string) $payout['id'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars((string) $payout['payout_amount'], ENT_QUOTES, 'UTF-8'); ?> BTC</code></td><td><code><?php echo htmlspecialchars((string) $payout['exchange_fee'], ENT_QUOTES, 'UTF-8'); ?> BTC</code></td><td><?php echo htmlspecialchars((string) $payout['state'], ENT_QUOTES, 'UTF-8'); ?></td><td><code><?php echo htmlspecialchars((string) ($payout['txid'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></code></td></tr><?php endforeach; ?>
   </tbody></table></div></section>
 <?php endif; ?>
+<script>
+document.querySelectorAll('[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
+  if (!window.confirm(form.dataset.confirm || 'Potvrdit operaci?')) event.preventDefault();
+}));
+</script>
 <?php require __DIR__ . '/layout/footer.php'; ?>

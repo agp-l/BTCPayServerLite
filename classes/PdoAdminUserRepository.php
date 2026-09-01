@@ -136,6 +136,28 @@ final class PdoAdminUserRepository implements AdminUserRepository
         return $statement->fetchColumn() !== false;
     }
 
+    public function updateClientEmail(int $userId, string $email): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            "UPDATE users
+             SET email = ?, session_version = session_version + 1
+             WHERE id = ? AND role = 'client'"
+        );
+        $statement->execute([$email, $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function revokeClientSessions(int $userId): bool
+    {
+        $statement = $this->database->getPdo()->prepare(
+            "UPDATE users
+             SET session_version = session_version + 1
+             WHERE id = ? AND role = 'client'"
+        );
+        $statement->execute([$userId]);
+        return $statement->rowCount() === 1;
+    }
+
     public function adoptSingleWallet(int $userId, int $assignedAt): bool
     {
         return $this->database->transactional(function (PDO $pdo) use ($userId, $assignedAt): bool {

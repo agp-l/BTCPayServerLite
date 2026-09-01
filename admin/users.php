@@ -53,6 +53,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 is_string($_POST['status'] ?? null) ? $_POST['status'] : ''
             );
             $toastMsg = 'Stav klienta byl změněn a jeho starší relace ukončeny.';
+        } elseif ($action === 'update_email') {
+            $service->updateEmail(
+                $selectedUserId,
+                is_string($_POST['email'] ?? null) ? $_POST['email'] : ''
+            );
+            $toastMsg = 'E-mail klienta byl změněn a jeho starší relace ukončeny.';
+        } elseif ($action === 'revoke_sessions') {
+            $service->revokeSessions($selectedUserId);
+            $toastMsg = 'Všechny relace klienta byly ukončeny.';
         } elseif ($action === 'adopt_wallet') {
             $service->adoptSingleWallet($selectedUserId);
             $toastMsg = 'Jediná historická peněženka byla přiřazena klientovi.';

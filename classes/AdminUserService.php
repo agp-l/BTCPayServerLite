@@ -71,6 +71,34 @@ final class AdminUserService
         }
     }
 
+    public function updateEmail(int $userId, string $email): void
+    {
+        $email = strtolower(trim($email));
+        if (
+            $userId < 1
+            || strlen($email) > 254
+            || filter_var($email, FILTER_VALIDATE_EMAIL) === false
+        ) {
+            throw new AuthException('E-mail klienta není platný.');
+        }
+        try {
+            if (!$this->users->updateClientEmail($userId, $email)) {
+                throw new AuthException('Klient nebyl nalezen.');
+            }
+        } catch (AuthException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw new AuthException('E-mail již používá jiný účet nebo jej nyní nelze uložit.', 0, $exception);
+        }
+    }
+
+    public function revokeSessions(int $userId): void
+    {
+        if ($userId < 1 || !$this->users->revokeClientSessions($userId)) {
+            throw new AuthException('Klient nebyl nalezen.');
+        }
+    }
+
     public function adoptSingleWallet(int $userId): void
     {
         if ($userId < 1 || !$this->users->adoptSingleWallet($userId, time())) {
