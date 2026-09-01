@@ -31,6 +31,27 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 
 Třídy a rozhraní v `classes/` jsou rozdělené podle odpovědností; další kontrola se proto soustředí hlavně na deployment a integrační smoke test.
 
+## Správa uživatelů a tenantů
+
+Aplikace rozlišuje role `admin` a `client`. Veškeré klientské dotazy a změny obchodů, faktur, webhooků, výběrů, integrací a API provozu jsou omezené přes `stores.user_id`; Store ID z formuláře samo o sobě nikdy neopravňuje k přístupu.
+
+Administrátor může:
+
+- filtrovat dashboard, obchody, faktury a webhooky podle klienta a obchodu,
+- zobrazit poslední přihlášení a aktivitu klienta, API požadavky, rozpoznané pluginy/e-shopy, faktury, webhooky a výběry,
+- aktivovat nebo pozastavit účet, změnit klientův e-mail a ukončit všechny jeho relace,
+- přiřadit hlavní peněženku pouze z cest, které už patří obchodům daného klienta,
+- vytvořit obchod pro vybraného klienta nebo systémový obchod bez klienta,
+- přejmenovat obchod, vyměnit jeho API klíč, upravit webhook URL a vyměnit webhook secret,
+- změnit stav nezaplacené faktury; stav `Settled` nelze nastavit ani přepsat ručně,
+- vypnout nebo znovu povolit veřejnou registraci v nastavení administrace.
+
+Klient ve vlastním portálu vidí samostatné sekce Přehled, Obchody, Faktury, Webhooky, Výběry a Aktivita. Může filtrovat vlastní data, vytvářet a přejmenovávat své obchody, vyměňovat jejich API klíče, spravovat webhooky a měnit heslo. Všechny tyto změny používají CSRF ochranu a repository dotazy současně ověřují přihlášeného vlastníka.
+
+Jeden klient má v `client_wallets` právě jednu kanonickou peněženku. Všechny jeho nově vytvořené obchody tuto peněženku znovu použijí; admin naproti tomu může ovládat všechny klientské i systémové peněženky. Faktury a výběry se vždy vážou na konkrétní obchod, a tím i na jeho vlastníka.
+
+Mazání je záměrně omezené. Webhook lze odstranit, ale obchod lze smazat pouze tehdy, pokud nemá žádné faktury ani výběry. Finanční historie a zaplacené stavy se nemažou ani nepřepisují z administračního rozhraní.
+
 ### Hlavní soubory mimo `classes/`
 
 | Soubor / oblast | Stav | Poznámka |
@@ -47,8 +68,8 @@ Třídy a rozhraní v `classes/` jsou rozdělené podle odpovědností; další 
 | `admin/url_invoices.php`, `admin/views/url_invoices_view.php` | Přepracováno | Admin generátor používá samostatnou factory bez databáze, CSRF, procesní zámek, bezpečné JSON chyby a oddělený JavaScript pro lokální historii. |
 | `admin/url_pay.php`, `admin/views/url_pay_view.php` | Přepracováno | Veřejný checkout podepsaného tokenu bez admin session, databázového invoice záznamu a externích QR služeb; podporuje kanonické i starší odkazy. |
 | `client/login.php`, registrace a obnova hesla | Přepracováno | CSRF, throttling, bezpečné session, změna hesla, jednorázový 30minutový reset token a jednotná odpověď bez zjišťování existence účtu. |
-| `client/index.php`, klientský dashboard | Přepracováno | User-scoped obchody, jedna peněženka účtu, živý zůstatek, faktury, výběry, webhooky, integrace a API provoz. |
-| `admin/users.php`, `admin/settings.php` | Nově implementováno | Správa klientů, pozastavení účtu, přehled peněženek/zůstatků/provozu a vypnutí veřejných registrací. |
+| `client/index.php`, klientský dashboard | Přepracováno | Oddělené sekce a filtry; user-scoped obchody, přejmenování a výměna API klíče, jedna peněženka účtu, živý zůstatek, faktury, výběry, webhooky, integrace a API provoz. |
+| `admin/users.php`, `admin/settings.php` | Nově implementováno | Správa klientů, e-mailu a relací, pozastavení účtu, bezpečné přiřazení peněženky, přehled zůstatků/provozu a vypnutí veřejných registrací. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
 | `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
 | testovací a pomocné skripty | Částečně uklizeno | Veřejný debugger, stará registrace a zastaralé ruční testy byly odstraněny. `eshop_simulator.php` bude přepracován na univerzální integrační ukázku mimo web root v `tools/`. |
@@ -166,7 +187,7 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 | `AdminOperationsService` | Validuje a koordinuje administrační vytvoření obchodu, bezpečný wallet provisioning a správu webhooků. | Přepracováno a auditováno |
 | `AdminOperationsFactory` | Sestavuje administrační služby z validované konfigurace včetně kompatibility starších názvů wallet klíčů. | Přepracováno a auditováno |
 | `AdminOperationsException` | Bezpečná doménová chyba administrační operace s odpovídajícím HTTP statusem. | Přepracováno a auditováno |
-| `AdminInvoiceService` | Validuje přesnou BTC částku a koordinuje administrační vytvoření a odstranění faktury. | Přepracováno a auditováno |
+| `AdminInvoiceService` | Validuje přesnou BTC částku a koordinuje administrační vytvoření faktury pro explicitně vybraný obchod. | Přepracováno a auditováno |
 | `BitcoinMarketDataProvider` | Rozhraní pro tržní cenu BTC a doporučené fee rates. | Přepracováno a auditováno |
 | `HttpBitcoinMarketDataProvider` | Omezený cURL klient tržních API s TLS kontrolou, timeouty a validací odpovědí. | Přepracováno a auditováno |
 | `BtcDashboard` | Typovaná aplikační fasáda administrační peněženky; vrací strojová data, používá přesné satoshi a oddělený market provider. | Přepracováno a auditováno |
@@ -368,7 +389,31 @@ Audit přidal tyto jednorázové migrace a read-only kontroly:
 - `migrations/20260901_add_user_accounts.sql`
 - `migrations/20260901_add_request_monitoring.sql`
 
-Po ověřené záloze spusťte nejprve `20260901_user_accounts_preflight.sql`. Vypíše klienty s více peněženkami, sdílenou cestou nebo bez obchodu; tyto případy se nesmí automaticky přepisovat. Poté spusťte `20260901_add_user_accounts.sql` a `20260901_add_request_monitoring.sql`. Nové registrace již zapisují jednu kanonickou peněženku. U starého klienta s jedinou cestou ji může admin explicitně převzít v detailu klienta.
+Projekt zatím nepoužívá automatický migration runner. Upgrade existující databáze se provádí ručním spuštěním SQL souborů v uvedeném pořadí. Před změnou vytvořte a ověřte obnovitelnou zálohu.
+
+```bash
+mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/20260901_user_accounts_preflight.sql
+
+mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/20260901_add_user_accounts.sql
+
+mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/20260901_add_request_monitoring.sql
+```
+
+Preflight nic nemění. Vypíše klienty s více peněženkami, sdílenou cestou nebo bez obchodu; tyto případy se nesmí automaticky přepisovat. Nové registrace zapisují jednu kanonickou peněženku. U starého klienta s jedinou cestou ji může admin explicitně převzít v detailu klienta.
+
+Po migraci ověřte alespoň přítomnost tabulek a výchozí registrační politiky:
+
+```sql
+SHOW TABLES LIKE 'client_wallets';
+SHOW TABLES LIKE 'password_reset_tokens';
+SHOW TABLES LIKE 'api_request_log';
+SHOW TABLES LIKE 'store_integrations';
+SELECT setting_key, setting_value FROM app_settings
+WHERE setting_key = 'registration_enabled';
+```
 
 ## Instalace a požadavky
 
@@ -428,12 +473,14 @@ php tests/ClientUiBoundaryTest.php
 php tests/AdminOperationsServiceTest.php
 php tests/AdminOperationsRepositoryQueryTest.php
 php tests/AdminManagementBoundaryTest.php
+php tests/AdminManagementServiceTest.php
 php tests/AdminInvoiceServiceTest.php
 php tests/ClientRegistrationServiceTest.php
 php tests/ClientRegistrationBoundaryTest.php
 php tests/UserAccountServiceTest.php
 php tests/PasswordResetMailerTest.php
 php tests/AdminUserServiceTest.php
+php tests/WalletBalanceErrorTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
