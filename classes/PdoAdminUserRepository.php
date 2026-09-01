@@ -179,6 +179,29 @@ final class PdoAdminUserRepository implements AdminUserRepository
         });
     }
 
+    public function setClientWallet(int $userId, string $walletPath, int $assignedAt): bool
+    {
+        return $this->database->transactional(function (PDO $pdo) use ($userId, $walletPath, $assignedAt): bool {
+            $statement = $pdo->prepare(
+                "SELECT 1 FROM stores s
+                 INNER JOIN users u ON u.id = s.user_id
+                 WHERE s.user_id = ? AND s.wallet_path = ? AND u.role = 'client'
+                 LIMIT 1 FOR UPDATE"
+            );
+            $statement->execute([$userId, $walletPath]);
+            if ($statement->fetchColumn() === false) {
+                return false;
+            }
+            $statement = $pdo->prepare(
+                'INSERT INTO client_wallets (user_id, wallet_path, created_at, updated_at)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE wallet_path = VALUES(wallet_path), updated_at = VALUES(updated_at)'
+            );
+            $statement->execute([$userId, $walletPath, $assignedAt, $assignedAt]);
+            return true;
+        });
+    }
+
     private function clientSelect(): string
     {
         return "SELECT

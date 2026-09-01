@@ -55,6 +55,24 @@ $formatTime = static fn (?int $value): string => $value === null ? '—' : date(
     <article class="stat-card"><div class="stat-label">Webhooky / integrace</div><div class="stat-value"><?php echo (int) $client['webhook_count']; ?> / <?php echo (int) $client['integration_count']; ?></div><div class="stat-meta">Aktivní napojení obchodů</div></article>
   </section>
 
+  <?php
+  $walletOptions = [];
+  foreach ($detail['stores'] as $store) {
+      $walletOptions[(string) $store['wallet_path']] = (string) $store['name'];
+  }
+  ?>
+  <?php if ($walletOptions !== []): ?>
+    <section class="card">
+      <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wallet"></i> Hlavní peněženka klienta</span></div>
+      <p class="card-subtitle">Lze vybrat pouze peněženku, kterou už používá některý obchod tohoto klienta. Změna nezasahuje do historických faktur.</p>
+      <form method="post" action="<?php echo $routeUrl('/admin/users'); ?>" class="filter-bar">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="set_wallet"><input type="hidden" name="user_id" value="<?php echo (int) $client['id']; ?>">
+        <div class="field"><label for="clientWalletPath">Přiřazený soubor</label><div class="input-wrap"><select id="clientWalletPath" name="wallet_path" required><?php foreach ($walletOptions as $walletPath => $storeName): ?><option value="<?php echo htmlspecialchars($walletPath, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $client['wallet_path'] === $walletPath ? 'selected' : ''; ?>><?php echo htmlspecialchars($storeName . ' — ' . $walletPath, ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?></select></div></div>
+        <div class="filter-actions"><button type="submit" class="primary"><i class="fa-solid fa-floppy-disk"></i> Uložit peněženku</button></div>
+      </form>
+    </section>
+  <?php endif; ?>
+
   <?php if ($client['wallet_path'] === null && (int) $client['wallet_count'] === 1): ?>
     <section class="card">
       <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Klient má jednu historickou peněženku, ale ještě není zapsána jako vlastník účtu. Přiřazení nemění cestu žádného obchodu.</span></div>

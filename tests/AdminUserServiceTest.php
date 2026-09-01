@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../classes/AuthException.php';
 require_once __DIR__ . '/../classes/AdminUserRepository.php';
 require_once __DIR__ . '/../classes/AdminUserService.php';
+require_once __DIR__ . '/../classes/WalletBalanceError.php';
 
 use BtcPayLite\AdminUserRepository;
 use BtcPayLite\AdminUserService;
@@ -12,6 +13,7 @@ use BtcPayLite\AdminUserService;
 final class AdminUserRepositoryFixture implements AdminUserRepository
 {
     public string $status = 'active';
+    public ?string $assignedWallet = null;
     public function listClients(int $limit): array { return [$this->client()]; }
     public function findClient(int $userId): ?array { return $userId === 7 ? $this->client() : null; }
     public function listStores(int $userId): array { return [['id' => 'store_1']]; }
@@ -25,6 +27,12 @@ final class AdminUserRepositoryFixture implements AdminUserRepository
         return true;
     }
     public function adoptSingleWallet(int $userId, int $assignedAt): bool { return $userId === 7; }
+    public function setClientWallet(int $userId, string $walletPath, int $assignedAt): bool
+    {
+        if ($userId !== 7 || $walletPath !== '/wallets/client') return false;
+        $this->assignedWallet = $walletPath;
+        return true;
+    }
     private function client(): array
     {
         return [
@@ -59,8 +67,13 @@ if ($repository->status !== 'suspended') {
     throw new RuntimeException('Client status was not changed.');
 }
 $service->adoptSingleWallet(7);
+$service->setWallet(7, '/wallets/client');
+if ($repository->assignedWallet !== '/wallets/client') {
+    throw new RuntimeException('Explicit client wallet assignment failed.');
+}
 
 echo '[PASS] composes client operations and live wallet balance' . PHP_EOL;
 echo '[PASS] changes only a validated client status' . PHP_EOL;
 echo '[PASS] adopts only an unambiguous historical wallet' . PHP_EOL;
-echo '3 AdminUserService tests passed.' . PHP_EOL;
+echo '[PASS] assigns only a wallet owned by the client' . PHP_EOL;
+echo '4 AdminUserService tests passed.' . PHP_EOL;

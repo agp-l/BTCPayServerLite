@@ -27,4 +27,6 @@ interface AdminUserRepository
     public function setClientStatus(int $userId, string $status): bool;
 
     public function adoptSingleWallet(int $userId, int $assignedAt): bool;
+
+    public function setClientWallet(int $userId, string $walletPath, int $assignedAt): bool;
 }

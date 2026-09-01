@@ -56,6 +56,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } elseif ($action === 'adopt_wallet') {
             $service->adoptSingleWallet($selectedUserId);
             $toastMsg = 'Jediná historická peněženka byla přiřazena klientovi.';
+        } elseif ($action === 'set_wallet') {
+            $service->setWallet(
+                $selectedUserId,
+                is_string($_POST['wallet_path'] ?? null) ? $_POST['wallet_path'] : ''
+            );
+            $toastMsg = 'Hlavní peněženka klienta byla změněna.';
         } else {
             throw new AuthException('Neplatná akce formuláře.');
         }

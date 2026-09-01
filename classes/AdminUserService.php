@@ -41,7 +41,8 @@ final class AdminUserService
             try {
                 $walletBalance = ($this->balanceLoader)($client['wallet_path']);
             } catch (\Throwable $exception) {
-                $walletError = 'Zůstatek peněženky nyní nelze načíst.';
+                WalletBalanceError::log($exception, $client['wallet_path']);
+                $walletError = WalletBalanceError::message($exception);
             }
         } elseif ($client['wallet_count'] > 1) {
             $walletError = 'Klient má více historických peněženek; přiřazení je nutné vyřešit ručně.';
@@ -76,6 +77,17 @@ final class AdminUserService
             throw new AuthException(
                 'Peněženku nelze přiřadit automaticky. Klient musí mít právě jednu historickou peněženku.'
             );
+        }
+    }
+
+    public function setWallet(int $userId, string $walletPath): void
+    {
+        $walletPath = trim($walletPath);
+        if ($userId < 1 || $walletPath === '' || strlen($walletPath) > 255 || str_contains($walletPath, "\0")) {
+            throw new AuthException('Přiřazení peněženky není platné.');
+        }
+        if (!$this->users->setClientWallet($userId, $walletPath, time())) {
+            throw new AuthException('Vybraná peněženka nepatří žádnému obchodu tohoto klienta.');
         }
     }
 }

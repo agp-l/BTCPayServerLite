@@ -12,6 +12,7 @@ use BtcPayLite\ElectrumWallet;
 use BtcPayLite\PdoClientDashboardRepository;
 use BtcPayLite\UrlManager;
 use BtcPayLite\WebhookEndpointPolicy;
+use BtcPayLite\WalletBalanceError;
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -209,8 +210,8 @@ if ($service instanceof ClientDashboardService) {
                 $wallet->loadWallet($walletPath);
                 $walletBalance = $wallet->getWalletBalance();
             } catch (Throwable $exception) {
-                error_log('Client wallet balance load failed: ' . $exception::class);
-                $walletError = 'Zůstatek peněženky nyní nelze načíst.';
+                WalletBalanceError::log($exception, $walletPath);
+                $walletError = WalletBalanceError::message($exception);
             }
         }
     } catch (Throwable $exception) {
