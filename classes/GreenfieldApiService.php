@@ -26,6 +26,7 @@ class GreenfieldApiService
     private string $checkoutBaseUrl;
     private WebhookEndpointPolicy $webhookEndpointPolicy;
     private BitcoinMarketDataProvider $marketData;
+    private ExchangeQuoteService $exchangeQuotes;
 
     public function __construct(
         GreenfieldApiRepository $repository,
@@ -35,7 +36,8 @@ class GreenfieldApiService
         string $adminApiKey,
         string $checkoutBaseUrl,
         ?WebhookEndpointPolicy $webhookEndpointPolicy = null,
-        ?BitcoinMarketDataProvider $marketData = null
+        ?BitcoinMarketDataProvider $marketData = null,
+        ?ExchangeQuoteService $exchangeQuotes = null
     ) {
         $checkoutBaseUrl = rtrim(trim($checkoutBaseUrl), '/');
         $parts = parse_url($checkoutBaseUrl);
@@ -62,6 +64,7 @@ class GreenfieldApiService
         $this->checkoutBaseUrl = $checkoutBaseUrl;
         $this->webhookEndpointPolicy = $webhookEndpointPolicy ?? new WebhookEndpointPolicy();
         $this->marketData = $marketData ?? new HttpBitcoinMarketDataProvider();
+        $this->exchangeQuotes = $exchangeQuotes ?? new ExchangeQuoteService($this->marketData);
     }
 
     /** @return array<string,mixed> */
@@ -124,6 +127,37 @@ class GreenfieldApiService
             'cryptoCode' => 'BTC',
             'enabled' => true,
         ]];
+    }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    public function createExchangeQuote(string $storeId, array $input, string $apiKey): array
+    {
+        $this->authenticateStore($storeId, $apiKey);
+        if (!is_string($input['amount'] ?? null) || !is_string($input['currency'] ?? null)) {
+            throw new GreenfieldApiException(
+                'Exchange quote requires string amount and currency fields.',
+                'create_exchange_quote',
+                400
+            );
+        }
+
+        try {
+            return $this->exchangeQuotes->quote($input['amount'], $input['currency']);
+        } catch (InvalidArgumentException $exception) {
+            throw new GreenfieldApiException(
+                $exception->getMessage(),
+                'create_exchange_quote',
+                400,
+                $exception
+            );
+        } catch (RuntimeException $exception) {
+            throw new GreenfieldApiException(
+                'Exchange rate is temporarily unavailable.',
+                'create_exchange_quote',
+                503,
+                $exception
+            );
+        }
     }
 
     /** @return array<string,mixed> */
