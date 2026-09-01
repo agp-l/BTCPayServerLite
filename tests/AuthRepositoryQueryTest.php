@@ -8,10 +8,13 @@ if (!is_string($source)) {
 }
 
 $checks = [
-    'selects only authentication columns' => "SELECT id, email, password_hash, role FROM users",
+    'selects only authentication and session columns' =>
+        'SELECT id, email, password_hash, role, status, session_version',
     'limits the user lookup' => 'WHERE email = ? LIMIT 1',
     'stores binary throttle identities' => 'identity_hash = UNHEX(?)',
     'uses parameterized failure inserts' => 'VALUES (UNHEX(?), ?)',
+    'records successful login telemetry without credentials' =>
+        'SET last_login_at = ?, last_login_ip = ?, last_seen_at = ?, last_seen_ip = ?',
 ];
 
 foreach ($checks as $name => $needle) {
