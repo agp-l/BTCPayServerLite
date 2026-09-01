@@ -19,10 +19,14 @@ class BtcStatelessService
     /** @var array<string, mixed> */
     private array $config;
     private ElectrumWallet $wallet;
-    private BtcInvoiceManager $invoiceManager;
+    private BtcStatelessInvoiceGateway $invoiceManager;
 
     /** @param array<string, mixed> $config */
-    public function __construct(array $config, ElectrumWallet $wallet, BtcInvoiceManager $invoiceManager)
+    public function __construct(
+        array $config,
+        ElectrumWallet $wallet,
+        BtcStatelessInvoiceGateway $invoiceManager
+    )
     {
         $this->config = $config;
         $this->wallet = $wallet;
