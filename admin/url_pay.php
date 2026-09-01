@@ -5,6 +5,7 @@ declare(strict_types=1);
 use BtcPayLite\BtcStatelessCheckoutController;
 use BtcPayLite\BtcStatelessFactory;
 use BtcPayLite\BtcStatelessServiceException;
+use BtcPayLite\BtcInvoiceManagerException;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -61,7 +62,7 @@ try {
 
     $checkout = $controller->paymentPage($token);
     require __DIR__ . '/views/url_pay_view.php';
-} catch (BtcStatelessServiceException $exception) {
+} catch (BtcStatelessServiceException | BtcInvoiceManagerException $exception) {
     error_log(sprintf(
         'Stateless checkout %s failed: %s',
         $exception->getOperation(),
@@ -100,4 +101,3 @@ try {
     http_response_code(404);
     require __DIR__ . '/views/url_pay_error_view.php';
 }
-
