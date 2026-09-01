@@ -347,6 +347,8 @@ final class PayoutService
             'payoutCurrency' => 'BTC',
             'payoutAmount' => $payout['payout_amount'],
             'payoutMethodId' => 'BTC-CHAIN',
+            'exchangeFee' => $payout['exchange_fee'],
+            'exchangeFeeCurrency' => 'BTC',
             'state' => $state,
             'paymentProof' => $proof,
             'metadata' => $payout['metadata'],
