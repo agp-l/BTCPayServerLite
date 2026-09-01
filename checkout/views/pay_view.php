@@ -25,7 +25,7 @@ $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="dark">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title><?= htmlspecialchars((string) $checkout['title'], ENT_QUOTES, 'UTF-8') ?> · Bitcoin platba</title>
     <link rel="stylesheet" href="<?= htmlspecialchars($stylesheetUrl, ENT_QUOTES, 'UTF-8') ?>">
@@ -43,12 +43,12 @@ $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:
                 <span class="brand-mark" aria-hidden="true">₿</span>
                 <span>
                     <strong>BTCPay Lite</strong>
-                    <small>Bitcoin checkout</small>
+                    <small>Bezpečný Bitcoin checkout</small>
                 </span>
             </div>
             <div class="secure-pill">
                 <span class="secure-dot" aria-hidden="true"></span>
-                Lokální a soukromé
+                Lokální QR · bez trackerů
             </div>
         </header>
 
