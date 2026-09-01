@@ -62,6 +62,9 @@ try {
         $database
     );
     $repository = new GreenfieldApiRepository($database);
+    $adminApiKey = is_string($config['admin_api_key'] ?? null)
+        ? $config['admin_api_key']
+        : '';
 
     $configuredBaseUrl = $config['app_url'] ?? null;
     $checkoutBaseUrl = is_string($configuredBaseUrl) && trim($configuredBaseUrl) !== ''
@@ -99,7 +102,8 @@ try {
         $payoutWalletPasswords,
         $payoutMaxBtc,
         $payoutDailyLimitBtc,
-        ($config['payout_api_enabled'] ?? false) === true
+        ($config['payout_api_enabled'] ?? false) === true,
+        $adminApiKey
     );
 
     $service = new GreenfieldApiService(
@@ -107,7 +111,7 @@ try {
         $database,
         $wallet,
         $invoiceManager,
-        is_string($config['admin_api_key'] ?? null) ? $config['admin_api_key'] : '',
+        $adminApiKey,
         $checkoutBaseUrl,
         new WebhookEndpointPolicy(
             null,
