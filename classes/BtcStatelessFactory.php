@@ -33,7 +33,7 @@ final class BtcStatelessFactory
                 $this->requiredString('rpc_host'),
                 $this->requiredPort('rpc_port'),
                 $this->requiredString('rpc_user'),
-                $this->requiredString('rpc_pass', true)
+                $this->requiredString('rpc_pass', true, false)
             );
             $this->wallet = new ElectrumWallet($rpc);
         }
@@ -81,14 +81,18 @@ final class BtcStatelessFactory
         return dirname($this->requiredString('wallet_path'));
     }
 
-    private function requiredString(string $key, bool $allowEmpty = false): string
+    private function requiredString(
+        string $key,
+        bool $allowEmpty = false,
+        bool $trim = true
+    ): string
     {
         $value = $this->config[$key] ?? null;
         if (!is_string($value) || str_contains($value, "\0")) {
             throw new InvalidArgumentException("Configuration value {$key} is invalid.");
         }
 
-        $value = trim($value);
+        $value = $trim ? trim($value) : $value;
         if (!$allowEmpty && $value === '') {
             throw new InvalidArgumentException("Configuration value {$key} is required.");
         }
