@@ -111,17 +111,17 @@ function e(string $value): string
 
     <style>
         :root {
-            --ink: #07150f;
-            --ink-soft: #173126;
-            --paper: #f3f7f2;
-            --paper-deep: #e7efe9;
+            --ink: #2c2c2c;
+            --ink-soft: #202221;
+            --paper: #fff;
+            --paper-deep: #fff;
             --white: #ffffff;
-            --muted: #5f7469;
+            --muted: #080808;
             --line: rgba(7, 21, 15, .13);
             --brand: #20c875;
-            --brand-dark: #0f9c56;
-            --mint: #6cf0a7;
-            --lime: #c9ff65;
+            --brand-dark: #0f9c45;
+            --mint: #ebebc3;
+            --lime: #fdf16b;
             --radius: 24px;
             --shadow: 0 24px 70px rgba(7, 21, 15, .11);
         }
@@ -144,8 +144,8 @@ function e(string $value): string
             z-index: -2;
             pointer-events: none;
             background:
-                radial-gradient(circle at 82% 4%, rgba(32, 200, 117, .18), transparent 30rem),
-                radial-gradient(circle at 5% 30%, rgba(108, 240, 167, .18), transparent 34rem);
+                radial-gradient(circle at 82% 4%, rgba(54, 54, 54, 0.18), transparent 30rem),
+                radial-gradient(circle at 5% 30%, rgba(49, 49, 49, 0.18), transparent 34rem);
         }
         a { color: inherit; }
         img, svg { display: block; }
@@ -196,8 +196,7 @@ function e(string $value): string
             border-radius: 50%;
             color: var(--white);
             background: var(--brand);
-            box-shadow: inset 0 -4px 10px rgba(0, 75, 38, .28);
-            font-size: 1.2rem;
+            font-size: 0.9rem;
             font-weight: 900;
         }
         .brand small { display: block; margin-top: -4px; color: var(--muted); font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -221,10 +220,10 @@ function e(string $value): string
         .button-primary { color: var(--white); background: var(--ink); box-shadow: 0 14px 30px rgba(7, 21, 15, .18); }
         .button-primary:hover { background: #102b1e; box-shadow: 0 18px 36px rgba(7, 21, 15, .24); }
         .button-brand { color: #041b10; background: var(--brand); box-shadow: 0 14px 30px rgba(32, 200, 117, .24); }
-        .button-brand:hover { background: #42dd91; }
-        .button-ghost { border-color: var(--line); background: rgba(255, 255, 255, .55); }
+        .button-brand:hover { background: #ffffff; }
+        .button-ghost { border-color: var(--line); background: rgb(255, 255, 255); }
 
-        .hero { padding: clamp(4.5rem, 9vw, 8rem) 0 5rem; overflow: hidden; }
+        .hero { padding: clamp(4.5rem, 2vw, 8rem) 0 5rem; overflow: hidden; }
         .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(3rem, 7vw, 7rem); align-items: center; }
         .hero-copy { position: relative; z-index: 1; }
         .hero-lead { max-width: 700px; margin-bottom: 2rem; color: var(--muted); font-size: clamp(1.08rem, 1.8vw, 1.3rem); }
@@ -333,7 +332,7 @@ function e(string $value): string
             padding: clamp(2rem, 5vw, 4.5rem);
             border-radius: 34px;
             color: var(--white);
-            background: linear-gradient(135deg, #173126 0%, #07150f 70%);
+            background: linear-gradient(135deg, #2e2e2e 0%, #1e1e1e 70%);
             box-shadow: var(--shadow);
         }
         .tech-panel p { color: #b8c9bf; }
@@ -350,7 +349,7 @@ function e(string $value): string
         .price-card { position: relative; display: flex; flex-direction: column; min-height: 520px; padding: 2rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
         .price-card.featured { color: var(--white); background: var(--ink); transform: translateY(-12px); box-shadow: var(--shadow); }
         .price-card .plan { color: var(--muted); font-size: .79rem; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
-        .price-card.featured .plan, .price-card.featured .price-note { color: #a9bbb1; }
+        .price-card.featured .plan, .price-card.featured .price-note { color: #ebde9a; }
         .popular { position: absolute; top: 1.2rem; right: 1.2rem; padding: .35rem .65rem; border-radius: 999px; color: var(--ink); background: var(--lime); font-size: .68rem; font-weight: 900; text-transform: uppercase; }
         .price { margin: 1.2rem 0 .2rem; font-size: clamp(2.3rem, 4vw, 3.7rem); font-weight: 850; letter-spacing: -.06em; }
         .price sup { font-size: .9rem; letter-spacing: 0; }
@@ -385,7 +384,7 @@ function e(string $value): string
 
         .cta { padding: clamp(5rem, 9vw, 8rem) 0 2.2rem; color: var(--white); background: var(--ink); }
         .cta-box { position: relative; overflow: hidden; padding: clamp(2.3rem, 6vw, 5.5rem); border-radius: 34px; background: var(--brand); color: #041b10; }
-        .cta-box::after { content: "₿"; position: absolute; right: -3rem; bottom: -8rem; color: rgba(255, 255, 255, .18); font-size: 22rem; font-weight: 900; line-height: 1; transform: rotate(12deg); }
+        .cta-box::after { content: "₿"; position: absolute; right: -3rem; bottom: -7rem; color: rgba(255, 255, 255, 0.72); font-size: 22rem; font-weight: 900; line-height: 1; transform: rotate(12deg); }
         .cta-box h2, .cta-box p, .cta-box .hero-actions { position: relative; z-index: 1; }
         .cta-box p { max-width: 650px; font-size: 1.12rem; }
         .footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding-top: 4rem; color: #96aa9f; font-size: .85rem; }
@@ -441,8 +440,8 @@ function e(string $value): string
 <div class="nav-shell wrap">
     <nav class="nav" aria-label="Hlavní navigace">
         <a class="brand" href="<?= e($canonicalUrl) ?>" aria-label="BTCPay Server Lite – úvod">
-            <span class="brand-mark" aria-hidden="true">₿</span>
-            <span>BTCPay Server Lite<small>Bitcoin payments</small></span>
+            <span class="brand-mark" aria-hidden="true">BTC</span>
+            <span>Pay Server Lite<small>Bitcoin payments</small></span>
         </a>
         <div class="nav-links">
             <a href="#jak-to-funguje">Jak to funguje</a>
