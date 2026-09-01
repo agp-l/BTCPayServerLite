@@ -67,21 +67,9 @@ class BtcStatelessService
      */
     public function getPaymentPageData(string $token): array
     {
-        $invoiceData = $this->invoiceManager->decodeStatelessToken($token);
-        $dashboard = new BtcDashboard($this->wallet, $this->walletDirectory());
-
-        // Fiat is display-only. BTC invoice calculations remain in satoshis.
-        $market = $dashboard->marketSnapshot('CZK');
-        $fiatRate = $market['fiat_price'];
-        $fiatAmount = $fiatRate !== null
-            ? round((float) $invoiceData['v'] * $fiatRate, 2)
-            : 0.0;
-
-        return [
-            'invoice' => $invoiceData,
-            'fiat_amount' => $fiatAmount,
-            'seconds_remaining' => max(0, (int) $invoiceData['e'] - time()),
-        ];
+        // Backwards-compatible entry point. Payment-page data now comes solely
+        // from the portable kernel and never initializes dashboard/database code.
+        return $this->checkStatus($token);
     }
 
     /**
@@ -130,13 +118,17 @@ class BtcStatelessService
         if (!isset($result['token']) || !is_string($result['token']) || $result['token'] === '') {
             throw new BtcStatelessServiceException('Invoice manager returned an invalid token.', 'create_invoice');
         }
+        $invoice = $this->invoiceManager->decodeStatelessToken($result['token']);
 
         return [
             'token' => $result['token'],
+            'bip21_uri' => is_string($result['bip21_uri'] ?? null) ? $result['bip21_uri'] : '',
             'amount' => $amount,
             'description' => $description,
             'order_id' => $orderId,
             'wallet' => $safeWalletName,
+            'created_at' => is_int($invoice['t'] ?? null) ? $invoice['t'] : time(),
+            'expires_at' => is_int($invoice['e'] ?? null) ? $invoice['e'] : time() + ($expirationMinutes * 60),
             'expires_in_minutes' => $expirationMinutes,
         ];
     }
