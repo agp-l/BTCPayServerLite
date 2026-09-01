@@ -1,3 +1,5 @@
 config.php
+.btcpay-config-*
+.install.lock
 english
 *.log

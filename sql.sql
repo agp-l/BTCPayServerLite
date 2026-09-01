@@ -1,8 +1,6 @@
 -- Fresh-install schema for MariaDB 10.4+.
-CREATE DATABASE IF NOT EXISTS `btcpay_lite`
-    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE `btcpay_lite`;
+-- Select the target database before executing this file. The web installer does
+-- this automatically and can create the database when the DB user is allowed to.
 
 CREATE TABLE `users` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -248,12 +246,3 @@ CREATE TABLE store_integrations (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- Development-only sample. Replace both credentials and wallet path before use.
-INSERT INTO `stores` (`id`, `name`, `api_key`, `wallet_path`)
-VALUES (
-    'store_12345',
-    'Můj První E-shop',
-    'replace-with-a-random-store-api-key',
-    '/opt/btcpay_wallets/replace-with-wallet-path'
-);
