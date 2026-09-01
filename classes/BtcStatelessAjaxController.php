@@ -11,13 +11,23 @@ class BtcStatelessAjaxController
 {
     private BtcStatelessService $service;
     private string $defaultWallet;
-    private string $baseUri;
+    private string $paymentPageUrl;
 
-    public function __construct(BtcStatelessService $service, string $defaultWallet, string $baseUri)
+    public function __construct(
+        BtcStatelessService $service,
+        string $defaultWallet,
+        string $paymentPageUrl
+    )
     {
         $this->service = $service;
         $this->defaultWallet = trim($defaultWallet);
-        $this->baseUri = rtrim($baseUri, '/\\');
+        $this->paymentPageUrl = rtrim(trim($paymentPageUrl), '?&');
+        if ($this->defaultWallet === '' || $this->paymentPageUrl === '') {
+            throw new BtcStatelessServiceException(
+                'Stateless controller configuration is invalid.',
+                'configure_controller'
+            );
+        }
     }
 
     /**
@@ -59,7 +69,9 @@ class BtcStatelessAjaxController
             'desc' => $result['description'],
             'order_id' => $result['order_id'],
             'wallet' => $result['wallet'],
-            'time' => time(),
+            'time' => $result['created_at'],
+            'created_at' => $result['created_at'],
+            'expires_at' => $result['expires_at'],
             'expires_in_minutes' => $result['expires_in_minutes'],
         ];
     }
@@ -90,12 +102,20 @@ class BtcStatelessAjaxController
         return [
             'status' => 'ok',
             'payment_status' => $this->requiredResponseString($statusData['status'] ?? null, 'payment status'),
+            'received_amount' => $this->requiredResponseString(
+                $payment['received_total'] ?? null,
+                'received amount'
+            ),
             'missing_amount' => $this->requiredResponseString($payment['missing_amount'] ?? null, 'missing amount'),
             'amount' => $this->requiredResponseString($invoice['v'] ?? null, 'invoice amount'),
             'desc' => is_string($invoice['d'] ?? null) ? $invoice['d'] : '',
             'order_id' => is_string($customData['order_id'] ?? null) ? $customData['order_id'] : '',
             'wallet' => is_string($customData['wallet'] ?? null) ? $customData['wallet'] : $this->defaultWallet,
             'time' => is_int($invoice['t'] ?? null) ? $invoice['t'] : time(),
+            'expires_at' => is_int($invoice['e'] ?? null) ? $invoice['e'] : time(),
+            'seconds_remaining' => is_int($statusData['seconds_remaining'] ?? null)
+                ? $statusData['seconds_remaining']
+                : 0,
             'url' => $this->paymentUrl($token),
             'token' => $token,
         ];
@@ -103,7 +123,7 @@ class BtcStatelessAjaxController
 
     private function paymentUrl(string $token): string
     {
-        return $this->baseUri . '/url_pay.php?inv=' . rawurlencode($token);
+        return $this->paymentPageUrl . '?token=' . rawurlencode($token);
     }
 
     private function requiredResponseString(mixed $value, string $field): string
