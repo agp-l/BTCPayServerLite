@@ -18,6 +18,21 @@ require __DIR__ . '/layout/header.php';
     </div>
 </section>
 
+<section class="stateless-mode-grid" aria-label="Vlastnosti stateless režimu">
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-database" aria-hidden="true"></i>
+        <div><strong>Bez tabulky faktur</strong><span>Server neukládá částku, popis ani historii vystavených odkazů.</span></div>
+    </article>
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-signature" aria-hidden="true"></i>
+        <div><strong>Podepsaný obsah</strong><span>Změna adresy, částky nebo expirace zneplatní celý token.</span></div>
+    </article>
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-feather" aria-hidden="true"></i>
+        <div><strong>Přenosné jádro</strong><span>Režim používá pouze Electrum, stateless třídy a společné BTC výpočty.</span></div>
+    </article>
+</section>
+
 <div class="url-invoice-workspace" data-url-invoices-app data-csrf-token="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>">
 <section class="card">
     <div class="card-title">
@@ -27,7 +42,7 @@ require __DIR__ . '/layout/header.php';
     <form id="createForm">
         <div class="form-grid">
             <div class="field">
-                <label>Cílová peněženka</label>
+                <label for="walletSelect">Cílová peněženka</label>
                 <div class="input-wrap">
                     <select id="walletSelect" required>
                         <?php foreach ($availableWallets as $w): ?>
@@ -37,21 +52,21 @@ require __DIR__ . '/layout/header.php';
                 </div>
             </div>
             <div class="field">
-                <label>Částka (BTC)</label>
-                <div class="input-wrap"><input type="text" id="amount" placeholder="0.00100000" required><div class="unit">BTC</div></div>
+                <label for="amount">Částka (BTC)</label>
+                <div class="input-wrap"><input type="text" id="amount" inputmode="decimal" autocomplete="off" placeholder="0.00100000" required><div class="unit">BTC</div></div>
             </div>
         </div>
         <div class="form-grid form-grid-wide">
             <div class="field">
-                <label>Popis / Název položky</label>
+                <label for="desc">Popis / Název položky</label>
                 <div class="input-wrap"><input type="text" id="desc" placeholder="Např. Osobní konzultace" required></div>
             </div>
             <div class="field">
-                <label>Interní ID (volitelné)</label>
+                <label for="order_id">Interní ID (volitelné)</label>
                 <div class="input-wrap"><input type="text" id="order_id" placeholder="Např. ORD-123"></div>
             </div>
             <div class="field">
-                <label>Expirace platby</label>
+                <label for="expiration_minutes">Expirace platby</label>
                 <div class="input-wrap">
                     <select id="expiration_minutes">
                         <option value="15">15 minut (E-shopy)</option>
@@ -74,7 +89,7 @@ require __DIR__ . '/layout/header.php';
     <p class="card-subtitle">Ověří podpis, platnost a odpovídající peněženku bez uložení faktury do databáze.</p>
     <form id="verifyForm">
         <div class="field">
-            <label>Vložte odkaz (nebo token) od zákazníka</label>
+            <label for="verifyInput">Vložte odkaz (nebo token) od zákazníka</label>
             <div class="input-wrap">
                 <input type="text" id="verifyInput" placeholder="https://..." required>
             </div>
@@ -103,5 +118,4 @@ require __DIR__ . '/layout/header.php';
 <script src="<?php echo $routeUrl('/assets/url-invoices.js'); ?>" defer></script>
 
 <?php require __DIR__ . '/layout/footer.php'; ?>
-
 
