@@ -15,6 +15,7 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
     public ?array $createdWebhook = null;
     public ?string $deletedWebhook = null;
     public bool $failStoreCreation = false;
+    public ?string $clientWallet = '/wallets/client';
 
     public function fetchStores(): array
     {
@@ -39,6 +40,18 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
             throw new RuntimeException('Simulated store persistence failure.');
         }
         $this->createdStore = compact('id', 'name', 'apiKey', 'walletPath');
+    }
+
+    public function fetchClientWallet(int $userId): ?string
+    {
+        return $userId === 7 ? $this->clientWallet : null;
+    }
+
+    public function createClientStore(int $userId, string $id, string $name, string $apiKey, string $proposedWalletPath, int $createdAt): ?string
+    {
+        if ($userId !== 7) return null;
+        $this->createdStore = compact('id', 'name', 'apiKey', 'proposedWalletPath', 'userId', 'createdAt');
+        return $proposedWalletPath;
     }
 
     public function storeExists(string $storeId): bool
@@ -104,6 +117,16 @@ if (
 }
 echo "[PASS] provisions a wallet before persisting an admin store\n";
 
+$clientStore = $service->createClientStore(7, 'Klientský obchod');
+if (
+    $clientStore['wallet_path'] !== '/wallets/client'
+    || $repository->createdStore['userId'] !== 7
+    || $repository->createdStore['createdAt'] !== 1788160000
+) {
+    throw new RuntimeException('Client store did not reuse the canonical wallet.');
+}
+echo "[PASS] creates a client store with its canonical wallet\n";
+
 $repository->failStoreCreation = true;
 try {
     $service->createStore('Selhávající obchod');
@@ -146,4 +169,4 @@ try {
 }
 echo "[PASS] rejects a webhook for an unknown store\n";
 
-echo "6 admin operations service tests passed.\n";
+echo "7 admin operations service tests passed.\n";

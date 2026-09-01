@@ -17,6 +17,17 @@ interface AdminOperationsRepository
 
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void;
 
+    public function fetchClientWallet(int $userId): ?string;
+
+    public function createClientStore(
+        int $userId,
+        string $id,
+        string $name,
+        string $apiKey,
+        string $proposedWalletPath,
+        int $createdAt
+    ): ?string;
+
     public function storeExists(string $storeId): bool;
 
     /** @return list<array{id:string,store_id:string,store_name:string,url:string,secret:string,created_at:int}> */

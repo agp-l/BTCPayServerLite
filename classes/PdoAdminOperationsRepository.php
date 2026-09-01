@@ -75,6 +75,72 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         $statement->execute([$id, $name, $apiKey, $walletPath]);
     }
 
+    public function fetchClientWallet(int $userId): ?string
+    {
+        $statement = $this->database->getPdo()->prepare(
+            "SELECT cw.wallet_path
+             FROM client_wallets cw
+             INNER JOIN users u ON u.id = cw.user_id
+             WHERE cw.user_id = ? AND u.role = 'client' AND u.status = 'active'
+             LIMIT 1"
+        );
+        $statement->execute([$userId]);
+        $walletPath = $statement->fetchColumn();
+        return is_string($walletPath) && $walletPath !== '' ? $walletPath : null;
+    }
+
+    public function createClientStore(
+        int $userId,
+        string $id,
+        string $name,
+        string $apiKey,
+        string $proposedWalletPath,
+        int $createdAt
+    ): ?string {
+        return $this->database->transactional(function (PDO $pdo) use (
+            $userId,
+            $id,
+            $name,
+            $apiKey,
+            $proposedWalletPath,
+            $createdAt
+        ): ?string {
+            $statement = $pdo->prepare(
+                "SELECT id FROM users
+                 WHERE id = ? AND role = 'client' AND status = 'active'
+                 LIMIT 1 FOR UPDATE"
+            );
+            $statement->execute([$userId]);
+            if ($statement->fetchColumn() === false) {
+                return null;
+            }
+
+            $statement = $pdo->prepare(
+                'SELECT wallet_path FROM client_wallets WHERE user_id = ? LIMIT 1 FOR UPDATE'
+            );
+            $statement->execute([$userId]);
+            $existingWallet = $statement->fetchColumn();
+            $walletPath = is_string($existingWallet) && $existingWallet !== ''
+                ? $existingWallet
+                : $proposedWalletPath;
+
+            $statement = $pdo->prepare(
+                'INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, ?)'
+            );
+            $statement->execute([$id, $name, $apiKey, $walletPath, $userId]);
+
+            if ($existingWallet === false) {
+                $statement = $pdo->prepare(
+                    'INSERT INTO client_wallets (user_id, wallet_path, created_at, updated_at)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $statement->execute([$userId, $walletPath, $createdAt, $createdAt]);
+            }
+
+            return $walletPath;
+        });
+    }
+
     public function storeExists(string $storeId): bool
     {
         $statement = $this->database->getPdo()->prepare('SELECT 1 FROM stores WHERE id = ? LIMIT 1');

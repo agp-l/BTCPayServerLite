@@ -68,8 +68,18 @@ if ($service instanceof AdminOperationsService
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
         if ($action === 'create') {
             $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
-            $service->createStore($name);
-            $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
+            $rawOwnerId = is_string($_POST['owner_user_id'] ?? null) ? $_POST['owner_user_id'] : '';
+            if (!ctype_digit($rawOwnerId)) {
+                throw new AdminOperationsException('Vlastník obchodu není platný.');
+            }
+            $ownerId = (int) $rawOwnerId;
+            if ($ownerId > 0) {
+                $service->createClientStore($ownerId, $name);
+                $toastMsg = 'Obchod byl vytvořen pro klienta a používá jeho hlavní peněženku.';
+            } else {
+                $service->createStore($name);
+                $toastMsg = 'Systémový obchod a jeho peněženka byly úspěšně vytvořeny.';
+            }
         } elseif ($action === 'rename') {
             $management->renameStore(
                 is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '',

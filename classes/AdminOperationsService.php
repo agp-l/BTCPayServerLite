@@ -52,10 +52,7 @@ final class AdminOperationsService
     /** @return array{id:string,name:string,api_key:string,wallet_path:string} */
     public function createStore(string $name): array
     {
-        $name = trim($name);
-        if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
-            throw new AdminOperationsException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
-        }
+        $name = $this->storeName($name);
 
         $store = [
             'id' => 'store_' . bin2hex(random_bytes(16)),
@@ -82,6 +79,61 @@ final class AdminOperationsService
             }
             throw new AdminOperationsException(
                 'Obchod a jeho peněženku se nyní nepodařilo vytvořit.',
+                503,
+                $exception
+            );
+        }
+
+        return $store;
+    }
+
+    /** @return array{id:string,name:string,api_key:string,wallet_path:string} */
+    public function createClientStore(int $userId, string $name): array
+    {
+        if ($userId < 1) {
+            throw new AdminOperationsException('Vybraný klient není platný.');
+        }
+        $name = $this->storeName($name);
+        $store = [
+            'id' => 'store_' . bin2hex(random_bytes(16)),
+            'name' => $name,
+            'api_key' => bin2hex(random_bytes(32)),
+            'wallet_path' => '',
+        ];
+        $provisionedWallet = null;
+
+        try {
+            $knownWallet = $this->repository->fetchClientWallet($userId);
+            if ($knownWallet === null) {
+                $provisionedWallet = $this->walletProvisioner->provision($store['id']);
+            }
+            $createdAt = ($this->clock)();
+            if (!is_int($createdAt) || $createdAt < 1) {
+                throw new AdminOperationsException('Čas aplikace není dostupný.', 500);
+            }
+            $walletPath = $this->repository->createClientStore(
+                $userId,
+                $store['id'],
+                $store['name'],
+                $store['api_key'],
+                $knownWallet ?? $provisionedWallet ?? '',
+                $createdAt
+            );
+            if ($walletPath === null) {
+                throw new AdminOperationsException('Aktivní klient nebyl nalezen.', 404);
+            }
+            $store['wallet_path'] = $walletPath;
+            if ($provisionedWallet !== null && $provisionedWallet !== $walletPath) {
+                $this->walletProvisioner->discard($provisionedWallet);
+                $provisionedWallet = null;
+            }
+        } catch (AdminOperationsException $exception) {
+            $this->discardProvisionedWallet($provisionedWallet);
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->discardProvisionedWallet($provisionedWallet);
+            throw new AdminOperationsException(
+                'Klientský obchod se nyní nepodařilo vytvořit.',
                 503,
                 $exception
             );
@@ -133,5 +185,26 @@ final class AdminOperationsService
         }
 
         return $value;
+    }
+
+    private function storeName(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+            throw new AdminOperationsException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
+        }
+        return $name;
+    }
+
+    private function discardProvisionedWallet(?string $walletPath): void
+    {
+        if ($walletPath === null) {
+            return;
+        }
+        try {
+            $this->walletProvisioner->discard($walletPath);
+        } catch (Throwable $exception) {
+            error_log('Unused client wallet cleanup failed: ' . $exception::class);
+        }
     }
 }
