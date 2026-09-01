@@ -79,6 +79,23 @@ class PayoutRepository
     }
 
     /** @return array<string,mixed>|null */
+    public function findByIdempotency(string $storeId, string $idempotencyHash): ?array
+    {
+        try {
+            $statement = $this->database->getPdo()->prepare(
+                'SELECT * FROM payouts WHERE store_id = ? AND idempotency_hash = ? LIMIT 1'
+            );
+            $statement->execute([$storeId, $idempotencyHash]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+            return is_array($row) ? $this->normalize($row) : null;
+        } catch (PayoutException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new PayoutException('Payout could not be loaded.', 'find_payout', 500, $exception);
+        }
+    }
+
+    /** @return array<string,mixed>|null */
     public function find(string $payoutId): ?array
     {
         try {
