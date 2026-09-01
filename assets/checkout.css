@@ -321,7 +321,9 @@ a:focus-visible {
 
 .success-panel.is-visible { display: flex; }
 .success-panel h2 { margin: 0; font-size: clamp(1.3rem, 3vw, 1.9rem); }
-.success-panel p:last-child { margin: 8px 0 0; color: var(--muted); }
+.success-panel p { margin: 8px 0 0; color: var(--muted); }
+.success-panel .secondary-button { margin-top: 18px; }
+.redirect-notice { display: block; margin-top: 10px; color: var(--muted); font-size: 0.78rem; }
 .success-symbol { display: grid; flex: 0 0 58px; width: 58px; height: 58px; place-items: center; border-radius: 18px; color: #07110d; background: var(--green); font-size: 1.75rem; font-weight: 900; }
 
 .checkout-footer {
