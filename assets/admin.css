@@ -419,6 +419,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .url-invoice-workspace { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr); gap: 24px; align-items: start; }
 .url-invoice-workspace > .card { margin-bottom: 0; }
+.stateless-mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: -4px 0 24px; }
+.stateless-mode-item { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 13px; align-items: start; padding: 17px; border: 1px solid var(--admin-line); border-radius: 15px; background: linear-gradient(145deg, rgba(192, 132, 252, 0.065), rgba(10, 11, 16, 0.42)); }
+.stateless-mode-item > i { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 12px; color: var(--admin-accent-light); background: var(--admin-accent-soft); box-shadow: 0 0 24px rgba(168, 85, 247, 0.08); }
+.stateless-mode-item div { display: grid; gap: 5px; }
+.stateless-mode-item strong { color: var(--admin-text); font-size: 12px; }
+.stateless-mode-item span { color: var(--admin-muted); font-size: 10px; line-height: 1.55; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
 .form-grid-wide { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .result-panel { display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--admin-line); border-radius: 14px; background: rgba(7, 8, 12, 0.4); }
@@ -449,6 +455,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (max-width: 1040px) {
   .wallet-grid, .merchant-grid, .dashboard-grid, .management-grid, .url-invoice-workspace { grid-template-columns: 1fr; }
+  .stateless-mode-grid { grid-template-columns: 1fr; }
   .management-aside { position: static; }
 }
 
