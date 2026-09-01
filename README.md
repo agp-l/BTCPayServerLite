@@ -32,7 +32,7 @@ V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a 
 
 | Soubor / oblast | Stav | Poznámka |
 |---|---|---|
-| `api.php` | Auditováno | Databázové Greenfield API, Bearer autentizace, přesné částky, store scoping a bezpečné chyby. |
+| `api.php` | Přepracováno | Kompatibilní podmnožina BTCPay Greenfield API pro pluginy: `token` i `Bearer` autentizace, server/API-key discovery, store/payment-method informace, faktury, webhooky, store scoping a bezpečné chyby. |
 | `api_stateless.php` | Auditováno | Stateless API, omezení vstupu, autentizace, zámek Electrumu a bezpečné HTTP odpovědi. |
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
 | `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
@@ -128,9 +128,9 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 
 | Komponenta | Odpovědnost | Stav auditu |
 |---|---|---|
-| `GreenfieldApiController` | Parsuje bezpečnou cestu požadavku, metodu, JSON a Bearer token; routuje store, invoice a webhook endpointy. | Auditováno |
-| `GreenfieldApiService` | Autentizace admin/store klíče, store scoping, přesné částky, vytvoření/načtení faktury a registrace webhooku. | Auditováno |
-| `GreenfieldApiRepository` | Úzká PDO hranice pro načtení obchodu a idempotentní registraci webhooku s časem registrace. | Auditováno |
+| `GreenfieldApiController` | Parsuje bezpečnou cestu, metodu a JSON; přijímá BTCPay schéma `Authorization: token` i kompatibilní `Bearer` a routuje discovery, store, payment-method, invoice a webhook endpointy. | Přepracováno |
+| `GreenfieldApiService` | Autentizace admin/store klíče, deklarace oprávnění, store scoping, přesné BTC částky, převod podporované fiat měny, checkout volby, faktury a webhooky. | Přepracováno |
+| `GreenfieldApiRepository` | Úzká PDO hranice pro nalezení obchodu podle ID/API klíče, výpis webhooků a jejich idempotentní registraci s časem registrace. | Přepracováno |
 | `GreenfieldApiException` | Bezpečná API chyba s operací a HTTP statusem. | Auditováno |
 
 ### Webhooky
@@ -190,18 +190,39 @@ Hlavní `index.php` používá přesné route bez prefixového porovnávání. A
 
 Veřejná cesta `GET /pay?id={invoiceId}` zobrazuje zákazníkovi částku, bitcoinovou adresu, zbývající čas a aktuální stav databázové faktury. Stav se obnovuje přes `GET /pay?id={invoiceId}&action=check`; JSON odpověď obsahuje pouze dynamické platební údaje potřebné pro UI.
 
-Checkout používá přesné osmidesetinné BTC řetězce, společný databázový zámek pro Electrum a bezpečné chybové odpovědi. Tlačítko „Otevřít Bitcoin peněženku“ používá lokálně sestavené BIP21 URI. Původní vzdálený generátor QR byl nahrazen lokálním SVG generátorem `endroid/qr-code` 4.7.0, aby adresa, částka a invoice ID neopouštěly aplikaci. Verze je záměrně připnutá kvůli kompatibilitě s PHP 8.0.
+Checkout používá přesné osmidesetinné BTC řetězce, společný databázový zámek pro Electrum a bezpečné chybové odpovědi. Tlačítko „Otevřít Bitcoin peněženku“ používá lokálně sestavené BIP21 URI. Původní vzdálený generátor QR byl nahrazen lokálním SVG generátorem `endroid/qr-code` 4.7.0, aby adresa, částka a invoice ID neopouštěly aplikaci. Verze je záměrně připnutá kvůli kompatibilitě s PHP 8.0. Greenfield volby `checkout.redirectURL` a `checkout.redirectAutomatically` jsou validované, uložené s fakturou a po potvrzení platby vrátí zákazníka do obchodu.
 
-### `api.php` – databázové API
+### `api.php` – kompatibilní Greenfield podmnožina
 
-Podporované cesty:
+Cílem není vydávat aplikaci za celý BTCPay Server, ale implementovat stabilní podmnožinu jeho [Greenfield API](https://docs.btcpayserver.org/API/Greenfield/v1/), kterou používají běžné e-shopové integrace. Aktuálně jsou podporované tyto cesty:
 
+- `GET /api/v1/health` (bez autentizace)
+- `GET /api/v1/server/info`
+- `GET /api/v1/api-keys/current`
 - `GET /api/v1/stores/{storeId}`
+- `GET /api/v1/stores/{storeId}/payment-methods`
 - `POST /api/v1/stores/{storeId}/invoices`
 - `GET /api/v1/stores/{storeId}/invoices/{invoiceId}`
+- `GET /api/v1/stores/{storeId}/invoices/{invoiceId}/payment-methods`
+- `GET /api/v1/stores/{storeId}/webhooks`
 - `POST /api/v1/stores/{storeId}/webhooks`
 
-Autentizace používá `Authorization: Bearer ...`. Částka faktury musí být JSON řetězec s přesnou BTC hodnotou, například `"0.00000001"`; JSON číslo se záměrně odmítá kvůli riziku `float` nepřesnosti.
+Primární autentizace kompatibilní s oficiálním klientem je `Authorization: token <api-key>`; kvůli starším klientům zůstává podporované také `Authorization: Bearer <api-key>`. Odpověď aktuálního API klíče záměrně deklaruje pouze skutečně implementovaná oprávnění, takže plugin nemá nabýt dojmu, že jsou dostupné refundace nebo pull payments.
+
+Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency`. Pro `BTC` a `SAT` probíhá převod bez `float`; podporované fiat měny se převádějí přes nakonfigurovaný tržní provider. Volby `checkout.redirectURL`, `checkout.redirectAutomatically` a `checkout.expirationMinutes` jsou zachované. Výsledná odpověď obsahuje BTCPay kompatibilní `checkoutLink`, stav, metadata a on-chain payment method `BTC-CHAIN`.
+
+Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
+
+#### Aktuální hranice kompatibility
+
+- podporována je pouze Bitcoin on-chain platební metoda `BTC-CHAIN`,
+- hlavní kompatibilní režim pluginu je přesměrování na checkout; BTCPay modal skript zatím není implementován,
+- refundace, pull payments, Lightning Network a správa uživatelů nejsou vystavené,
+- doručení webhooků vyžaduje pravidelné spouštění `webhook_cron.php`,
+- praktická kapacita závisí na MariaDB, Electrum RPC a frekvenci workeru; současná architektura je vhodná hlavně pro malé a středně zatížené obchody, rezervace a interní platební systémy,
+- konkrétní plugin je před produkčním použitím nutné ověřit integračním smoke testem, protože může používat další Greenfield endpointy.
+
+Referenční implementace a kontrakty: [Greenfield e-commerce integrace](https://docs.btcpayserver.org/Development/GreenFieldExample/), [oficiální PHP příklad](https://docs.btcpayserver.org/Development/GreenfieldExample-PHP/) a [WooCommerce Greenfield plugin](https://github.com/btcpayserver/woocommerce-greenfield-plugin).
 
 ### `api_stateless.php`
 
