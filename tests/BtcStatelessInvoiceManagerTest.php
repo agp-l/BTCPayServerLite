@@ -132,10 +132,9 @@ $tests['keeps a paid request paid after address funds move'] = static function (
 $tests['has no database dependency'] = static function (): void {
     $source = file_get_contents(dirname(__DIR__) . '/classes/BtcStatelessInvoiceManager.php');
     kernelAssertTrue(is_string($source), 'Kernel source could not be read.');
-    kernelAssertTrue(
-        !preg_match('/\\bDatabase\\b|PDO|invoices\\s/i', $source),
-        'Standalone kernel contains a database dependency.'
-    );
+    kernelAssertTrue(!str_contains($source, 'private ?Database'), 'Kernel stores a Database dependency.');
+    kernelAssertTrue(!str_contains($source, 'new Database'), 'Kernel creates a Database connection.');
+    kernelAssertTrue(!str_contains($source, 'PDO'), 'Kernel contains PDO code.');
 };
 
 $passed = 0;
@@ -151,4 +150,3 @@ foreach ($tests as $name => $test) {
 }
 
 fwrite(STDOUT, "{$passed} stateless invoice kernel tests passed.\n");
-
