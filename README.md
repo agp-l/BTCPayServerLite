@@ -317,6 +317,7 @@ php tests/BitcoinAmountTest.php
 php tests/ElectrumWalletTest.php
 php tests/BtcInvoiceManagerTest.php
 php tests/BtcStatelessInvoiceManagerTest.php
+php tests/BtcStatelessFactoryTest.php
 php tests/DatabaseCheckoutServiceTest.php
 php tests/CheckoutRepositoryQueryTest.php
 php tests/CheckoutHttpBoundaryTest.php
