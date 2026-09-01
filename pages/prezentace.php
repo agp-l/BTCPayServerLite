@@ -118,8 +118,8 @@ function e(string $value): string
             --white: #ffffff;
             --muted: #5f7469;
             --line: rgba(7, 21, 15, .13);
-            --orange: #f7931a;
-            --orange-dark: #d87500;
+            --brand: #20c875;
+            --brand-dark: #0f9c56;
             --mint: #6cf0a7;
             --lime: #c9ff65;
             --radius: 24px;
@@ -144,13 +144,13 @@ function e(string $value): string
             z-index: -2;
             pointer-events: none;
             background:
-                radial-gradient(circle at 82% 4%, rgba(247, 147, 26, .15), transparent 30rem),
+                radial-gradient(circle at 82% 4%, rgba(32, 200, 117, .18), transparent 30rem),
                 radial-gradient(circle at 5% 30%, rgba(108, 240, 167, .18), transparent 34rem);
         }
         a { color: inherit; }
         img, svg { display: block; }
         button, a { -webkit-tap-highlight-color: transparent; }
-        :focus-visible { outline: 3px solid var(--orange); outline-offset: 4px; }
+        :focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; }
         .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; padding: .7rem 1rem; background: var(--white); border-radius: 10px; }
         .skip-link:focus { top: 1rem; }
         .wrap { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
@@ -165,14 +165,14 @@ function e(string $value): string
             letter-spacing: .14em;
             text-transform: uppercase;
         }
-        .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--orange); }
+        .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--brand); }
         h1, h2, h3, p { margin-top: 0; }
         h1, h2, h3 { line-height: 1.08; letter-spacing: -.035em; }
         h1 { margin-bottom: 1.5rem; font-size: clamp(3rem, 7.8vw, 6.8rem); font-weight: 850; }
         h2 { margin-bottom: 1rem; font-size: clamp(2.15rem, 4.5vw, 4.2rem); font-weight: 830; }
         h3 { font-size: 1.35rem; font-weight: 780; }
         .muted { color: var(--muted); }
-        .orange { color: var(--orange); }
+        .brand-accent { color: var(--brand); }
 
         .nav-shell { padding-top: 18px; }
         .nav {
@@ -195,15 +195,15 @@ function e(string $value): string
             aspect-ratio: 1;
             border-radius: 50%;
             color: var(--white);
-            background: var(--orange);
-            box-shadow: inset 0 -4px 10px rgba(117, 56, 0, .22);
+            background: var(--brand);
+            box-shadow: inset 0 -4px 10px rgba(0, 75, 38, .28);
             font-size: 1.2rem;
             font-weight: 900;
         }
         .brand small { display: block; margin-top: -4px; color: var(--muted); font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
         .nav-links { display: flex; align-items: center; gap: 1.6rem; }
         .nav-links > a:not(.button) { color: var(--ink-soft); font-size: .92rem; font-weight: 700; text-decoration: none; }
-        .nav-links > a:not(.button):hover { color: var(--orange-dark); }
+        .nav-links > a:not(.button):hover { color: var(--brand-dark); }
         .button {
             display: inline-flex;
             align-items: center;
@@ -220,8 +220,8 @@ function e(string $value): string
         .button:hover { transform: translateY(-2px); }
         .button-primary { color: var(--white); background: var(--ink); box-shadow: 0 14px 30px rgba(7, 21, 15, .18); }
         .button-primary:hover { background: #102b1e; box-shadow: 0 18px 36px rgba(7, 21, 15, .24); }
-        .button-orange { color: #2a1400; background: var(--orange); box-shadow: 0 14px 30px rgba(247, 147, 26, .24); }
-        .button-orange:hover { background: #ffa936; }
+        .button-brand { color: #041b10; background: var(--brand); box-shadow: 0 14px 30px rgba(32, 200, 117, .24); }
+        .button-brand:hover { background: #42dd91; }
         .button-ghost { border-color: var(--line); background: rgba(255, 255, 255, .55); }
 
         .hero { padding: clamp(4.5rem, 9vw, 8rem) 0 5rem; overflow: hidden; }
@@ -242,7 +242,7 @@ function e(string $value): string
             right: -70px;
             top: 35px;
             border-radius: 50%;
-            background: var(--orange);
+            background: var(--brand);
             filter: saturate(.95);
         }
         .checkout {
@@ -294,7 +294,7 @@ function e(string $value): string
         .confirmation p { margin: 0; color: var(--muted); font-size: .86rem; }
         .confirmation strong { display: block; }
         .progress { height: 8px; margin-top: 1rem; overflow: hidden; border-radius: 99px; background: var(--paper-deep); }
-        .progress span { display: block; width: 78%; height: 100%; border-radius: inherit; background: var(--orange); }
+        .progress span { display: block; width: 78%; height: 100%; border-radius: inherit; background: var(--brand); }
         .float-badge { position: absolute; z-index: 3; top: 67px; right: -14px; padding: .7rem 1rem; border-radius: 999px; background: var(--lime); box-shadow: 0 12px 30px rgba(7, 21, 15, .15); font-size: .82rem; font-weight: 850; transform: rotate(7deg); }
 
         .proof { padding: 1rem 0 6rem; }
@@ -302,7 +302,7 @@ function e(string $value): string
         .proof-item { text-align: center; }
         .proof-item strong { display: block; font-size: 1.1rem; }
         .proof-item span { color: var(--muted); font-size: .84rem; }
-        .proof-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--orange); }
+        .proof-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); }
 
         section { scroll-margin-top: 7rem; }
         .section { padding: clamp(5rem, 9vw, 8rem) 0; }
@@ -315,7 +315,7 @@ function e(string $value): string
         .step-list { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255, 255, 255, .14); }
         .step { position: relative; padding: 2.3rem 2.3rem 0 0; }
         .step + .step { padding-left: 2.3rem; border-left: 1px solid rgba(255, 255, 255, .14); }
-        .step-number { display: block; margin-bottom: 3rem; color: var(--orange); font-size: .9rem; font-weight: 850; letter-spacing: .12em; }
+        .step-number { display: block; margin-bottom: 3rem; color: var(--brand); font-size: .9rem; font-weight: 850; letter-spacing: .12em; }
         .step p { color: #a9bbb1; }
 
         .benefit-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(3rem, 8vw, 8rem); align-items: start; }
@@ -340,7 +340,7 @@ function e(string $value): string
         .code-flow { align-self: center; }
         .flow-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .8rem; }
         .flow-box { flex: 1; padding: .9rem 1rem; border: 1px solid rgba(255, 255, 255, .14); border-radius: 12px; background: rgba(255, 255, 255, .06); font-size: .88rem; font-weight: 750; text-align: center; }
-        .flow-arrow { color: var(--orange); font-weight: 900; }
+        .flow-arrow { color: var(--brand); font-weight: 900; }
         .tech-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.5rem; }
         .tech-tags span { padding: .45rem .7rem; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; color: var(--mint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; }
 
@@ -358,7 +358,7 @@ function e(string $value): string
         .price-card ul { display: grid; gap: .8rem; margin: 1.6rem 0 2rem; padding: 1.5rem 0 0; border-top: 1px solid currentColor; border-color: var(--line); list-style: none; }
         .price-card.featured ul { border-color: rgba(255, 255, 255, .15); }
         .price-card li { position: relative; padding-left: 1.6rem; font-size: .92rem; }
-        .price-card li::before { content: "✓"; position: absolute; left: 0; color: var(--orange); font-weight: 900; }
+        .price-card li::before { content: "✓"; position: absolute; left: 0; color: var(--brand); font-weight: 900; }
         .price-card .button { margin-top: auto; }
         .pricing-foot { margin: 1.8rem 0 0; color: var(--muted); font-size: .84rem; text-align: center; }
 
@@ -380,11 +380,11 @@ function e(string $value): string
         summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; font-size: 1.05rem; font-weight: 800; list-style: none; }
         summary::-webkit-details-marker { display: none; }
         summary::after { content: "+"; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 50%; flex: 0 0 auto; }
-        details[open] summary::after { content: "−"; background: var(--orange); }
+        details[open] summary::after { content: "−"; background: var(--brand); }
         details p { max-width: 700px; margin: 1rem 2.8rem 0 0; color: var(--muted); }
 
         .cta { padding: clamp(5rem, 9vw, 8rem) 0 2.2rem; color: var(--white); background: var(--ink); }
-        .cta-box { position: relative; overflow: hidden; padding: clamp(2.3rem, 6vw, 5.5rem); border-radius: 34px; background: var(--orange); color: #241100; }
+        .cta-box { position: relative; overflow: hidden; padding: clamp(2.3rem, 6vw, 5.5rem); border-radius: 34px; background: var(--brand); color: #041b10; }
         .cta-box::after { content: "₿"; position: absolute; right: -3rem; bottom: -8rem; color: rgba(255, 255, 255, .18); font-size: 22rem; font-weight: 900; line-height: 1; transform: rotate(12deg); }
         .cta-box h2, .cta-box p, .cta-box .hero-actions { position: relative; z-index: 1; }
         .cta-box p { max-width: 650px; font-size: 1.12rem; }
@@ -459,10 +459,10 @@ function e(string $value): string
         <div class="wrap hero-grid">
             <div class="hero-copy">
                 <p class="eyebrow">Bitcoin pro normální e-shop</p>
-                <h1>Platby bez karet.<br><span class="orange">Přímo v Bitcoinu.</span></h1>
+                <h1>Platby bez karet.<br><span class="brand-accent">Přímo v Bitcoinu.</span></h1>
                 <p class="hero-lead">Dejte zákazníkům další možnost, jak zaplatit. BTCPay Server Lite propojí váš e-shop, rezervační systém nebo online službu s Bitcoinem — jednoduše, přehledně a bez zbytečně složité infrastruktury.</p>
                 <div class="hero-actions">
-                    <a class="button button-orange" href="<?= e($registerUrl) ?>">Chci přijímat Bitcoin <span aria-hidden="true">→</span></a>
+                    <a class="button button-brand" href="<?= e($registerUrl) ?>">Chci přijímat Bitcoin <span aria-hidden="true">→</span></a>
                     <a class="button button-ghost" href="#jak-to-funguje">Jak to funguje</a>
                 </div>
                 <div class="trust-row" aria-label="Hlavní výhody">
@@ -593,7 +593,7 @@ function e(string $value): string
                         <li>Průběžné aktualizace systému</li>
                         <li>Základní technická podpora</li>
                     </ul>
-                    <a class="button button-orange" href="<?= e($registerUrl) ?>">Začít přijímat BTC</a>
+                    <a class="button button-brand" href="<?= e($registerUrl) ?>">Začít přijímat BTC</a>
                 </article>
                 <article class="price-card">
                     <span class="plan">Instalace na váš HW</span>
