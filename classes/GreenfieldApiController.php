@@ -101,6 +101,18 @@ class GreenfieldApiController
             return ['status_code' => 200, 'body' => $this->service->getStorePaymentMethods($matches[1], $apiKey)];
         }
 
+        if (preg_match('/\\A\\/api\\/v1\\/stores\\/([A-Za-z0-9_-]+)\\/exchange\\/quotes\\z/D', $path, $matches)) {
+            $this->requireMethod($method, 'POST');
+            return [
+                'status_code' => 200,
+                'body' => $this->service->createExchangeQuote(
+                    $matches[1],
+                    $this->decodeJsonObject($rawBody),
+                    $apiKey
+                ),
+            ];
+        }
+
         if (preg_match(
             '/\A\/api\/v1\/stores\/([A-Za-z0-9_-]+)\/invoices\/([A-Za-z0-9_-]+)\/payment-methods\z/D',
             $path,
