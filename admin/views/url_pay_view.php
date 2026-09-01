@@ -12,6 +12,14 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     'UTF-8'
 );
 $isTerminal = in_array($checkout['status'], ['paid', 'expired'], true);
+$statusLabels = [
+    'unpaid' => 'Čeká na platbu',
+    'underpaid' => 'Částečná platba',
+    'pending_mempool' => 'Platba zachycena v síti',
+    'paid' => 'Zaplaceno',
+    'expired' => 'Platnost vypršela',
+];
+$statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
 ?>
 <!doctype html>
 <html lang="cs">
@@ -49,7 +57,7 @@ $isTerminal = in_array($checkout['status'], ['paid', 'expired'], true);
           </p>
         </div>
         <span class="status-pill" data-status-pill data-status="<?= $escape($checkout['status']) ?>">
-          Načítání stavu
+          <?= $escape($statusLabel) ?>
         </span>
       </header>
 
@@ -62,13 +70,23 @@ $isTerminal = in_array($checkout['status'], ['paid', 'expired'], true);
           <?php else: ?>
             <div class="qr-fallback">QR kód není na tomto serveru dostupný. Platbu otevřete tlačítkem níže.</div>
           <?php endif; ?>
-          <a class="wallet-link" href="<?= $escape($checkout['bip21_uri']) ?>">Otevřít Bitcoin peněženku</a>
+          <?php if ($isTerminal): ?>
+            <span class="wallet-link" aria-disabled="true"><?= $checkout['status'] === 'paid' ? 'Platba dokončena' : 'Faktura vypršela' ?></span>
+          <?php else: ?>
+            <a class="wallet-link" href="<?= $escape($checkout['bip21_uri']) ?>">Otevřít Bitcoin peněženku</a>
+          <?php endif; ?>
         </section>
 
         <section class="invoice-detail-panel">
           <span class="amount-label">Částka k úhradě</span>
           <div class="invoice-amount"><?= $escape($checkout['amount']) ?> <span class="invoice-unit">BTC</span></div>
-          <div class="invoice-timer" data-invoice-timer aria-live="polite"></div>
+          <div class="invoice-timer" data-invoice-timer aria-live="polite">
+            <?= $checkout['status'] === 'paid'
+              ? 'Platba byla úspěšně přijata.'
+              : ($checkout['status'] === 'expired'
+                ? 'Čas pro úhradu vypršel.'
+                : 'Zbývá ' . (int) $checkout['seconds_remaining'] . ' sekund') ?>
+          </div>
 
           <dl class="invoice-details">
             <div class="detail-row">
