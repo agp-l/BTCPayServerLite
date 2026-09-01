@@ -19,6 +19,10 @@ $isSettled = $checkout['status'] === 'Settled';
 $isExpired = $checkout['status'] === 'Expired';
 $isPartial = $checkout['additional_status'] === 'PaidPartial';
 $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:image/');
+$redirectUrl = isset($checkout['redirect_url']) && is_string($checkout['redirect_url'])
+    ? trim($checkout['redirect_url'])
+    : '';
+$redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatically'] ?? false) === true;
 ?>
 <!doctype html>
 <html lang="cs">
@@ -36,7 +40,9 @@ $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:
       class="checkout-shell"
       data-status-url="<?= htmlspecialchars($statusUrl, ENT_QUOTES, 'UTF-8') ?>"
       data-initial-status="<?= htmlspecialchars((string) $checkout['status'], ENT_QUOTES, 'UTF-8') ?>"
-      data-seconds-remaining="<?= htmlspecialchars((string) $checkout['seconds_remaining'], ENT_QUOTES, 'UTF-8') ?>">
+      data-seconds-remaining="<?= htmlspecialchars((string) $checkout['seconds_remaining'], ENT_QUOTES, 'UTF-8') ?>"
+      data-redirect-url="<?= htmlspecialchars($redirectUrl, ENT_QUOTES, 'UTF-8') ?>"
+      data-redirect-automatically="<?= $redirectAutomatically ? 'true' : 'false' ?>">
     <section class="checkout-card" aria-labelledby="checkout-title">
         <header class="checkout-header">
             <div class="checkout-brand">
@@ -72,6 +78,14 @@ $hasQrCode = is_string($qrCodeDataUri) && str_starts_with($qrCodeDataUri, 'data:
                 <p class="eyebrow">Hotovo</p>
                 <h2>Děkujeme, platba je potvrzena</h2>
                 <p>Faktura byla bezpečně uhrazena v bitcoinové síti.</p>
+                <?php if ($redirectUrl !== ''): ?>
+                    <a class="secondary-button" href="<?= htmlspecialchars($redirectUrl, ENT_QUOTES, 'UTF-8') ?>">
+                        Zpět do obchodu
+                    </a>
+                    <?php if ($redirectAutomatically): ?>
+                        <small id="redirect-notice" class="redirect-notice">Za okamžik vás vrátíme do obchodu.</small>
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
         </section>
 
