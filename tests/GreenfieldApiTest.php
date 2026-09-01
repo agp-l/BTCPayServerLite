@@ -31,7 +31,22 @@ final class GreenfieldTestRepository extends GreenfieldApiRepository
         return $this->stores[$storeId] ?? null;
     }
 
-    public function findOrCreateWebhook(string $storeId, string $url): array
+    public function findStoreByApiKey(string $apiKey): ?array
+    {
+        foreach ($this->stores as $store) {
+            if ($store['api_key'] === $apiKey) {
+                return $store;
+            }
+        }
+        return null;
+    }
+
+    public function listWebhooks(string $storeId): array
+    {
+        return [];
+    }
+
+    public function findOrCreateWebhook(string $storeId, string $url, ?string $requestedSecret = null): array
     {
         $this->webhookCalls[] = ['store_id' => $storeId, 'url' => $url];
 
@@ -321,7 +336,7 @@ $tests['creates an exact invoice while holding the Electrum lock'] = static func
     greenfieldAssertSame(1, $database->lockCalls, 'Invoice creation did not acquire the shared lock.');
     greenfieldAssertSame(realpath($walletPath), $wallet->loadedWalletPaths[0], 'The wrong wallet was loaded.');
     greenfieldAssertSame(
-        'http://localhost/BTCPayLite/checkout/pay.php?id=inv_test',
+        'http://localhost/BTCPayLite/pay?id=inv_test',
         $invoice['checkoutLink'],
         'The checkout URL is invalid.'
     );
@@ -464,7 +479,7 @@ $tests['rejects malformed JSON and wrong HTTP methods'] = static function (): vo
     greenfieldAssertSame(405, $methodException->getHttpStatus(), 'Wrong method returned the wrong status.');
 };
 
-$tests['requires a Bearer authorization scheme'] = static function (): void {
+$tests['requires an explicit authorization scheme'] = static function (): void {
     $controller = new GreenfieldApiController(new GreenfieldControllerTestService());
 
     $exception = greenfieldAssertThrows(
