@@ -403,7 +403,7 @@ final class PayoutService
         if ($value === null) {
             return [];
         }
-        if (!is_array($value) || array_is_list($value)) {
+        if (!is_array($value) || $this->isList($value)) {
             throw new PayoutException('Payout metadata must be an object.', 'create_payout', 400);
         }
         try {
@@ -445,6 +445,18 @@ final class PayoutService
             throw new PayoutException('Store wallet is unavailable.', 'load_wallet', 503);
         }
         return $realPath;
+    }
+
+    private function isList(array $value): bool
+    {
+        $expected = 0;
+        foreach ($value as $key => $_item) {
+            if ($key !== $expected) {
+                return false;
+            }
+            ++$expected;
+        }
+        return true;
     }
 
     /** @param array<mixed,mixed> $values @return array<string,string> */
