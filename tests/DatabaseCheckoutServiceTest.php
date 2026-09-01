@@ -9,10 +9,10 @@ require_once __DIR__ . '/../classes/CheckoutRepository.php';
 require_once __DIR__ . '/../classes/DatabaseCheckoutService.php';
 require_once __DIR__ . '/../classes/DatabaseCheckoutController.php';
 
-use BtcPayLiteCheckoutException;
-use BtcPayLiteCheckoutRepository;
-use BtcPayLiteDatabaseCheckoutController;
-use BtcPayLiteDatabaseCheckoutService;
+use BtcPayLite\CheckoutException;
+use BtcPayLite\CheckoutRepository;
+use BtcPayLite\DatabaseCheckoutController;
+use BtcPayLite\DatabaseCheckoutService;
 
 final class CheckoutTestRepository implements CheckoutRepository
 {
