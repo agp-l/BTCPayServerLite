@@ -26,6 +26,11 @@ routeSame('pages/prezentace.php', $home->getHandler(), 'Home handler mismatch');
 routeSame('home', $home->getMenu(), 'Home menu mismatch');
 $passes[] = 'matches an exact public route';
 
+$docs = $router->match('/dokumentace', 'GET');
+routeSame('pages/dokumentace.php', $docs->getHandler(), 'Documentation handler mismatch');
+routeSame(null, $docs->getRequiredRole(), 'Documentation route must remain public');
+$passes[] = 'exposes public developer documentation';
+
 $admin = $router->match('/admin/wallet', 'POST');
 routeSame('admin/wallet.php', $admin->getHandler(), 'Admin handler mismatch');
 routeSame('admin', $admin->getRequiredRole(), 'Admin role is missing');
@@ -94,6 +99,7 @@ $passes[] = 'supports HEAD on read-only pages';
 
 $handlerCases = [
     ['/', 'GET'],
+    ['/dokumentace', 'GET'],
     ['/login', 'GET'],
     ['/forgot-password', 'GET'],
     ['/reset-password', 'GET'],
