@@ -49,6 +49,8 @@ $clientAccount = $router->match('/client/account', 'POST');
 routeSame('client', $clientAccount->getRequiredRole(), 'Client account role is missing');
 $adminSettings = $router->match('/admin/settings', 'POST');
 routeSame('admin', $adminSettings->getRequiredRole(), 'Admin settings role is missing');
+$adminUsers = $router->match('/admin/users', 'POST');
+routeSame('admin', $adminUsers->getRequiredRole(), 'Admin users role is missing');
 $passes[] = 'protects account settings while keeping password recovery public';
 
 try {
@@ -107,6 +109,7 @@ $handlerCases = [
     ['/admin/dashboard', 'GET'],
     ['/admin/account', 'GET'],
     ['/admin/settings', 'GET'],
+    ['/admin/users', 'GET'],
     ['/admin/wallet', 'GET'],
     ['/admin/stores', 'GET'],
     ['/admin/invoices', 'GET'],

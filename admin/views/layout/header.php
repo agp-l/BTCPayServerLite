@@ -30,6 +30,7 @@ $menuContext = [
     'url_invoices' => ['label' => 'URL faktury', 'icon' => 'fa-link'],
     'settings' => ['label' => 'Nastavení', 'icon' => 'fa-gear'],
     'account' => ['label' => 'Účet', 'icon' => 'fa-user-shield'],
+    'users' => ['label' => 'Klienti', 'icon' => 'fa-users'],
 ];
 $currentContext = $menuContext[$activeMenu] ?? ['label' => 'Administrace', 'icon' => 'fa-shield-halved'];
 $routeUrl = static fn (string $path): string => htmlspecialchars(
@@ -81,6 +82,7 @@ $navItem = static function (
       <div class="admin-nav-group">
         <div class="admin-nav-label">Přehled</div>
         <?php $navItem('/admin/dashboard', 'dashboard', 'fa-chart-line', 'Dashboard'); ?>
+        <?php $navItem('/admin/users', 'users', 'fa-users', 'Klienti'); ?>
         <?php $navItem('/admin/wallet', 'wallet', 'fa-wallet', 'Peněženka'); ?>
       </div>
 

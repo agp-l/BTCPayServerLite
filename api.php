@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use BtcPayLite\BtcInvoiceManager;
+use BtcPayLite\ApiRequestLogger;
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
@@ -25,6 +26,8 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 
 require __DIR__ . '/vendor/autoload.php';
 
+$requestStartedAt = microtime(true);
+$database = null;
 $statusCode = 500;
 $responseBody = ['message' => 'Internal server error.'];
 
@@ -197,4 +200,15 @@ try {
 }
 
 http_response_code($statusCode);
+if ($database instanceof Database) {
+    try {
+        (new ApiRequestLogger($database))->record(
+            $_SERVER,
+            $statusCode,
+            (int) round((microtime(true) - $requestStartedAt) * 1000)
+        );
+    } catch (Throwable $exception) {
+        error_log('API request metadata could not be recorded: ' . $exception::class);
+    }
+}
 echo $json;

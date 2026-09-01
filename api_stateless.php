@@ -5,6 +5,8 @@ declare(strict_types=1);
 use BtcPayLite\BtcStatelessApiController;
 use BtcPayLite\BtcStatelessFactory;
 use BtcPayLite\BtcStatelessServiceException;
+use BtcPayLite\ApiRequestLogger;
+use BtcPayLite\Database;
 use BtcPayLite\UrlManager;
 
 ini_set('display_errors', '0');
@@ -18,6 +20,8 @@ require_once __DIR__ . '/vendor/autoload.php';
 $config = require __DIR__ . '/config.php';
 
 $lockHandle = null;
+$requestStartedAt = microtime(true);
+$responseStatus = 500;
 
 try {
     $requestMethod = is_string($_SERVER['REQUEST_METHOD'] ?? null)
@@ -75,7 +79,8 @@ try {
         $authorizationHeader
     );
 
-    http_response_code(200);
+    $responseStatus = 200;
+    http_response_code($responseStatus);
     echo json_encode(
         $response,
         JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
@@ -83,6 +88,7 @@ try {
 } catch (BtcStatelessServiceException $exception) {
     $code = $exception->getCode();
     $httpCode = $code >= 400 && $code < 600 ? $code : 500;
+    $responseStatus = $httpCode;
     if ($httpCode === 405) {
         header('Allow: POST');
     } elseif ($httpCode === 401) {
@@ -108,7 +114,8 @@ try {
     );
 } catch (Throwable $exception) {
     error_log('Unexpected stateless API failure: ' . $exception->getMessage());
-    http_response_code(500);
+    $responseStatus = 500;
+    http_response_code($responseStatus);
     echo json_encode(
         ['status' => 'error', 'message' => 'Internal server error.'],
         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
@@ -117,5 +124,21 @@ try {
     if (is_resource($lockHandle)) {
         flock($lockHandle, LOCK_UN);
         fclose($lockHandle);
+    }
+    try {
+        $database = new Database(
+            $config['db_host'],
+            $config['db_name'],
+            $config['db_user'],
+            $config['db_pass'],
+            (int) ($config['db_port'] ?? 3306)
+        );
+        (new ApiRequestLogger($database))->record(
+            $_SERVER,
+            $responseStatus,
+            (int) round((microtime(true) - $requestStartedAt) * 1000)
+        );
+    } catch (Throwable $exception) {
+        error_log('Stateless API request metadata could not be recorded: ' . $exception::class);
     }
 }

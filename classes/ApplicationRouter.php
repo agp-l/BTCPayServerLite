@@ -53,6 +53,9 @@ final class ApplicationRouter
             '/admin/account' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'pages/account.php', 'account', 'admin'
             ),
+            '/admin/users' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'admin/users.php', 'users', 'admin'
+            ),
             '/admin/settings' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/settings.php', 'settings', 'admin'
             ),

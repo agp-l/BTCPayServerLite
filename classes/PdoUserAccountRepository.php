@@ -228,16 +228,16 @@ final class PdoUserAccountRepository implements UserAccountRepository
     private function positiveInt(mixed $value): int
     {
         if (is_int($value)) {
-            $value = $value;
+            $number = $value;
         } elseif (is_string($value) && ctype_digit($value)) {
-            $value = (int) $value;
+            $number = (int) $value;
         } else {
             throw new AuthException('Účet nyní nelze načíst.');
         }
-        if ($value < 1) {
+        if ($number < 1) {
             throw new AuthException('Účet nyní nelze načíst.');
         }
-        return $value;
+        return $number;
     }
 
     private function nonEmptyString(mixed $value): string
