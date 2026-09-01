@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use BtcPayLite\AuthManager;
 use BtcPayLite\BtcDashboard;
+use BtcPayLite\BtcInvoiceManagerException;
 use BtcPayLite\BtcStatelessAjaxController;
 use BtcPayLite\BtcStatelessFactory;
 use BtcPayLite\BtcStatelessServiceException;
@@ -65,7 +66,7 @@ if ($requestMethod === 'POST' && isset($_POST['api_action'])) {
             $response,
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
-    } catch (BtcStatelessServiceException $exception) {
+    } catch (BtcStatelessServiceException | BtcInvoiceManagerException $exception) {
         ob_end_clean();
         $code = $exception->getCode();
         $httpCode = $code >= 400 && $code < 600 ? $code : 500;
@@ -129,4 +130,3 @@ $defaultWallet = $defaultWalletName;
 $csrfToken = AuthManager::csrfToken();
 
 require __DIR__ . '/views/url_invoices_view.php';
-
