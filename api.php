@@ -6,10 +6,12 @@ use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
+use BtcPayLite\ExchangeQuoteService;
 use BtcPayLite\GreenfieldApiController;
 use BtcPayLite\GreenfieldApiException;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\GreenfieldApiService;
+use BtcPayLite\HttpBitcoinMarketDataProvider;
 use BtcPayLite\UrlManager;
 use BtcPayLite\WebhookEndpointPolicy;
 
@@ -64,6 +66,15 @@ try {
         ? $configuredBaseUrl
         : (new UrlManager())->getBaseUrl();
 
+    $exchangeFeeBps = $config['exchange_fee_bps'] ?? 0;
+    if (is_string($exchangeFeeBps) && ctype_digit($exchangeFeeBps)) {
+        $exchangeFeeBps = (int) $exchangeFeeBps;
+    }
+    if (!is_int($exchangeFeeBps)) {
+        throw new GreenfieldApiException('Exchange fee configuration is invalid.', 'configure_api');
+    }
+    $marketData = new HttpBitcoinMarketDataProvider();
+
     $service = new GreenfieldApiService(
         $repository,
         $database,
@@ -74,7 +85,9 @@ try {
         new WebhookEndpointPolicy(
             null,
             ($config['allow_local_webhooks'] ?? false) === true
-        )
+        ),
+        $marketData,
+        new ExchangeQuoteService($marketData, $exchangeFeeBps)
     );
     $controller = new GreenfieldApiController($service);
 
