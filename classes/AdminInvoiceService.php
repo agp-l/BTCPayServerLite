@@ -22,7 +22,7 @@ final class AdminInvoiceService
     }
 
     /** @return array{id:string,amount:string,created_at:int,description:string} */
-    public function create(string $amount, string $description, string $orderId): array
+    public function create(string $amount, string $description, string $orderId, ?string $storeId = null): array
     {
         try {
             $exactAmount = BitcoinAmount::fromBtc(trim($amount));
@@ -46,9 +46,19 @@ final class AdminInvoiceService
             throw new AdminOperationsException('ID objednávky může mít nejvýše 100 platných znaků.');
         }
 
-        $store = $this->repository->fetchDefaultStore();
+        $storeId = $storeId !== null ? trim($storeId) : null;
+        if ($storeId !== null && !preg_match('/\Astore_[a-f0-9]{32}\z/D', $storeId)) {
+            throw new AdminOperationsException('Vybraný obchod má neplatný identifikátor.');
+        }
+
+        $store = $storeId === null
+            ? $this->repository->fetchDefaultStore()
+            : $this->repository->fetchStore($storeId);
         if ($store === null) {
-            throw new AdminOperationsException('Nejprve vytvořte alespoň jeden obchod.', 404);
+            throw new AdminOperationsException(
+                $storeId === null ? 'Nejprve vytvořte alespoň jeden obchod.' : 'Vybraný obchod neexistuje.',
+                404
+            );
         }
 
         try {

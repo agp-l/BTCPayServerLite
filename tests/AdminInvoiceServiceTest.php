@@ -12,6 +12,12 @@ final class AdminInvoiceRepositoryFixture implements AdminOperationsRepository
 {
     public function fetchStores(): array { return []; }
     public function fetchDefaultStore(): ?array { return ['id' => 'store_test', 'wallet_path' => '/wallet']; }
+    public function fetchStore(string $storeId): ?array
+    {
+        return $storeId === 'store_0123456789abcdef0123456789abcdef'
+            ? ['id' => $storeId, 'wallet_path' => '/selected-wallet']
+            : null;
+    }
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void {}
     public function storeExists(string $storeId): bool { return true; }
     public function fetchWebhooks(): array { return []; }
@@ -32,16 +38,22 @@ $service = new AdminInvoiceService(
     }
 );
 
-$invoice = $service->create('0.00000001', ' Konzultace ', ' ORD-1 ');
+$invoice = $service->create(
+    '0.00000001',
+    ' Konzultace ',
+    ' ORD-1 ',
+    'store_0123456789abcdef0123456789abcdef'
+);
 if (
     $invoice['amount'] !== '0.00000001'
     || $invoice['description'] !== 'Konzultace'
     || $captured['amount'] !== '0.00000001'
+    || $captured['store']['wallet_path'] !== '/selected-wallet'
     || $captured['metadata']['orderId'] !== 'ORD-1'
 ) {
     throw new RuntimeException('Exact admin invoice data was not preserved.');
 }
-echo "[PASS] creates an exact normalized admin invoice\n";
+echo "[PASS] creates an exact normalized admin invoice for the selected store\n";
 
 foreach (['1e-8', '0.000000001', '0'] as $invalidAmount) {
     try {
@@ -59,4 +71,14 @@ try {
 }
 echo "[PASS] rejects unsafe invoice metadata\n";
 
-echo "3 admin invoice service tests passed.\n";
+try {
+    $service->create('0.1', 'Invoice', '', 'store_ffffffffffffffffffffffffffffffff');
+    throw new RuntimeException('Missing selected store was accepted.');
+} catch (AdminOperationsException $exception) {
+    if ($exception->getHttpStatus() !== 404) {
+        throw new RuntimeException('Missing selected store did not retain its HTTP status.');
+    }
+}
+echo "[PASS] rejects an unknown selected store\n";
+
+echo "4 admin invoice service tests passed.\n";

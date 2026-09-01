@@ -47,6 +47,26 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         ];
     }
 
+    public function fetchStore(string $storeId): ?array
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT id, wallet_path FROM stores WHERE id = ? LIMIT 1'
+        );
+        $statement->execute([$storeId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+        if (!is_array($row)) {
+            throw new RuntimeException('Store query returned an invalid row.');
+        }
+
+        return [
+            'id' => $this->requiredString($row['id'] ?? null, 'store id'),
+            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'wallet path'),
+        ];
+    }
+
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
     {
         $statement = $this->database->getPdo()->prepare(

@@ -26,6 +26,13 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
         return ['id' => 'store_owned', 'wallet_path' => '/wallet'];
     }
 
+    public function fetchStore(string $storeId): ?array
+    {
+        return $storeId === 'store_owned'
+            ? ['id' => 'store_owned', 'wallet_path' => '/wallet']
+            : null;
+    }
+
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
     {
         if ($this->failStoreCreation) {

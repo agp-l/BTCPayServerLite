@@ -108,6 +108,17 @@ $statusClasses = [
       <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
       <input type="hidden" name="action" value="create">
       <div class="field">
+        <label for="invoiceStore">Obchod</label>
+        <div class="input-wrap"><select id="invoiceStore" name="store_id" required>
+          <option value="">Vyberte obchod</option>
+          <?php foreach ($filterStores as $store): ?>
+            <option value="<?php echo htmlspecialchars((string) $store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+              <?php echo htmlspecialchars((string) $store['client_email'] . ' — ' . (string) $store['name'], ENT_QUOTES, 'UTF-8'); ?>
+            </option>
+          <?php endforeach; ?>
+        </select></div>
+      </div>
+      <div class="field">
         <label for="invoiceAmount">Částka</label>
         <div class="input-wrap"><input id="invoiceAmount" type="text" inputmode="decimal" name="amount" pattern="[0-9]+([.][0-9]{1,8})?" placeholder="0.00100000" required><span class="unit">BTC</span></div>
       </div>

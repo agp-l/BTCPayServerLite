@@ -118,7 +118,8 @@ if ($service instanceof AdminInvoiceService
             $amount = is_string($_POST['amount'] ?? null) ? $_POST['amount'] : '';
             $description = is_string($_POST['description'] ?? null) ? $_POST['description'] : '';
             $orderId = is_string($_POST['order_id'] ?? null) ? $_POST['order_id'] : '';
-            $invoice = $service->create($amount, $description, $orderId);
+            $storeId = is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '';
+            $invoice = $service->create($amount, $description, $orderId, $storeId);
             $newInvoiceUrl = $urlManager->url('/checkout/pay.php', ['id' => $invoice['id']]);
 
             $history = is_array($_SESSION['created_invoices'] ?? null)

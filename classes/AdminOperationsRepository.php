@@ -12,6 +12,9 @@ interface AdminOperationsRepository
     /** @return array{id:string,wallet_path:string}|null */
     public function fetchDefaultStore(): ?array;
 
+    /** @return array{id:string,wallet_path:string}|null */
+    public function fetchStore(string $storeId): ?array;
+
     public function createStore(string $id, string $name, string $apiKey, string $walletPath): void;
 
     public function storeExists(string $storeId): bool;
