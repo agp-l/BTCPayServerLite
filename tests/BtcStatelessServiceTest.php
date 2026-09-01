@@ -268,7 +268,11 @@ $tests['keeps exact amounts in the AJAX status response'] = static function (): 
             'missing_amount' => '0.00000002',
         ],
     ];
-    $controller = new BtcStatelessAjaxController($service, 'default_wallet', '/BTCPayLite/admin');
+    $controller = new BtcStatelessAjaxController(
+        $service,
+        'default_wallet',
+        '/BTCPayLite/url-invoice'
+    );
 
     $result = $controller->handleRequest([
         'api_action' => 'check_status',
@@ -278,7 +282,7 @@ $tests['keeps exact amounts in the AJAX status response'] = static function (): 
     statelessAssertSame('0.00000005', $result['amount'], 'The AJAX controller changed the invoice amount.');
     statelessAssertSame('0.00000002', $result['missing_amount'], 'The AJAX controller recalculated the missing amount imprecisely.');
     statelessAssertSame(
-        '/BTCPayLite/admin/url_pay.php?inv=token%2Bwith%2Fslash',
+        '/BTCPayLite/url-invoice?token=token%2Bwith%2Fslash',
         $result['url'],
         'The invoice token was not URL-encoded.'
     );
@@ -286,7 +290,11 @@ $tests['keeps exact amounts in the AJAX status response'] = static function (): 
 
 $tests['rejects non-string AJAX boundary values'] = static function (): void {
     $service = new StatelessControllerTestService();
-    $controller = new BtcStatelessAjaxController($service, 'default_wallet', '/BTCPayLite/admin');
+    $controller = new BtcStatelessAjaxController(
+        $service,
+        'default_wallet',
+        '/BTCPayLite/url-invoice'
+    );
 
     statelessAssertThrows(
         BtcStatelessServiceException::class,
@@ -308,7 +316,7 @@ $tests['validates and maps the public stateless API request'] = static function 
     ];
     $controller = new BtcStatelessApiController(
         $service,
-        'https://payments.example/admin/url_pay.php'
+        'https://payments.example/url-invoice'
     );
 
     $result = $controller->handleRequest(
@@ -321,7 +329,7 @@ $tests['validates and maps the public stateless API request'] = static function 
     statelessAssertSame('api-key', $service->apiKey, 'The Bearer token was parsed incorrectly.');
     statelessAssertSame('0.00000001', $service->apiInput['amount'] ?? null, 'The JSON amount changed.');
     statelessAssertSame(
-        'https://payments.example/admin/url_pay.php?inv=token%2Bwith%2Fslash',
+        'https://payments.example/url-invoice?token=token%2Bwith%2Fslash',
         $result['data']['url'],
         'The public payment URL is invalid.'
     );
@@ -331,7 +339,7 @@ $tests['rejects malformed public API requests'] = static function (): void {
     $service = new StatelessControllerTestService();
     $controller = new BtcStatelessApiController(
         $service,
-        'https://payments.example/admin/url_pay.php'
+        'https://payments.example/url-invoice'
     );
 
     $invalidJson = statelessAssertThrows(
