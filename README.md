@@ -212,7 +212,7 @@ Vytváří stateless fakturu bez databázového invoice záznamu. Přístup je o
 Pro lehkou instalaci není potřeba `Database`, PDO, databázové tabulky, webhook worker ani standardní checkout. Přenositelná vrstva používá tyto komponenty:
 
 - `BitcoinAmount`, `ElectrumRPC`, `ElectrumWallet` a jejich výjimky,
-- `BtcStatelessTokenCodec`, `BtcStatelessInvoiceGateway`, `BtcStatelessInvoiceManager`,
+- `BtcInvoiceManagerException`, `BtcStatelessTokenCodec`, `BtcStatelessInvoiceGateway`, `BtcStatelessInvoiceManager`,
 - volitelně `BtcStatelessService`, `BtcStatelessFactory` a příslušné HTTP controllery,
 - `CheckoutQrCodeGenerator` a `endroid/qr-code` pouze pro lokální QR na platební stránce.
 
