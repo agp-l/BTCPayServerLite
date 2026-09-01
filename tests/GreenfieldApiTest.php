@@ -173,6 +173,23 @@ final class GreenfieldControllerTestService extends GreenfieldApiService
         return ['id' => 'inv_test', 'amount' => $input['amount'] ?? null];
     }
 
+    public function createPayout(
+        string $storeId,
+        array $input,
+        string $apiKey,
+        string $idempotencyKey
+    ): array {
+        $this->calls[] = [
+            'method' => 'createPayout',
+            'store_id' => $storeId,
+            'input' => $input,
+            'api_key' => $apiKey,
+            'idempotency_key' => $idempotencyKey,
+        ];
+
+        return ['id' => 'po_0123456789abcdef0123456789abcdef'];
+    }
+
     public function createWebhook(string $storeId, array $input, string $apiKey): array
     {
         $this->calls[] = [
@@ -448,6 +465,28 @@ $tests['adapts an Apache PATH_INFO request without its query string'] = static f
     greenfieldAssertSame(200, $response['status_code'], 'The Apache request returned the wrong status.');
     greenfieldAssertSame('getStore', $service->calls[0]['method'], 'The Apache path was routed incorrectly.');
     greenfieldAssertSame('store-api-key', $service->calls[0]['api_key'], 'The redirected Bearer token changed.');
+};
+
+$tests['routes idempotent payout requests with their dedicated key'] = static function (): void {
+    $service = new GreenfieldControllerTestService();
+    $controller = new GreenfieldApiController($service);
+
+    $response = $controller->handleServerRequest([
+        'REQUEST_METHOD' => 'POST',
+        'REQUEST_URI' => '/BTCPayLite/api.php/api/v1/stores/store_test/payouts',
+        'SCRIPT_NAME' => '/BTCPayLite/api.php',
+        'HTTP_AUTHORIZATION' => 'token payout-api-key',
+        'HTTP_IDEMPOTENCY_KEY' => 'exchange-order-2026-000001',
+    ], '{"destination":"bc1qtest","amount":"500.00","currency":"CZK"}');
+
+    greenfieldAssertSame(200, $response['status_code'], 'The payout route returned the wrong status.');
+    greenfieldAssertSame('createPayout', $service->calls[0]['method'], 'The payout route called the wrong service.');
+    greenfieldAssertSame('payout-api-key', $service->calls[0]['api_key'], 'The payout API key changed.');
+    greenfieldAssertSame(
+        'exchange-order-2026-000001',
+        $service->calls[0]['idempotency_key'],
+        'The payout idempotency key changed.'
+    );
 };
 
 $tests['rejects malformed JSON and wrong HTTP methods'] = static function (): void {
