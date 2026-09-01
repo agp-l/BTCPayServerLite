@@ -448,7 +448,7 @@ function e(string $value): string
             <a href="#jak-to-funguje">Jak to funguje</a>
             <a href="#moznosti">Možnosti</a>
             <a href="#cenik">Ceník</a>
-            <a href="#faq">Otázky</a>
+            <a href="<?= e($baseUrl . '/dokumentace') ?>">Dokumentace</a>
             <a class="button button-primary" href="<?= e($registerUrl) ?>">Vyzkoušet</a>
         </div>
     </nav>
@@ -696,6 +696,7 @@ Webhook     → objednávka zaplacena</pre>
             <footer class="footer">
                 <span>© <?= date('Y') ?> BTCPay Server Lite. Open-source software pod MIT licencí.</span>
                 <div class="footer-links">
+                    <a href="<?= e($baseUrl . '/dokumentace') ?>">Dokumentace API</a>
                     <a href="<?= e($githubUrl) ?>" target="_blank" rel="noopener noreferrer">GitHub</a>
                     <a href="<?= e($contactUrl) ?>" target="_blank" rel="noopener noreferrer">Kontakt</a>
                     <a href="<?= e($loginUrl) ?>">Přihlášení</a>
