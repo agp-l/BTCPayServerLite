@@ -17,6 +17,7 @@ final class ApplicationRouter
             '/' => $this->page(['GET', 'HEAD'], 'pages/prezentace.php', 'home'),
             '/home' => $this->redirect('/'),
             '/prezentace' => $this->redirect('/'),
+            '/dokumentace' => $this->page(['GET', 'HEAD'], 'pages/dokumentace.php', 'dokumentace'),
             '/login' => $this->page(['GET', 'HEAD', 'POST'], 'client/login.php', 'login'),
             '/forgot-password' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'client/forgot_password.php', 'forgot_password'
