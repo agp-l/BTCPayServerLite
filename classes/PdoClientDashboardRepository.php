@@ -58,6 +58,32 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
         );
     }
 
+    public function findAssignedWallet(int $userId): ?string
+    {
+        $statement = $this->database->getPdo()->prepare(
+            'SELECT wallet_path FROM client_wallets WHERE user_id = ? LIMIT 1'
+        );
+        $statement->execute([$userId]);
+        $walletPath = $statement->fetchColumn();
+
+        return $walletPath === false
+            ? null
+            : $this->string($walletPath, 'assigned wallet path');
+    }
+
+    public function assignWallet(int $userId, string $walletPath, int $assignedAt): void
+    {
+        $statement = $this->database->getPdo()->prepare(
+            "INSERT INTO client_wallets (user_id, wallet_path, created_at, updated_at)
+             SELECT id, ?, ?, ? FROM users
+             WHERE id = ? AND role = 'client' AND status = 'active'"
+        );
+        $statement->execute([$walletPath, $assignedAt, $assignedAt, $userId]);
+        if ($statement->rowCount() !== 1) {
+            throw new RuntimeException('Client wallet could not be assigned.');
+        }
+    }
+
     public function fetchInvoices(int $userId, int $limit): array
     {
         if ($limit < 1 || $limit > 100) {
@@ -116,9 +142,15 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
     public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
     {
         $statement = $this->database->getPdo()->prepare(
-            'INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO stores (id, name, api_key, wallet_path, user_id)
+             SELECT ?, ?, ?, wallet_path, user_id
+             FROM client_wallets
+             WHERE user_id = ? AND wallet_path = ?'
         );
-        $statement->execute([$id, $name, $apiKey, $walletPath, $userId]);
+        $statement->execute([$id, $name, $apiKey, $userId, $walletPath]);
+        if ($statement->rowCount() !== 1) {
+            throw new RuntimeException('Store wallet ownership could not be verified.');
+        }
     }
 
     public function ownsStore(int $userId, string $storeId): bool

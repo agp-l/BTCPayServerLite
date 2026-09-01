@@ -51,6 +51,7 @@ final class ClientRegistrationService
                 $walletPath
             ): int {
                 $userId = $this->auth->registerUser($email, $password, $passwordConfirm);
+                $this->stores->assignWallet($userId, $walletPath, time());
                 $this->stores->createStore(
                     $userId,
                     $storeId,

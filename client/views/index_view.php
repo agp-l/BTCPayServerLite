@@ -51,7 +51,7 @@ $statusClasses = [
   <div class="card-title">
     <span class="card-title-group"><i class="fa-solid fa-store" aria-hidden="true"></i> Obchody a API přístup</span>
   </div>
-  <p class="card-subtitle">Každý obchod má vlastní peněženku a oddělený API klíč.</p>
+  <p class="card-subtitle">Všechny vaše obchody používají jednu peněženku účtu; každý má oddělený API klíč.</p>
 
   <details class="disclosure">
     <summary><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit nový obchod</summary>

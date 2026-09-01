@@ -7,7 +7,6 @@ use BtcPayLite\AuthManager;
 use BtcPayLite\ClientDashboardException;
 use BtcPayLite\ClientDashboardService;
 use BtcPayLite\Database;
-use BtcPayLite\ElectrumCliWalletProvisioner;
 use BtcPayLite\PdoClientDashboardRepository;
 use BtcPayLite\UrlManager;
 use BtcPayLite\WebhookEndpointPolicy;
@@ -50,11 +49,6 @@ $pageError = null;
 $service = null;
 
 try {
-    $walletPath = $config['wallet_path'] ?? null;
-    if (!is_string($walletPath) || trim($walletPath) === '') {
-        throw new RuntimeException('Configured default wallet path is unavailable.');
-    }
-
     $database = new Database(
         $config['db_host'],
         $config['db_name'],
@@ -64,23 +58,6 @@ try {
     );
     $service = new ClientDashboardService(
         new PdoClientDashboardRepository($database),
-        new ElectrumCliWalletProvisioner(
-            is_string($config['electrum_cli_path'] ?? null)
-                ? $config['electrum_cli_path']
-                : (is_string($config['electrum_cli'] ?? null)
-                    ? $config['electrum_cli']
-                    : '/opt/electrum/run_electrum'),
-            is_string($config['electrum_data_dir'] ?? null)
-                ? $config['electrum_data_dir']
-                : (is_string($config['electrum_data_directory'] ?? null)
-                    ? $config['electrum_data_directory']
-                    : '/opt/electrum_config'),
-            is_string($config['store_wallets_dir'] ?? null)
-                ? $config['store_wallets_dir']
-                : (is_string($config['wallet_directory'] ?? null)
-                    ? $config['wallet_directory']
-                    : dirname($walletPath))
-        ),
         new WebhookEndpointPolicy(
             null,
             ($config['allow_local_webhooks'] ?? false) === true
@@ -104,7 +81,7 @@ if ($service instanceof ClientDashboardService && ($_SERVER['REQUEST_METHOD'] ??
         if ($action === 'create_store') {
             $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
             $service->createStore($userId, $name);
-            $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
+            $toastMsg = 'Obchod byl vytvořen se sdílenou peněženkou účtu.';
         } elseif ($action === 'create_webhook') {
             $storeId = is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '';
             $url = is_string($_POST['url'] ?? null) ? $_POST['url'] : '';

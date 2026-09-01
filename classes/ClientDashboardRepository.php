@@ -12,6 +12,10 @@ interface ClientDashboardRepository
     /** @return list<array{id:string,name:string,api_key:string,wallet_path:string}> */
     public function fetchStores(int $userId): array;
 
+    public function findAssignedWallet(int $userId): ?string;
+
+    public function assignWallet(int $userId, string $walletPath, int $assignedAt): void;
+
     /** @return list<array{id:string,store_id:string,store_name:string,amount:string,status:string,created_at:int}> */
     public function fetchInvoices(int $userId, int $limit): array;
 

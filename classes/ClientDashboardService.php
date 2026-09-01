@@ -12,18 +12,15 @@ final class ClientDashboardService
     private const INVOICE_LIMIT = 30;
 
     private ClientDashboardRepository $repository;
-    private StoreWalletProvisioner $walletProvisioner;
     private WebhookEndpointPolicy $webhookPolicy;
     private Closure $clock;
 
     public function __construct(
         ClientDashboardRepository $repository,
-        StoreWalletProvisioner $walletProvisioner,
         WebhookEndpointPolicy $webhookPolicy,
         ?callable $clock = null
     ) {
         $this->repository = $repository;
-        $this->walletProvisioner = $walletProvisioner;
         $this->webhookPolicy = $webhookPolicy;
         $this->clock = $clock === null ? static fn (): int => time() : Closure::fromCallable($clock);
     }
@@ -57,15 +54,44 @@ final class ClientDashboardService
             throw new ClientDashboardException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
         }
 
+        $walletPath = $this->repository->findAssignedWallet($userId);
+        if ($walletPath === null) {
+            $walletPaths = [];
+            foreach ($this->repository->fetchStores($userId) as $existingStore) {
+                $walletPaths[$existingStore['wallet_path']] = true;
+            }
+            if (count($walletPaths) !== 1) {
+                throw new ClientDashboardException(
+                    $walletPaths === []
+                        ? 'Účet nemá přiřazenou peněženku. Kontaktujte administrátora.'
+                        : 'Účet má více historických peněženek. Administrátor musí zvolit jednu.',
+                    409
+                );
+            }
+            $walletPath = (string) array_key_first($walletPaths);
+            try {
+                $assignedAt = ($this->clock)();
+                if (!is_int($assignedAt) || $assignedAt < 1) {
+                    throw new ClientDashboardException('Čas aplikace není dostupný.', 500);
+                }
+                $this->repository->assignWallet($userId, $walletPath, $assignedAt);
+            } catch (\Throwable $exception) {
+                throw new ClientDashboardException(
+                    'Přiřazení peněženky se nyní nepodařilo ověřit.',
+                    409,
+                    $exception
+                );
+            }
+        }
+
         $store = [
             'id' => 'store_' . bin2hex(random_bytes(16)),
             'name' => $name,
             'api_key' => bin2hex(random_bytes(32)),
-            'wallet_path' => '',
+            'wallet_path' => $walletPath,
         ];
 
         try {
-            $store['wallet_path'] = $this->walletProvisioner->provision($store['id']);
             $this->repository->createStore(
                 $userId,
                 $store['id'],
@@ -74,13 +100,6 @@ final class ClientDashboardService
                 $store['wallet_path']
             );
         } catch (Throwable $exception) {
-            if ($store['wallet_path'] !== '') {
-                try {
-                    $this->walletProvisioner->discard($store['wallet_path']);
-                } catch (Throwable $cleanupException) {
-                    error_log('Unused client wallet cleanup failed: ' . $cleanupException::class);
-                }
-            }
             throw new ClientDashboardException(
                 'Obchod se nyní nepodařilo vytvořit. Zkuste to prosím později.',
                 503,
