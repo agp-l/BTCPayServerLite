@@ -9,12 +9,36 @@ CREATE TABLE `users` (
     `email` VARCHAR(254) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
     `role` ENUM('admin', 'client') NOT NULL DEFAULT 'client',
+    `status` ENUM('active', 'suspended') NOT NULL DEFAULT 'active',
+    `session_version` INT UNSIGNED NOT NULL DEFAULT 1,
+    `last_login_at` BIGINT UNSIGNED DEFAULT NULL,
+    `last_login_ip` VARCHAR(45) DEFAULT NULL,
+    `last_seen_at` BIGINT UNSIGNED DEFAULT NULL,
+    `last_seen_ip` VARCHAR(45) DEFAULT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_users_email` (`email`)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `app_settings` (
+    `setting_key` VARCHAR(100) NOT NULL,
+    `setting_value` VARCHAR(255) NOT NULL,
+    `updated_by` INT UNSIGNED DEFAULT NULL,
+    `updated_at` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`setting_key`),
+    KEY `idx_app_settings_updated_by` (`updated_by`),
+    CONSTRAINT `fk_app_settings_updated_by`
+        FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`)
+        ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `app_settings` (`setting_key`, `setting_value`, `updated_by`, `updated_at`)
+VALUES ('registration_enabled', '1', NULL, UNIX_TIMESTAMP());
 
 CREATE TABLE `auth_attempts` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -40,6 +64,39 @@ CREATE TABLE `stores` (
     CONSTRAINT `fk_stores_user`
         FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
         ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `client_wallets` (
+    `user_id` INT UNSIGNED NOT NULL,
+    `wallet_path` VARCHAR(255) NOT NULL,
+    `created_at` BIGINT UNSIGNED NOT NULL,
+    `updated_at` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`user_id`),
+    UNIQUE KEY `uq_client_wallets_path` (`wallet_path`),
+    CONSTRAINT `fk_client_wallets_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+        ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `password_reset_tokens` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `token_hash` BINARY(32) NOT NULL,
+    `expires_at` BIGINT UNSIGNED NOT NULL,
+    `used_at` BIGINT UNSIGNED DEFAULT NULL,
+    `requested_ip` VARCHAR(45) DEFAULT NULL,
+    `created_at` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_password_reset_token` (`token_hash`),
+    KEY `idx_password_reset_user` (`user_id`, `created_at`),
+    KEY `idx_password_reset_expiry` (`expires_at`, `used_at`),
+    CONSTRAINT `fk_password_reset_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+        ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
