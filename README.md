@@ -2,7 +2,7 @@
 
 Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
-> Stav dokumentace: větev `main` po refaktoru dashboardů, checkoutu a administračního rozhraní, 31. srpna 2026. Označení „auditováno“ níže znamená, že komponenta prošla samostatnou kontrolou a kontraktními testy; produkční nasazení stále vyžaduje smoke test proti skutečné databázi a Electrum daemonu.
+> Stav dokumentace: správa uživatelů a provozní dohled, 1. září 2026. Produkční nasazení stále vyžaduje zálohu, migrace a smoke test proti skutečné databázi, poštovnímu systému a Electrum daemonu.
 
 ## Aktuální stav auditu
 
@@ -23,10 +23,13 @@ Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. 
 - `BtcDashboard`, přesné wallet výpočty a oddělený HTTP provider tržních dat,
 - administrační dashboard, peněženka, obchody, faktury a webhooky s repository/service vrstvou,
 - klientský dashboard a registrace s objektovým store scopingem, transakcemi a bezpečným provisioningem peněženek,
+- správa klientských a administračních účtů, změna a jednorázová obnova hesla, pozastavení účtu a zneplatnění starších relací,
+- jedna kanonická peněženka na klienta, admin přehled klientů a živých zůstatků,
+- provozní metadata API požadavků, rozpoznané pluginy/e-shopy a klientský přehled faktur, výběrů a integrací,
 - široký responzivní design systém administrace v grafitově černé a fialové paletě a samostatný design klientského portálu,
 - databázové preflighty a migrace pro auditované části.
 
-V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a dashboard controllery jsou nyní rozdělené podle odpovědností; další audit se proto soustředí hlavně na zbývající vstupní body a deployment.
+Třídy a rozhraní v `classes/` jsou rozdělené podle odpovědností; další kontrola se proto soustředí hlavně na deployment a integrační smoke test.
 
 ### Hlavní soubory mimo `classes/`
 
@@ -43,8 +46,9 @@ V adresáři `classes/` je 60 tříd a rozhraní. Původní velké UI třídy a 
 | `admin/views/`, `assets/admin.css` | Přepracováno | Sdílený široký a responzivní dark design systém dashboardu, peněženky, obchodů, faktur, webhooků a URL faktur; primární akce používají fialový akcent a provozní stavy vlastní sémantické barvy. |
 | `admin/url_invoices.php`, `admin/views/url_invoices_view.php` | Přepracováno | Admin generátor používá samostatnou factory bez databáze, CSRF, procesní zámek, bezpečné JSON chyby a oddělený JavaScript pro lokální historii. |
 | `admin/url_pay.php`, `admin/views/url_pay_view.php` | Přepracováno | Veřejný checkout podepsaného tokenu bez admin session, databázového invoice záznamu a externích QR služeb; podporuje kanonické i starší odkazy. |
-| `client/login.php`, `client/registrace.php` a session | Přepracováno a auditováno | CSRF, bezpečné chyby, throttling, cookie/session limity, regenerace ID, POST logout a transakční registrace se samostatnou peněženkou. |
-| `client/index.php`, klientský dashboard | Přepracováno a auditováno | Tenký controller, user-scoped repository, bezpečný wallet provisioner, CSRF a escapované responzivní views. |
+| `client/login.php`, registrace a obnova hesla | Přepracováno | CSRF, throttling, bezpečné session, změna hesla, jednorázový 30minutový reset token a jednotná odpověď bez zjišťování existence účtu. |
+| `client/index.php`, klientský dashboard | Přepracováno | User-scoped obchody, jedna peněženka účtu, živý zůstatek, faktury, výběry, webhooky, integrace a API provoz. |
+| `admin/users.php`, `admin/settings.php` | Nově implementováno | Správa klientů, pozastavení účtu, přehled peněženek/zůstatků/provozu a vypnutí veřejných registrací. |
 | `config.php` a deployment | Čeká | Správa tajemství, oprávnění souboru, produkční hodnoty a oddělení prostředí. |
 | `sql.sql` | Částečně auditováno | Obsahuje nové schéma; čistá instalace a upgrade z více historických verzí ještě potřebují samostatný test. |
 | testovací a pomocné skripty | Částečně uklizeno | Veřejný debugger, stará registrace a zastaralé ruční testy byly odstraněny. `eshop_simulator.php` bude přepracován na univerzální integrační ukázku mimo web root v `tools/`. |
@@ -216,6 +220,8 @@ Cílem není vydávat aplikaci za celý BTCPay Server, ale implementovat stabiln
 
 Primární autentizace kompatibilní s oficiálním klientem je `Authorization: token <api-key>`; kvůli starším klientům zůstává podporované také `Authorization: Bearer <api-key>`. Odpověď aktuálního API klíče záměrně deklaruje pouze skutečně implementovaná oprávnění, takže plugin nemá nabýt dojmu, že jsou dostupné refundace nebo pull payments.
 
+Pro pojmenovaný přehled integrací může e-shop posílat `X-BTCPay-Plugin-Name`, `X-BTCPay-Plugin-Version` a `X-BTCPay-Shop-URL`. Z URL se ukládá pouze origin (schéma, host a volitelný port). Bez těchto hlaviček se stále zaznamená metoda, cesta, HTTP stav, trvání, čas a příslušný obchod; nikdy autorizační hlavička ani tělo požadavku.
+
 Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency`. Pro `BTC` a `SAT` probíhá převod bez `float`; podporované fiat měny se převádějí přes nakonfigurovaný tržní provider. Volby `checkout.redirectURL`, `checkout.redirectAutomatically` a `checkout.expirationMinutes` jsou zachované. Výsledná odpověď obsahuje BTCPay kompatibilní `checkoutLink`, stav, metadata a on-chain payment method `BTC-CHAIN`.
 
 Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
@@ -314,6 +320,7 @@ return [
     'secret_key' => '...',
     'cron_key' => '...',
     'app_url' => 'https://pay.example.com',
+    'password_reset_from' => 'no-reply@example.com',
     'wallet_path' => '/opt/btcpay_wallets/admin_wallet',
     'electrum_cli_path' => '/opt/electrum/run_electrum',
     'electrum_data_dir' => '/opt/electrum_config',
@@ -339,11 +346,13 @@ return [
 
 `app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Pro wallet nástroje jsou podporované nové klíče `electrum_cli_path`, `electrum_data_dir`, `store_wallets_dir` i kompatibilní starší názvy `electrum_cli`, `electrum_data_directory`, `wallet_directory`. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
+`password_reset_from` musí být platná adresa odesílatele a server musí mít funkční PHP `mail()`/MTA. Resetovací token se do databáze ukládá pouze jako SHA-256, platí 30 minut, je jednorázový a po změně hesla zvýší verzi relace.
+
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
 ## Databáze a migrace
 
-Produkční schéma používá tabulky `users`, `auth_attempts`, `stores`, `invoices`, `webhooks`, `webhook_deliveries` a volitelný výplatní ledger `payouts` s indexy a cizími klíči.
+Produkční schéma navíc používá `app_settings`, `client_wallets`, `password_reset_tokens`, `api_request_log` a `store_integrations`. Request log neukládá autorizační hlavičky, API klíče ani těla požadavků.
 
 Audit přidal tyto jednorázové migrace a read-only kontroly:
 
@@ -355,8 +364,11 @@ Audit přidal tyto jednorázové migrace a read-only kontroly:
 - `migrations/20260831_add_auth_attempts.sql`
 - `migrations/20260901_payout_preflight.sql`
 - `migrations/20260901_add_payouts.sql`
+- `migrations/20260901_user_accounts_preflight.sql`
+- `migrations/20260901_add_user_accounts.sql`
+- `migrations/20260901_add_request_monitoring.sql`
 
-Každou migrační SQL spusťte nejvýše jednou a až po záloze databáze. Preflight musí skončit bez problémů. Migrační soubory nejsou obecný idempotentní instalační skript.
+Po ověřené záloze spusťte nejprve `20260901_user_accounts_preflight.sql`. Vypíše klienty s více peněženkami, sdílenou cestou nebo bez obchodu; tyto případy se nesmí automaticky přepisovat. Poté spusťte `20260901_add_user_accounts.sql` a `20260901_add_request_monitoring.sql`. Nové registrace již zapisují jednu kanonickou peněženku. U starého klienta s jedinou cestou ji může admin explicitně převzít v detailu klienta.
 
 ## Instalace a požadavky
 
@@ -419,6 +431,9 @@ php tests/AdminManagementBoundaryTest.php
 php tests/AdminInvoiceServiceTest.php
 php tests/ClientRegistrationServiceTest.php
 php tests/ClientRegistrationBoundaryTest.php
+php tests/UserAccountServiceTest.php
+php tests/PasswordResetMailerTest.php
+php tests/AdminUserServiceTest.php
 ```
 
 Vedle testů je před nasazením nutný smoke test proti skutečné testovací databázi a Electrum daemonu. Testovací webhooky nikdy nesměřujte na produkční příjemce.
