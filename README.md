@@ -59,7 +59,7 @@ Mazání je záměrně omezené. Webhook lze odstranit, ale obchod lze smazat po
 | `api.php` | Přepracováno | Kompatibilní podmnožina BTCPay Greenfield API pro pluginy: `token` i `Bearer` autentizace, server/API-key discovery, store/payment-method informace, faktury, webhooky, store scoping a bezpečné chyby. |
 | `api_stateless.php` | Auditováno | Stateless API, omezení vstupu, autentizace, zámek Electrumu a bezpečné HTTP odpovědi. |
 | `webhook_cron.php` | Auditováno | Pouze CLI nebo HTTP `POST` s Bearer tokenem; používá persistentní outbox. |
-| `.htaccess` | Auditováno pro API | Předávání hlavičky `Authorization` do PHP. |
+| `.htaccess` | Auditováno pro API a instalaci | Předávání hlavičky `Authorization` do PHP a zákaz stažení konfigurace, instalačního zámku a dočasných souborů s tajemstvími. |
 | `admin/stores.php`, `admin/invoices.php`, `admin/webhooks.php` | Přepracováno a auditováno | Tenké controllery, jednotná oprávnění a CSRF, validované služby, přesné BTC částky a společná webhook URL policy. |
 | `checkout/pay.php`, `checkout/views/`, `assets/checkout.*` | Přepracováno a auditováno | Tenký veřejný controller pro databázové faktury, bezpečný JSON status endpoint, přesné částky, lokálně generovaný BIP21 QR kód, zelený responzivní design a žádné předávání platebních dat externí službě. |
 | `index.php` | Přepracováno a auditováno | Tenký front controller, deklarativní router, role, bezpečný výběr handleru, kanonické redirecty a jednotné HTTP chyby. |
@@ -440,6 +440,8 @@ composer dump-autoload --optimize
 
 Instalátor přijímá pouze prázdnou databázi. Nejde o upgrade nástroj a nikdy se nesmí spouštět nad existující produkční databází. Schéma vytvoří všechny tabulky, výchozí registrační politiku a přesně jeden aktivní účet s rolí `admin`; žádný ukázkový obchod ani veřejný API klíč se nevytváří. `admin_api_key`, podpisový `secret_key` a `cron_key` se generují kryptograficky na serveru.
 
+Nenainstalovanou instanci nenechávejte volně dostupnou z internetu: první návštěvník instalačního formuláře by mohl založit vlastní administrační účet. Instalaci dokončete za firewallem, přes VPN nebo s dočasným omezením přístupu v Apache/Nginx a teprve potom aplikaci zveřejněte. Produkční formulář otevírejte výhradně přes HTTPS.
+
 Pokud PHP nemůže zapsat do kořene projektu, vytvořte `config.php` ručně podle sekce Konfigurace nebo dočasně upravte vlastnictví adresáře. Po instalaci ponechte soubor čitelný pouze pro uživatele PHP; instalátor se pokusí nastavit režim `0600`. Soubor nikdy necommitujte – je zahrnutý v `.gitignore`.
 
 Apache ochranu tajných instalačních souborů obsahuje v `.htaccess`. U Nginx přidejte ekvivalentní zákaz a teprve potom obecné PHP pravidlo:
@@ -533,7 +535,7 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 ## Doporučené pořadí dalšího auditu
 
 1. Přepracování `eshop_simulator.php` na univerzální integrační ukázku v `tools/` pro externí e-shopy a další systémy.
-2. `config.php`, přesun tajemství do prostředí, oprávnění souborů a produkční security headers.
-3. Čistá instalace z `sql.sql`, upgrade cesta a deployment hardening.
+2. Přesun produkčních tajemství z `config.php` do prostředí nebo secret manageru a kontrola hlaviček na skutečné reverse proxy.
+3. Smoke test webového instalátoru na podporované MariaDB/MySQL a automatizovaná upgrade cesta pro historické databáze.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
