@@ -107,12 +107,27 @@ $statusClasses = [
         </div>
         <div class="credential">
           <span class="credential-label">API klíč</span>
-          <div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="API klíč"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit API klíč"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat API klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div>
+          <div class="credential-value">
+            <input type="password" readonly value="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="API klíč">
+            <button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit API klíč"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
+            <button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['api_key'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat API klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+            <form method="post" action="<?php echo $clientUrl; ?>" class="inline-edit-form" data-confirm="Vyměnit API klíč? Starý klíč přestane okamžitě platit.">
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+              <input type="hidden" name="action" value="rotate_store_key">
+              <input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+              <button class="ghost-btn" type="submit" aria-label="Vyměnit API klíč"><i class="fa-solid fa-rotate"></i> Vyměnit</button>
+            </form>
+          </div>
         </div>
         <div class="store-metrics muted">Faktury: <?php echo (int) $store['invoice_count']; ?> · Webhooky: <?php echo (int) $store['webhook_count']; ?> · Výběry: <?php echo (int) $store['payout_count']; ?></div>
-        <details class="disclosure compact-disclosure"><summary><i class="fa-solid fa-pen"></i> Nastavení obchodu</summary><div class="disclosure-body form-stack">
-          <form method="post" action="<?php echo $clientUrl; ?>" class="form-stack"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rename_store"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><div class="field"><label>Název</label><div class="input-wrap"><input name="store_name" maxlength="100" value="<?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div><button class="ghost-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Uložit</button></form>
-          <form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Vyměnit API klíč? Starý klíč přestane okamžitě platit."><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_store_key"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="ghost-btn" type="submit"><i class="fa-solid fa-rotate"></i> Vyměnit API klíč</button></form>
+        <form method="post" action="<?php echo $clientUrl; ?>" class="form-stack">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+          <input type="hidden" name="action" value="rename_store">
+          <input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+          <div class="field"><label for="storeName-<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>">Název obchodu</label><div class="input-wrap"><input id="storeName-<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" name="store_name" maxlength="100" value="<?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div>
+          <button class="ghost-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Uložit název</button>
+        </form>
+        <details class="disclosure compact-disclosure"><summary><i class="fa-solid fa-ellipsis"></i> Další akce</summary><div class="disclosure-body form-stack">
           <?php if ((int) $store['invoice_count'] === 0 && (int) $store['payout_count'] === 0): ?><form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Odstranit prázdný obchod a jeho webhooky?"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="delete_store"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="danger-btn" type="submit"><i class="fa-solid fa-trash"></i> Odstranit obchod</button></form><?php else: ?><div class="surface-note"><i class="fa-solid fa-lock"></i><span>Obchod s finanční historií nelze odstranit.</span></div><?php endif; ?>
         </div></details>
       </article>

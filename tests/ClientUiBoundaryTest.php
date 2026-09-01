@@ -49,6 +49,16 @@ if (substr_count($sources['view'], 'name="csrf_token"') < 3) {
 }
 echo "[PASS] protects every client dashboard mutation with CSRF\n";
 
+if (
+    !str_contains($sources['view'], 'name="action" value="rename_store"')
+    || !str_contains($sources['view'], 'name="action" value="rotate_store_key"')
+    || !str_contains($sources['controller'], '$service->renameStore(')
+    || !str_contains($sources['controller'], '$service->rotateStoreApiKey(')
+) {
+    throw new RuntimeException('Client store name or API key management is missing from the UI boundary.');
+}
+echo "[PASS] exposes client store name and API key management\n";
+
 if (str_contains($sources['header'], '<style>') || !str_contains($sources['header'], '/assets/admin.css')) {
     throw new RuntimeException('Client layout does not use the shared application design system.');
 }
@@ -83,4 +93,4 @@ if (
 }
 echo "[PASS] restricts wallet cleanup to managed store wallets\n";
 
-echo "8 client UI boundary tests passed.\n";
+echo "9 client UI boundary tests passed.\n";
