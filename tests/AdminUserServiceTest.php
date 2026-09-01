@@ -24,6 +24,7 @@ final class AdminUserRepositoryFixture implements AdminUserRepository
         $this->status = $status;
         return true;
     }
+    public function adoptSingleWallet(int $userId, int $assignedAt): bool { return $userId === 7; }
     private function client(): array
     {
         return [
@@ -57,7 +58,9 @@ $service->setStatus(7, 'suspended');
 if ($repository->status !== 'suspended') {
     throw new RuntimeException('Client status was not changed.');
 }
+$service->adoptSingleWallet(7);
 
 echo '[PASS] composes client operations and live wallet balance' . PHP_EOL;
 echo '[PASS] changes only a validated client status' . PHP_EOL;
-echo '2 AdminUserService tests passed.' . PHP_EOL;
+echo '[PASS] adopts only an unambiguous historical wallet' . PHP_EOL;
+echo '3 AdminUserService tests passed.' . PHP_EOL;

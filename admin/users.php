@@ -43,17 +43,22 @@ $selectedUserId = is_string($_GET['user_id'] ?? null) && ctype_digit($_GET['user
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
-        if (($_POST['action'] ?? null) !== 'set_status') {
-            throw new AuthException('Neplatná akce formuláře.');
-        }
+        $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
         $selectedUserId = is_string($_POST['user_id'] ?? null) && ctype_digit($_POST['user_id'])
             ? (int) $_POST['user_id']
             : 0;
-        $service->setStatus(
-            $selectedUserId,
-            is_string($_POST['status'] ?? null) ? $_POST['status'] : ''
-        );
-        $toastMsg = 'Stav klienta byl změněn a jeho starší relace ukončeny.';
+        if ($action === 'set_status') {
+            $service->setStatus(
+                $selectedUserId,
+                is_string($_POST['status'] ?? null) ? $_POST['status'] : ''
+            );
+            $toastMsg = 'Stav klienta byl změněn a jeho starší relace ukončeny.';
+        } elseif ($action === 'adopt_wallet') {
+            $service->adoptSingleWallet($selectedUserId);
+            $toastMsg = 'Jediná historická peněženka byla přiřazena klientovi.';
+        } else {
+            throw new AuthException('Neplatná akce formuláře.');
+        }
     } catch (AuthException $exception) {
         $pageError = $exception->getMessage();
     } catch (Throwable $exception) {

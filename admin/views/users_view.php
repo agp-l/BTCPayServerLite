@@ -55,6 +55,17 @@ $formatTime = static fn (?int $value): string => $value === null ? '—' : date(
     <article class="stat-card"><div class="stat-label">Webhooky / integrace</div><div class="stat-value"><?php echo (int) $client['webhook_count']; ?> / <?php echo (int) $client['integration_count']; ?></div><div class="stat-meta">Aktivní napojení obchodů</div></article>
   </section>
 
+  <?php if ($client['wallet_path'] === null && (int) $client['wallet_count'] === 1): ?>
+    <section class="card">
+      <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Klient má jednu historickou peněženku, ale ještě není zapsána jako vlastník účtu. Přiřazení nemění cestu žádného obchodu.</span></div>
+      <form method="post" action="<?php echo $routeUrl('/admin/users'); ?>">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="action" value="adopt_wallet"><input type="hidden" name="user_id" value="<?php echo (int) $client['id']; ?>">
+        <button type="submit" class="primary"><i class="fa-solid fa-wallet" aria-hidden="true"></i> Přiřadit jedinou historickou peněženku</button>
+      </form>
+    </section>
+  <?php endif; ?>
+
   <section class="card"><div class="card-title"><span class="card-title-group"><i class="fa-solid fa-store"></i> Obchody a webhooky</span></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Obchod</th><th>Store ID</th><th>Peněženka</th><th>Faktury</th><th>Webhooky</th><th>Poslední faktura</th></tr></thead><tbody>
   <?php foreach ($detail['stores'] as $store): ?><tr><td><strong><?php echo htmlspecialchars((string) $store['name'], ENT_QUOTES, 'UTF-8'); ?></strong></td><td><code><?php echo htmlspecialchars((string) $store['id'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><code><?php echo htmlspecialchars((string) $store['wallet_path'], ENT_QUOTES, 'UTF-8'); ?></code></td><td><?php echo (int) $store['invoice_count']; ?></td><td><?php echo (int) $store['webhook_count']; ?></td><td><?php echo htmlspecialchars($formatTime($store['last_invoice_at']), ENT_QUOTES, 'UTF-8'); ?></td></tr><?php endforeach; ?>
   </tbody></table></div></section>

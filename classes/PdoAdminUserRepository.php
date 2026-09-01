@@ -136,6 +136,49 @@ final class PdoAdminUserRepository implements AdminUserRepository
         return $statement->fetchColumn() !== false;
     }
 
+    public function adoptSingleWallet(int $userId, int $assignedAt): bool
+    {
+        return $this->database->transactional(function (PDO $pdo) use ($userId, $assignedAt): bool {
+            $statement = $pdo->prepare(
+                'SELECT wallet_path FROM client_wallets WHERE user_id = ? LIMIT 1 FOR UPDATE'
+            );
+            $statement->execute([$userId]);
+            if ($statement->fetchColumn() !== false) {
+                return true;
+            }
+
+            $statement = $pdo->prepare(
+                "SELECT s.wallet_path
+                 FROM stores s
+                 INNER JOIN users u ON u.id = s.user_id
+                 WHERE s.user_id = ? AND u.role = 'client'
+                 FOR UPDATE"
+            );
+            $statement->execute([$userId]);
+            $paths = [];
+            $rows = $statement->fetchAll(PDO::FETCH_COLUMN);
+            if (!is_array($rows)) {
+                return false;
+            }
+            foreach ($rows as $walletPath) {
+                if (is_string($walletPath) && $walletPath !== '') {
+                    $paths[$walletPath] = true;
+                }
+            }
+            if (count($paths) !== 1) {
+                return false;
+            }
+
+            $walletPath = (string) array_key_first($paths);
+            $statement = $pdo->prepare(
+                'INSERT INTO client_wallets (user_id, wallet_path, created_at, updated_at)
+                 VALUES (?, ?, ?, ?)'
+            );
+            $statement->execute([$userId, $walletPath, $assignedAt, $assignedAt]);
+            return $statement->rowCount() === 1;
+        });
+    }
+
     private function clientSelect(): string
     {
         return "SELECT

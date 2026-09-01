@@ -41,7 +41,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $_SESSION['auth_issued_at'] = time();
         $_SESSION['auth_last_activity'] = time();
         if (!session_regenerate_id(true)) {
-            throw new AuthException('Heslo bylo změněno, ale relaci je nutné obnovit přihlášením.');
+            (new AuthManager($database))->logout();
+            header('Location: ' . $urlManager->url('/login'), true, 303);
+            exit;
         }
         $success = 'Heslo bylo změněno. Ostatní přihlášené relace byly ukončeny.';
     } catch (AuthException $exception) {

@@ -25,4 +25,6 @@ interface AdminUserRepository
     public function listPayouts(int $userId, int $limit): array;
 
     public function setClientStatus(int $userId, string $status): bool;
+
+    public function adoptSingleWallet(int $userId, int $assignedAt): bool;
 }

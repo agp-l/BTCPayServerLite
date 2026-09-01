@@ -69,4 +69,13 @@ final class AdminUserService
             throw new AuthException('Klient nebyl nalezen.');
         }
     }
+
+    public function adoptSingleWallet(int $userId): void
+    {
+        if ($userId < 1 || !$this->users->adoptSingleWallet($userId, time())) {
+            throw new AuthException(
+                'Peněženku nelze přiřadit automaticky. Klient musí mít právě jednu historickou peněženku.'
+            );
+        }
+    }
 }

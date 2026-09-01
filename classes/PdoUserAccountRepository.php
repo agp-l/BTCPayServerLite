@@ -31,13 +31,17 @@ final class PdoUserAccountRepository implements UserAccountRepository
     {
         $statement = $this->database->getPdo()->prepare(
             "INSERT INTO app_settings (setting_key, setting_value, updated_by, updated_at)
-             VALUES ('registration_enabled', ?, ?, ?)
+             SELECT 'registration_enabled', ?, id, ? FROM users
+             WHERE id = ? AND role = 'admin' AND status = 'active'
              ON DUPLICATE KEY UPDATE
                  setting_value = VALUES(setting_value),
                  updated_by = VALUES(updated_by),
                  updated_at = VALUES(updated_at)"
         );
-        $statement->execute([$enabled ? '1' : '0', $adminUserId, $changedAt]);
+        $statement->execute([$enabled ? '1' : '0', $changedAt, $adminUserId]);
+        if ($statement->rowCount() < 1) {
+            throw new AuthException('Nastavení může změnit pouze aktivní administrátor.');
+        }
     }
 
     public function findAccountById(int $userId): ?array
