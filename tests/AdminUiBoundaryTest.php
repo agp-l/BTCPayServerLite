@@ -12,6 +12,7 @@ $storesView = file_get_contents(__DIR__ . '/../admin/views/stores_view.php');
 $invoicesView = file_get_contents(__DIR__ . '/../admin/views/invoices_view.php');
 $urlInvoices = file_get_contents(__DIR__ . '/../admin/url_invoices.php');
 $urlInvoicesView = file_get_contents(__DIR__ . '/../admin/views/url_invoices_view.php');
+$urlInvoicesScript = file_get_contents(__DIR__ . '/../assets/url-invoices.js');
 
 foreach (compact(
     'dashboard',
@@ -23,7 +24,8 @@ foreach (compact(
     'storesView',
     'invoicesView',
     'urlInvoices',
-    'urlInvoicesView'
+    'urlInvoicesView',
+    'urlInvoicesScript'
 ) as $name => $source) {
     if (!is_string($source)) {
         throw new RuntimeException("{$name} source could not be read.");
@@ -85,6 +87,7 @@ if (
     || str_contains($urlInvoicesView, 'onclick=')
     || str_contains($urlInvoicesView, 'onchange=')
     || str_contains($urlInvoicesView, 'style=')
+    || preg_match('/<script>(.|\\n)*<\\/script>/', $urlInvoicesView)
 ) {
     throw new RuntimeException('Stateless invoice view still performs unsafe inline rendering.');
 }
@@ -93,7 +96,8 @@ echo "[PASS] renders stateless invoice history without unsafe inline HTML\n";
 if (
     !str_contains($urlInvoices, "ini_set('display_errors', '0')")
     || !str_contains($urlInvoices, 'requireCsrfToken')
-    || !str_contains($urlInvoicesView, "formData.set('csrf_token'")
+    || !str_contains($urlInvoicesView, 'data-csrf-token')
+    || !str_contains($urlInvoicesScript, "formData.set('csrf_token'")
 ) {
     throw new RuntimeException('Stateless invoice admin mutations are not protected at the HTTP boundary.');
 }
