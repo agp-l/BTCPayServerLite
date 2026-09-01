@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use BtcPayLite\AuthManager;
+use BtcPayLite\AuthException;
 use BtcPayLite\BtcDashboard;
 use BtcPayLite\BtcInvoiceManagerException;
 use BtcPayLite\BtcStatelessAjaxController;
@@ -65,6 +66,14 @@ if ($requestMethod === 'POST' && isset($_POST['api_action'])) {
         echo json_encode(
             $response,
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+    } catch (AuthException $exception) {
+        ob_end_clean();
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(
+            ['status' => 'error', 'message' => 'Bezpečnostní token formuláře není platný.'],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
     } catch (BtcStatelessServiceException | BtcInvoiceManagerException $exception) {
         ob_end_clean();
