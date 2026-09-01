@@ -21,8 +21,6 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
 {
     private const MAX_EXPIRATION_MINUTES = 43_200;
     private const MAX_METADATA_BYTES = 16_384;
-    private const MAX_STATELESS_JSON_BYTES = 1_024;
-    private const MAX_DESCRIPTION_BYTES = 255;
     private const INTERNAL_REQUEST_ID_KEY = '_btcpaylite_electrum_request_id';
 
     private const ELECTRUM_STATUS_EXPIRED = 1;
@@ -427,28 +425,6 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         return $isExpired || $electrumStatus === self::ELECTRUM_STATUS_EXPIRED
             ? 'Expired'
             : 'New';
-    }
-
-    private function statelessStatus(
-        ?int $electrumStatus,
-        BitcoinAmount $confirmed,
-        BitcoinAmount $received,
-        BitcoinAmount $expected,
-        bool $isExpired
-    ): string {
-        if ($electrumStatus === self::ELECTRUM_STATUS_PAID || $confirmed->compare($expected) >= 0) {
-            return 'paid';
-        }
-        if ($electrumStatus === self::ELECTRUM_STATUS_UNCONFIRMED || $received->compare($expected) >= 0) {
-            return 'pending_mempool';
-        }
-        if ($received->isPositive()) {
-            return 'underpaid';
-        }
-
-        return $isExpired || $electrumStatus === self::ELECTRUM_STATUS_EXPIRED
-            ? 'expired'
-            : 'unpaid';
     }
 
     /**
