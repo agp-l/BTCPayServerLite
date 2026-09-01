@@ -59,7 +59,11 @@ $statusClasses = [
       <td><code><?php echo htmlspecialchars((string) $invoice['amount'], ENT_QUOTES, 'UTF-8'); ?> BTC</code></td>
       <td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars((string) $invoice['status'], ENT_QUOTES, 'UTF-8'); ?></span></td>
       <td class="muted"><?php echo date('d.m.Y H:i:s', (int) $invoice['expires_at']); ?></td>
-      <td><a class="ghost-btn" target="_blank" rel="noopener" href="<?php echo htmlspecialchars($urlManager->url('/pay', ['id' => (string) $invoice['id']]), ENT_QUOTES, 'UTF-8'); ?>"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td>
+      <td><div class="table-actions"><a class="ghost-btn" target="_blank" rel="noopener" href="<?php echo htmlspecialchars($urlManager->url('/pay', ['id' => (string) $invoice['id']]), ENT_QUOTES, 'UTF-8'); ?>"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+      <?php if ($invoice['status'] !== 'Settled'): ?><form method="post" action="<?php echo $invoicesUrl; ?>" class="inline-edit-form" data-confirm="Opravdu ručně změnit stav této nezaplacené faktury?">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="change_status"><input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string) $invoice['id'], ENT_QUOTES, 'UTF-8'); ?>">
+        <select name="status" aria-label="Nový stav faktury"><?php foreach ($invoiceStatuses as $status): ?><?php if ($status !== 'Settled'): ?><option value="<?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $invoice['status'] === $status ? 'selected' : ''; ?>><?php echo htmlspecialchars($status, ENT_QUOTES, 'UTF-8'); ?></option><?php endif; ?><?php endforeach; ?></select><button class="ghost-btn" type="submit" aria-label="Uložit stav"><i class="fa-solid fa-floppy-disk"></i></button>
+      </form><?php endif; ?></div></td>
     </tr>
   <?php endforeach; ?>
   </tbody></table></div>

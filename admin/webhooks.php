@@ -11,6 +11,7 @@ use BtcPayLite\AuthManager;
 use BtcPayLite\Database;
 use BtcPayLite\PdoAdminManagementRepository;
 use BtcPayLite\UrlManager;
+use BtcPayLite\WebhookEndpointPolicy;
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -56,7 +57,8 @@ try {
         (int) ($config['db_port'] ?? 3306)
     );
     $management = new AdminManagementService(
-        new PdoAdminManagementRepository($database->getPdo())
+        new PdoAdminManagementRepository($database->getPdo()),
+        new WebhookEndpointPolicy(null, ($config['allow_local_webhooks'] ?? false) === true)
     );
 } catch (Throwable $exception) {
     error_log(sprintf('Admin webhooks initialization failed: %s (%s)', $exception->getMessage(), $exception::class));
@@ -64,7 +66,10 @@ try {
     $pageError = 'Správa webhooků nyní není dostupná.';
 }
 
-if ($service instanceof AdminOperationsService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+if ($service instanceof AdminOperationsService
+    && $management instanceof AdminManagementService
+    && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+) {
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
@@ -77,6 +82,17 @@ if ($service instanceof AdminOperationsService && ($_SERVER['REQUEST_METHOD'] ??
             $webhookId = is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : '';
             $service->deleteWebhook($webhookId);
             $toastMsg = 'Webhook byl odstraněn.';
+        } elseif ($action === 'update') {
+            $management->updateWebhook(
+                is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : '',
+                is_string($_POST['url'] ?? null) ? $_POST['url'] : ''
+            );
+            $toastMsg = 'Webhook URL byla ověřena a změněna.';
+        } elseif ($action === 'rotate_secret') {
+            $management->rotateWebhookSecret(
+                is_string($_POST['webhook_id'] ?? null) ? $_POST['webhook_id'] : ''
+            );
+            $toastMsg = 'Podpisový secret byl nahrazen.';
         } else {
             throw new AdminOperationsException('Neznámá operace správy webhooků.');
         }

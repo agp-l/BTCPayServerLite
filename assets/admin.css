@@ -435,6 +435,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .filter-bar-wide .field { flex-basis: 190px; }
 .filter-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding-bottom: 1px; }
 .store-metrics { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--admin-border); font-size: 0.82rem; }
+.compact-disclosure { margin-top: 14px; }
+.table-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.inline-edit-form { display: flex; align-items: center; gap: 7px; }
+.inline-edit-form select { min-width: 126px; }
+.webhook-actions { min-width: min(300px, 100%); }
 .invoice-url { margin-top: 14px; padding: 11px 12px; border: 1px solid var(--admin-line); border-radius: 10px; background: rgba(7, 8, 12, 0.48); word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; }
 .invoice-url a { color: var(--admin-accent-light); text-decoration: none; }
 .invoice-url a:hover { text-decoration: underline; }

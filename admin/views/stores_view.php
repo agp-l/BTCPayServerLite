@@ -81,6 +81,28 @@ $storesUrl = $routeUrl('/admin/stores');
           <div class="store-metrics muted">
             Faktury: <?php echo (int) $store['invoice_count']; ?> · Webhooky: <?php echo (int) $store['webhook_count']; ?> · Výběry: <?php echo (int) $store['payout_count']; ?>
           </div>
+          <details class="disclosure compact-disclosure">
+            <summary><i class="fa-solid fa-pen"></i> Správa obchodu</summary>
+            <div class="disclosure-body form-stack">
+              <form method="post" action="<?php echo $storesUrl; ?>" class="form-stack">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rename"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars((string) $store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="field"><label>Název obchodu</label><div class="input-wrap"><input name="store_name" maxlength="100" value="<?php echo htmlspecialchars((string) $store['name'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div>
+                <button type="submit" class="ghost-btn"><i class="fa-solid fa-floppy-disk"></i> Uložit název</button>
+              </form>
+              <form method="post" action="<?php echo $storesUrl; ?>" data-confirm="Opravdu nahradit API klíč? Stávající integrace se okamžitě odpojí.">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_api_key"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars((string) $store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                <button type="submit" class="ghost-btn"><i class="fa-solid fa-rotate"></i> Vyměnit API klíč</button>
+              </form>
+              <?php if ((int) $store['invoice_count'] === 0 && (int) $store['payout_count'] === 0): ?>
+                <form method="post" action="<?php echo $storesUrl; ?>" data-confirm="Odstranit prázdný obchod? Jeho webhooky a integrační záznamy budou také odstraněny.">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="store_id" value="<?php echo htmlspecialchars((string) $store['id'], ENT_QUOTES, 'UTF-8'); ?>">
+                  <button type="submit" class="danger-btn"><i class="fa-solid fa-trash"></i> Odstranit obchod</button>
+                </form>
+              <?php else: ?>
+                <div class="surface-note"><i class="fa-solid fa-lock"></i><span>Obchod s finanční historií nelze smazat.</span></div>
+              <?php endif; ?>
+            </div>
+          </details>
         </article>
       <?php endforeach; ?>
       </div>
@@ -127,6 +149,9 @@ $storesUrl = $routeUrl('/admin/stores');
     const reveal = input.type === 'password';
     input.type = reveal ? 'text' : 'password';
     button.setAttribute('aria-label', reveal ? 'Skrýt API klíč' : 'Zobrazit API klíč');
+  }));
+  document.querySelectorAll('[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
+    if (!window.confirm(form.dataset.confirm || 'Potvrdit operaci?')) event.preventDefault();
   }));
 })();
 </script>

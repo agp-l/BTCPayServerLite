@@ -69,6 +69,20 @@ $webhooksUrl = $routeUrl('/admin/webhooks');
           <span class="muted code">ID: <?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?></span>
           <span class="muted">Poslední doručení: <?php echo $webhook['last_delivery_at'] === null ? '—' : date('d.m.Y H:i:s', (int) $webhook['last_delivery_at']); ?></span>
         </div>
+        <details class="disclosure compact-disclosure webhook-actions">
+          <summary><i class="fa-solid fa-pen"></i> Upravit</summary>
+          <div class="disclosure-body form-stack">
+            <form method="post" action="<?php echo $webhooksUrl; ?>" class="form-stack">
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="update"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars((string) $webhook['id'], ENT_QUOTES, 'UTF-8'); ?>">
+              <div class="field"><label>HTTPS URL</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<?php echo htmlspecialchars((string) $webhook['url'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div>
+              <button type="submit" class="ghost-btn"><i class="fa-solid fa-floppy-disk"></i> Uložit URL</button>
+            </form>
+            <form method="post" action="<?php echo $webhooksUrl; ?>" data-confirm="Vyměnit webhook secret? Příjemce musí okamžitě dostat nový secret.">
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_secret"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars((string) $webhook['id'], ENT_QUOTES, 'UTF-8'); ?>">
+              <button type="submit" class="ghost-btn"><i class="fa-solid fa-rotate"></i> Vyměnit secret</button>
+            </form>
+          </div>
+        </details>
         <form method="post" action="<?php echo $webhooksUrl; ?>" data-confirm="Opravdu chcete webhook odstranit?">
           <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
           <input type="hidden" name="action" value="delete">

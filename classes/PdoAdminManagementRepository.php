@@ -124,6 +124,56 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
         return $this->rows($statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function updateStoreName(string $storeId, string $name): bool
+    {
+        $statement = $this->pdo->prepare('UPDATE stores SET name = ? WHERE id = ?');
+        $statement->execute([$name, $storeId]);
+        return $statement->rowCount() === 1 || $this->exists('stores', $storeId);
+    }
+
+    public function rotateStoreApiKey(string $storeId, string $apiKey): bool
+    {
+        $statement = $this->pdo->prepare('UPDATE stores SET api_key = ? WHERE id = ?');
+        $statement->execute([$apiKey, $storeId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function deleteEmptyStore(string $storeId): bool
+    {
+        $statement = $this->pdo->prepare(
+            'DELETE FROM stores
+             WHERE id = ?
+               AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.store_id = stores.id)
+               AND NOT EXISTS (SELECT 1 FROM payouts p WHERE p.store_id = stores.id)'
+        );
+        $statement->execute([$storeId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function updateInvoiceStatus(string $invoiceId, string $status): bool
+    {
+        $statement = $this->pdo->prepare(
+            "UPDATE invoices SET status = ? WHERE id = ? AND status <> 'Settled'"
+        );
+        $statement->execute([$status, $invoiceId]);
+        return $statement->rowCount() === 1
+            || ($this->invoiceStatus($invoiceId) === $status && $status !== 'Settled');
+    }
+
+    public function updateWebhookUrl(string $webhookId, string $url): bool
+    {
+        $statement = $this->pdo->prepare('UPDATE webhooks SET url = ? WHERE id = ?');
+        $statement->execute([$url, $webhookId]);
+        return $statement->rowCount() === 1 || $this->exists('webhooks', $webhookId);
+    }
+
+    public function rotateWebhookSecret(string $webhookId, string $secret): bool
+    {
+        $statement = $this->pdo->prepare('UPDATE webhooks SET secret = ? WHERE id = ?');
+        $statement->execute([$secret, $webhookId]);
+        return $statement->rowCount() === 1;
+    }
+
     /** @return array{0:string,1:array<string,int>} */
     private function userWhere(?int $userId, string $alias): array
     {
@@ -155,5 +205,23 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
             }
         }
         return $rows;
+    }
+
+    private function exists(string $table, string $id): bool
+    {
+        if (!in_array($table, ['stores', 'webhooks'], true)) {
+            throw new RuntimeException('Admin management existence table is invalid.');
+        }
+        $statement = $this->pdo->prepare("SELECT 1 FROM {$table} WHERE id = ? LIMIT 1");
+        $statement->execute([$id]);
+        return $statement->fetchColumn() !== false;
+    }
+
+    private function invoiceStatus(string $invoiceId): ?string
+    {
+        $statement = $this->pdo->prepare('SELECT status FROM invoices WHERE id = ? LIMIT 1');
+        $statement->execute([$invoiceId]);
+        $status = $statement->fetchColumn();
+        return is_string($status) ? $status : null;
     }
 }

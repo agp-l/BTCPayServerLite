@@ -59,17 +59,36 @@ try {
     $pageError = 'Správa obchodů nyní není dostupná.';
 }
 
-if ($service instanceof AdminOperationsService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+if ($service instanceof AdminOperationsService
+    && $management instanceof AdminManagementService
+    && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+) {
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
-        if ($action !== 'create') {
+        if ($action === 'create') {
+            $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
+            $service->createStore($name);
+            $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
+        } elseif ($action === 'rename') {
+            $management->renameStore(
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : '',
+                is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : ''
+            );
+            $toastMsg = 'Název obchodu byl změněn.';
+        } elseif ($action === 'rotate_api_key') {
+            $management->rotateStoreApiKey(
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : ''
+            );
+            $toastMsg = 'API klíč byl nahrazen. Původní klíč přestal okamžitě platit.';
+        } elseif ($action === 'delete') {
+            $management->deleteStore(
+                is_string($_POST['store_id'] ?? null) ? $_POST['store_id'] : ''
+            );
+            $toastMsg = 'Prázdný obchod byl odstraněn.';
+        } else {
             throw new AdminOperationsException('Neznámá operace správy obchodů.');
         }
-
-        $name = is_string($_POST['store_name'] ?? null) ? $_POST['store_name'] : '';
-        $service->createStore($name);
-        $toastMsg = 'Obchod a jeho peněženka byly úspěšně vytvořeny.';
     } catch (AuthException $exception) {
         http_response_code(403);
         $pageError = 'Platnost formuláře vypršela. Obnovte stránku a zkuste akci znovu.';

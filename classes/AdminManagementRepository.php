@@ -20,4 +20,16 @@ interface AdminManagementRepository
 
     /** @return list<array<string,mixed>> */
     public function fetchWebhooks(?int $userId, ?string $storeId): array;
+
+    public function updateStoreName(string $storeId, string $name): bool;
+
+    public function rotateStoreApiKey(string $storeId, string $apiKey): bool;
+
+    public function deleteEmptyStore(string $storeId): bool;
+
+    public function updateInvoiceStatus(string $invoiceId, string $status): bool;
+
+    public function updateWebhookUrl(string $webhookId, string $url): bool;
+
+    public function rotateWebhookSecret(string $webhookId, string $secret): bool;
 }

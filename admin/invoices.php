@@ -106,7 +106,10 @@ if ($management instanceof AdminManagementService) {
     }
 }
 
-if ($service instanceof AdminInvoiceService && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+if ($service instanceof AdminInvoiceService
+    && $management instanceof AdminManagementService
+    && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+) {
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
@@ -132,6 +135,12 @@ if ($service instanceof AdminInvoiceService && ($_SERVER['REQUEST_METHOD'] ?? 'G
         } elseif ($action === 'clear_history') {
             $_SESSION['created_invoices'] = [];
             $toastMsg = 'Lokální náhled historie byl vymazán.';
+        } elseif ($action === 'change_status') {
+            $management->changeInvoiceStatus(
+                is_string($_POST['invoice_id'] ?? null) ? $_POST['invoice_id'] : '',
+                is_string($_POST['status'] ?? null) ? $_POST['status'] : ''
+            );
+            $toastMsg = 'Stav nezaplacené faktury byl změněn.';
         } else {
             throw new AdminOperationsException('Neznámá operace správy faktur.');
         }

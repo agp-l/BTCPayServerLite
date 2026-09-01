@@ -8,8 +8,10 @@ final class AdminManagementService
 {
     private const INVOICE_STATUSES = ['New', 'Processing', 'Settled', 'Expired', 'Invalid'];
 
-    public function __construct(private AdminManagementRepository $repository)
-    {
+    public function __construct(
+        private AdminManagementRepository $repository,
+        private ?WebhookEndpointPolicy $webhookPolicy = null
+    ) {
     }
 
     /** @return list<array{id:int,email:string,status:string}> */
@@ -65,6 +67,75 @@ final class AdminManagementService
         return self::INVOICE_STATUSES;
     }
 
+    public function renameStore(string $storeId, string $name): void
+    {
+        $storeId = $this->requiredIdentifier($storeId, 'Obchod');
+        $name = trim($name);
+        if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+            throw new AdminOperationsException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
+        }
+        if (!$this->repository->updateStoreName($storeId, $name)) {
+            throw new AdminOperationsException('Obchod nebyl nalezen.', 404);
+        }
+    }
+
+    public function rotateStoreApiKey(string $storeId): void
+    {
+        $storeId = $this->requiredIdentifier($storeId, 'Obchod');
+        if (!$this->repository->rotateStoreApiKey($storeId, bin2hex(random_bytes(32)))) {
+            throw new AdminOperationsException('Obchod nebyl nalezen.', 404);
+        }
+    }
+
+    public function deleteStore(string $storeId): void
+    {
+        $storeId = $this->requiredIdentifier($storeId, 'Obchod');
+        if (!$this->repository->deleteEmptyStore($storeId)) {
+            throw new AdminOperationsException(
+                'Obchod nelze odstranit. Buď neexistuje, nebo má faktury či výběry, které musí zůstat v historii.',
+                409
+            );
+        }
+    }
+
+    public function changeInvoiceStatus(string $invoiceId, string $status): void
+    {
+        $invoiceId = $this->requiredIdentifier($invoiceId, 'Faktura');
+        if (!in_array($status, self::INVOICE_STATUSES, true) || $status === 'Settled') {
+            throw new AdminOperationsException('Ruční nastavení tohoto stavu faktury není povoleno.');
+        }
+        if (!$this->repository->updateInvoiceStatus($invoiceId, $status)) {
+            throw new AdminOperationsException(
+                'Faktura nebyla nalezena nebo je již zaplacená a její stav je neměnný.',
+                409
+            );
+        }
+    }
+
+    public function updateWebhook(string $webhookId, string $url): void
+    {
+        $webhookId = $this->requiredIdentifier($webhookId, 'Webhook');
+        if (!$this->webhookPolicy instanceof WebhookEndpointPolicy) {
+            throw new AdminOperationsException('Ověření webhook URL není dostupné.', 500);
+        }
+        try {
+            $endpoint = $this->webhookPolicy->inspect($url);
+        } catch (\Throwable $exception) {
+            throw new AdminOperationsException('Webhook URL není bezpečná nebo ji nelze ověřit.', 400, $exception);
+        }
+        if (!$this->repository->updateWebhookUrl($webhookId, $endpoint['url'])) {
+            throw new AdminOperationsException('Webhook nebyl nalezen.', 404);
+        }
+    }
+
+    public function rotateWebhookSecret(string $webhookId): void
+    {
+        $webhookId = $this->requiredIdentifier($webhookId, 'Webhook');
+        if (!$this->repository->rotateWebhookSecret($webhookId, bin2hex(random_bytes(32)))) {
+            throw new AdminOperationsException('Webhook nebyl nalezen.', 404);
+        }
+    }
+
     private function userId(?int $userId): ?int
     {
         if ($userId !== null && $userId < 0) {
@@ -82,5 +153,15 @@ final class AdminManagementService
             throw new AdminOperationsException('Vybraný obchod není platný.');
         }
         return $value;
+    }
+
+    private function requiredIdentifier(string $value, string $field): string
+    {
+        $value = trim($value);
+        $validated = $this->identifier($value);
+        if ($validated === null) {
+            throw new AdminOperationsException($field . ' má neplatný identifikátor.');
+        }
+        return $validated;
     }
 }
