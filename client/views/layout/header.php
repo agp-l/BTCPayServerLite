@@ -65,6 +65,10 @@ $sectionUrl = static fn (string $section): string => htmlspecialchars(
     </nav>
 
     <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>Systém online</span>
+      </div>
       <div class="admin-profile">
         <span class="admin-profile-avatar" aria-hidden="true"><?php echo htmlspecialchars($clientInitial, ENT_QUOTES, 'UTF-8'); ?></span>
         <span class="admin-profile-copy"><strong>Klientský účet</strong><span title="<?php echo htmlspecialchars($clientEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($clientEmail, ENT_QUOTES, 'UTF-8'); ?></span></span>
@@ -79,11 +83,13 @@ $sectionUrl = static fn (string $section): string => htmlspecialchars(
 
   <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
   <div class="admin-main">
-    <header class="admin-topbar">
-      <div class="admin-topbar-context">
-        <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="clientSidebar" aria-expanded="false"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
-        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Zabezpečený klientský portál</span>
-      </div>
-      <span class="badge s-paid"><i class="fa-solid fa-circle" aria-hidden="true"></i> Systém online</span>
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="clientSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span>Klientský portál</span>
+      </span>
     </header>
     <main class="admin-content">
