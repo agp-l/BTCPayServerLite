@@ -105,6 +105,21 @@ if (
 }
 echo "[PASS] uses polished typography, icon hierarchy and semantic accents\n";
 
+if (
+    !str_contains($adminCss, '--admin-coin: #f0d54f')
+    || !str_contains($adminCss, '.transaction-amount.incoming')
+    || !str_contains($adminCss, '.transaction-amount.outgoing')
+    || !str_contains($adminCss, '.address-funds.has-utxo')
+    || !str_contains($walletView, 'transaction-item <?php echo $direction; ?>')
+    || !str_contains($walletView, 'address-row <?php echo $address[\'hasFunds\']')
+    || !str_contains($walletView, 'class="address-funds <?php echo')
+    || substr_count($walletView, 'class="ghost-btn icon-btn"') < 3
+    || str_contains($walletView, '> Kopírovat</button>')
+) {
+    throw new RuntimeException('Wallet identity, payment direction colors or icon-only copy controls are incomplete.');
+}
+echo "[PASS] gives the wallet a distinctive identity and semantic payment directions\n";
+
 if (!str_contains($adminCss, '1680px') || !str_contains($dashboardView, 'dashboard-grid')) {
     throw new RuntimeException('Admin workspace does not use the wider responsive layout.');
 }
@@ -136,4 +151,4 @@ if (
 }
 echo "[PASS] protects stateless invoice admin requests with CSRF\n";
 
-echo "14 admin UI boundary tests passed.\n";
+echo "15 admin UI boundary tests passed.\n";
