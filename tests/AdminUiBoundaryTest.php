@@ -95,10 +95,12 @@ if (
     || !str_contains($adminCss, 'background: var(--surface-subtle)')
     || !str_contains($adminCss, 'color: var(--brand-primary) !important')
     || !str_contains($adminCss, 'border: 1px solid var(--border-strong)')
+    || !str_contains($adminCss, '.input-wrap > input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),')
+    || !str_contains($adminCss, ".input-wrap > textarea {\n  border: 0;")
 ) {
     throw new RuntimeException('Admin icons or form controls lost their accepted visual treatment.');
 }
-echo "[PASS] keeps green icons on subtle surfaces and visible form borders\n";
+echo "[PASS] keeps green icons and exactly one border around every form control\n";
 
 if (
     !str_contains($adminCss, '--shadow-card: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1)')
