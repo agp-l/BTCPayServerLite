@@ -2313,3 +2313,114 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
+/* Dark navigation and elevated content cards. */
+:root {
+  --admin-bg: #F8F9FA;
+  --admin-sidebar-bg: #1A1B1C;
+  --admin-card-radius: 0.5rem;
+  --admin-card-shadow: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1);
+}
+
+html,
+body,
+.admin-main {
+  background: var(--admin-bg);
+}
+
+.admin-sidebar {
+  border-right: 0;
+  background: var(--admin-sidebar-bg);
+  color: #f4f5f5;
+}
+
+.admin-brand {
+  color: #ffffff;
+}
+
+.admin-brand-copy strong {
+  color: #ffffff;
+}
+
+.admin-brand-copy span {
+  color: #aeb3b6;
+}
+
+.admin-nav-label {
+  color: #858b8f;
+}
+
+.admin-nav-link,
+.admin-nav-link.is-active {
+  color: #d7dbdd;
+  font-weight: 400;
+}
+
+.admin-nav-link i {
+  background: #252729;
+  color: #b9bec1;
+}
+
+.admin-nav-link:hover {
+  background: #242628;
+  color: #ffffff;
+}
+
+.admin-nav-link:hover i {
+  background: #303335;
+  color: #ffffff;
+}
+
+.admin-nav-link.is-active {
+  background: #263129;
+  color: #ffffff;
+}
+
+.admin-nav-link.is-active i {
+  background: var(--admin-accent);
+  color: #071f14;
+}
+
+.admin-sidebar-footer {
+  border-top-color: #313437;
+}
+
+.admin-profile-copy strong {
+  color: #ffffff;
+}
+
+.admin-profile-copy span {
+  color: #aeb3b6;
+}
+
+.admin-profile-avatar {
+  background: #263c30;
+  color: #5be39a;
+}
+
+.admin-sidebar-footer .admin-nav-link {
+  color: #d7dbdd;
+}
+
+.admin-sidebar-footer .admin-nav-link i {
+  background: #252729;
+  color: #b9bec1;
+}
+
+.card,
+.stat-card,
+.wallet-hero {
+  border: 0;
+  border-radius: var(--admin-card-radius);
+  box-shadow: var(--admin-card-shadow);
+}
+
+.admin-topbar {
+  background: #ffffff;
+}
+
+@media (max-width: 860px) {
+  .admin-sidebar {
+    background: var(--admin-sidebar-bg);
+  }
+}
+
