@@ -79,6 +79,27 @@ if (
 }
 echo "[PASS] keeps the accepted palette in valid centralized design tokens\n";
 
+preg_match_all('/(--[a-z0-9-]+)\\s*:/i', $adminCss, $definedTokenMatches);
+preg_match_all('/var\\((--[a-z0-9-]+)/i', $adminCss, $usedTokenMatches);
+$missingTokens = array_values(array_diff(
+    array_unique($usedTokenMatches[1]),
+    array_unique($definedTokenMatches[1])
+));
+if ($missingTokens !== []) {
+    throw new RuntimeException('Admin CSS references undefined tokens: ' . implode(', ', $missingTokens));
+}
+echo "[PASS] resolves every referenced design token\n";
+
+if (
+    !str_contains($adminCss, '.card-title-group i,')
+    || !str_contains($adminCss, 'background: var(--surface-subtle)')
+    || !str_contains($adminCss, 'color: var(--brand-primary) !important')
+    || !str_contains($adminCss, 'border: 1px solid var(--border-strong)')
+) {
+    throw new RuntimeException('Admin icons or form controls lost their accepted visual treatment.');
+}
+echo "[PASS] keeps green icons on subtle surfaces and visible form borders\n";
+
 if (
     !str_contains($adminCss, '--shadow-card: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1)')
     || !str_contains($adminCss, '--radius-card: 0.5rem')
@@ -181,4 +202,4 @@ if (
 }
 echo "[PASS] protects stateless invoice admin requests with CSRF\n";
 
-echo "17 admin UI boundary tests passed.\n";
+echo "19 admin UI boundary tests passed.\n";
