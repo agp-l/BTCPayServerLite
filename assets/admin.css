@@ -157,7 +157,7 @@ a { color: inherit; }
 
 .admin-brand-copy span {
   margin-top: 3px;
-  color: var(--sidebar-text-soft);
+  color: var(--brand-strong);
   font-size: 12px;
   font-weight: 500;
 }
@@ -290,7 +290,7 @@ a { color: inherit; }
 
 .admin-profile-copy span {
   overflow: hidden;
-  color: var(--sidebar-text-soft);
+  color: var(--brand-strong);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -384,7 +384,7 @@ a { color: inherit; }
 
 .page-eyebrow {
   margin: 0 0 6px;
-  color: var(--brand-primary-dark);
+  color: var(--brand-primary);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -405,8 +405,8 @@ a { color: inherit; }
   place-items: center;
   margin-right: 9px;
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
-  color: var(--brand-primary-dark) !important;
+  background: var(--surface-subtle);
+  color: var(--brand-primary) !important;
   font-size: 15px;
   vertical-align: 3px;
 }
@@ -459,8 +459,8 @@ a { color: inherit; }
   flex: 0 0 auto;
   place-items: center;
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
-  color: var(--brand-primary-dark) !important;
+  background: var(--surface-subtle);
+  color: var(--brand-primary) !important;
   font-size: 12.5px;
 }
 
@@ -506,8 +506,8 @@ a { color: inherit; }
   height: 34px;
   place-items: center;
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
-  color: var(--brand-primary-dark);
+  background: var(--surface-subtle);
+  color: var(--brand-primary);
 }
 
 
@@ -574,7 +574,7 @@ a { color: inherit; }
 .badge-Processing, .s-pending_mempool { background: var(--status-info-surface); color: var(--status-info); }
 .badge-Settled, .s-paid, .s-paid_late { background: var(--status-success); color: var(--status-success-contrast); }
 .badge-Expired, .s-expired { background: var(--status-danger-surface); color: var(--status-danger); }
-.s-unknown { background: var(--surface-card-soft); color: var(--text-muted); }
+.s-unknown { background: var(--surface-subtle); color: var(--text-muted); }
 
 .connection-pill { background: var(--status-success); color: var(--status-success-contrast); }
 
@@ -595,14 +595,14 @@ a { color: inherit; }
 .data-table, table {
   width: 100%;
   border-collapse: collapse;
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-size: 13.5px;
 }
 
 .data-table th, table th {
   padding: 10px 13px;
-  border-bottom: 1px solid var(--border-default-strong);
-  background: var(--surface-card-soft);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface-subtle);
   color: var(--text-muted);
   font-size: 11.5px;
   font-weight: 650;
@@ -622,11 +622,11 @@ a { color: inherit; }
 .data-table td strong, table td strong { color: var(--text-primary); font-weight: 650; }
 
 .data-table tbody tr, table tbody tr { transition: background-color 100ms ease; }
-.data-table tbody tr:hover, table tbody tr:hover { background: var(--surface-card-soft); }
+.data-table tbody tr:hover, table tbody tr:hover { background: var(--surface-subtle); }
 .data-table tbody tr:last-child td, table tbody tr:last-child td { border-bottom: 0; }
 
 .code {
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12.5px;
 }
@@ -662,7 +662,7 @@ a { color: inherit; }
 .field label, label {
   display: block;
   margin-bottom: 6px;
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -670,7 +670,7 @@ a { color: inherit; }
 .input-wrap {
   display: flex;
   overflow: hidden;
-  border: 1px solid var(--border-default-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--surface-card);
   transition: border-color 120ms ease;
@@ -681,7 +681,7 @@ a { color: inherit; }
 .input-wrap input, .input-wrap select, .input-wrap textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--border-default-strong);
+  border: 1px solid var(--border-strong);
   border-radius: 0;
   outline: 0;
   background: transparent;
@@ -692,7 +692,7 @@ input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
 select, textarea {
   width: 100%;
   min-width: 0;
-  border: 0px solid var(--border-default-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   outline: 0;
   background: var(--surface-card);
@@ -723,7 +723,7 @@ select { color-scheme: light; }
   align-items: center;
   padding: 0 12px;
   border-left: 1px solid var(--border-default);
-  background: var(--surface-card-soft);
+  background: var(--surface-subtle);
   color: var(--text-muted);
   font-size: 12.5px;
   font-weight: 600;
@@ -757,18 +757,18 @@ select { color-scheme: light; }
   color: var(--text-on-accent);
 }
 
-.primary:hover { background: var(--brand-primary-dark); border-color: var(--brand-primary-dark); }
+.primary:hover { background: var(--brand-primary); border-color: var(--brand-primary); }
 .primary:active { background: var(--control-active); }
 
 .ghost, .ghost-btn, .action-link {
-  border-color: var(--border-default-strong);
+  border-color: var(--border-strong);
   background: var(--surface-card);
-  color: var(--brand-primary-dark);
+  color: var(--brand-primary);
 }
 
 .ghost:hover, .ghost-btn:hover, .action-link:hover {
   border-color: var(--text-muted);
-  background: var(--surface-card-soft);
+  background: var(--surface-subtle);
   color: var(--text-primary);
 }
 
@@ -890,7 +890,7 @@ select:focus-visible, textarea:focus-visible {
 .wallet-name {
   max-width: 280px;
   overflow: hidden;
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -915,14 +915,14 @@ select:focus-visible, textarea:focus-visible {
 .stateless-mode-item, .result-panel {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
+  background: var(--surface-subtle);
 }
 
 .address-panel { display: grid; gap: 11px; padding: 15px; }
 
 .address-value {
   overflow-wrap: anywhere;
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 600;
@@ -952,7 +952,7 @@ select:focus-visible, textarea:focus-visible {
   height: 36px;
   place-items: center;
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
+  background: var(--surface-subtle);
   color: var(--text-muted);
 }
 
@@ -992,7 +992,7 @@ select:focus-visible, textarea:focus-visible {
   background: var(--surface-card);
 }
 
-.transaction-details summary { color: var(--text-primary-soft); font-weight: 600; cursor: pointer; }
+.transaction-details summary { color: var(--text-secondary); font-weight: 600; cursor: pointer; }
 
 .transaction-output {
   display: grid;
@@ -1029,7 +1029,7 @@ select:focus-visible, textarea:focus-visible {
 .address-row-main {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary-soft);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1061,7 +1061,7 @@ select:focus-visible, textarea:focus-visible {
 }
 
 .address-funds.has-utxo { background: var(--status-success); color: var(--status-success-contrast); }
-.address-funds.is-empty { background: var(--surface-card-soft); color: var(--text-muted); }
+.address-funds.is-empty { background: var(--surface-subtle); color: var(--text-muted); }
 
 .security-warning {
   display: flex;
@@ -1079,8 +1079,8 @@ select:focus-visible, textarea:focus-visible {
   overflow-wrap: anywhere;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
-  background: var(--surface-card-soft);
-  color: var(--text-primary-soft);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1196,7 +1196,7 @@ select:focus-visible, textarea:focus-visible {
 }
 
 .invoice-amount {
-  color: var(--brand-primary-dark);
+  color: var(--brand-primary);
   font-family: var(--font-mono);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1297,7 +1297,7 @@ select:focus-visible, textarea:focus-visible {
 
 .invoice-history-item:last-child { border-bottom: 0; }
 .invoice-history-item code {
-  color: var(--brand-primary-dark);
+  color: var(--brand-primary);
   font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
@@ -1322,7 +1322,7 @@ select:focus-visible, textarea:focus-visible {
   text-decoration: none;
 }
 
-.operation-link:hover { background: var(--surface-card); border-color: var(--border-default-strong); }
+.operation-link:hover { background: var(--surface-card); border-color: var(--border-strong); }
 
 .operation-icon {
   display: grid;
@@ -1388,7 +1388,7 @@ select:focus-visible, textarea:focus-visible {
   place-items: center;
   border-radius: var(--radius-control);
   background: var(--surface-card);
-  color: var(--brand-primary-dark);
+  color: var(--brand-primary);
 }
 
 .stateless-mode-item div { display: grid; gap: 4px; }
@@ -1417,12 +1417,12 @@ select:focus-visible, textarea:focus-visible {
 .inline-edit-form select { min-width: 126px; }
 
 .invoice-url { margin-top: 13px; padding: 10px 11px; word-break: break-all; }
-.invoice-url a { color: var(--text-primary-soft); text-decoration: none; }
+.invoice-url a { color: var(--text-secondary); text-decoration: none; }
 .invoice-url a:hover { text-decoration: underline; }
 
 .danger-text { color: var(--status-danger) !important; }
 .verification-summary { margin-bottom: 11px; }
-.verification-data { color: var(--text-primary-soft); font-size: 13.5px; line-height: 1.7; }
+.verification-data { color: var(--text-secondary); font-size: 13.5px; line-height: 1.7; }
 
 .verification-row {
   display: grid;
