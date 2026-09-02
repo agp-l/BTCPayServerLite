@@ -808,10 +808,10 @@ select:focus-visible, textarea:focus-visible {
   align-items: end;
   margin-bottom: 20px;
   padding: 26px;
-  border: 1px solid var(--admin-line);
-  border-radius: var(--admin-radius);
+  border: 0px solid var(--admin-line);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1);
   background: var(--admin-surface);
-  box-shadow: var(--admin-shadow-card);
 }
 
 .wallet-hero-copy, .wallet-hero-meta { min-width: 0; }
