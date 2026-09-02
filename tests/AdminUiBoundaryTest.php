@@ -106,7 +106,7 @@ if (
     || !str_contains($adminCss, '--font-mono:')
     || !str_contains($adminCss, 'font-family: var(--font-ui)')
     || !str_contains($adminCss, 'font-family: var(--font-mono)')
-    || !str_contains($adminCss, '.card-title-group > i')
+    || !str_contains($adminCss, '.card-title-group i')
 ) {
     throw new RuntimeException('Admin typography or icon hierarchy is incomplete.');
 }
