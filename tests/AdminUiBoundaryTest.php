@@ -95,8 +95,9 @@ if (
 echo "[PASS] uses a clear, borderless and high-contrast navigation state\n";
 
 if (
-    !str_contains($adminCss, 'font-family: Manrope')
-    || !str_contains($adminCss, 'font-family: "IBM Plex Mono"')
+    !str_contains($adminCss, 'font-family: "Baloo 2"')
+    || !str_contains($adminCss, 'font-family: Inter')
+    || !str_contains($adminCss, 'font-family: "Fira Code"')
     || !str_contains($adminCss, '--admin-yellow: #f0d54f')
     || !str_contains($adminCss, '.stat-card-amber .stat-icon')
     || !str_contains($adminCss, '.card-title-group > i')
