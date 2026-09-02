@@ -24,6 +24,8 @@ $sectionUrl = static fn (string $section): string => htmlspecialchars(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,8 +37,8 @@ $sectionUrl = static fn (string $section): string => htmlspecialchars(
 <div class="admin-shell">
   <aside class="admin-sidebar" id="clientSidebar" aria-label="Klientská navigace">
     <a href="<?php echo $routeUrl('/client'); ?>" class="admin-brand">
-      <span class="admin-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
-      <span class="admin-brand-copy"><strong>BTCPay Lite</strong><span>Merchant portal</span></span>
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Merchant portal</span></span>
     </a>
 
     <nav class="admin-nav">
