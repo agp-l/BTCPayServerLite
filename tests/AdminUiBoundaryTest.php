@@ -87,12 +87,23 @@ echo "[PASS] uses a flat design with corners no larger than four pixels\n";
 if (
     !str_contains($adminCss, '.admin-nav-link.is-active::before')
     || !str_contains($adminCss, 'background: var(--admin-surface-selected)')
-    || !str_contains($adminCss, 'color: #242926')
-    || !str_contains($adminCss, 'font-weight: 600')
+    || !str_contains($adminCss, 'color: #242825')
+    || !str_contains($adminCss, 'font-weight: 650')
 ) {
     throw new RuntimeException('Admin navigation does not expose the professional high-contrast active state.');
 }
 echo "[PASS] uses a clear, borderless and high-contrast navigation state\n";
+
+if (
+    !str_contains($adminCss, 'font-family: Manrope')
+    || !str_contains($adminCss, 'font-family: "IBM Plex Mono"')
+    || !str_contains($adminCss, '--admin-yellow: #f0d54f')
+    || !str_contains($adminCss, '.stat-card-amber .stat-icon')
+    || !str_contains($adminCss, '.card-title-group > i')
+) {
+    throw new RuntimeException('Admin typography, icon hierarchy or semantic accents are incomplete.');
+}
+echo "[PASS] uses polished typography, icon hierarchy and semantic accents\n";
 
 if (!str_contains($adminCss, '1680px') || !str_contains($dashboardView, 'dashboard-grid')) {
     throw new RuntimeException('Admin workspace does not use the wider responsive layout.');
@@ -125,4 +136,4 @@ if (
 }
 echo "[PASS] protects stateless invoice admin requests with CSRF\n";
 
-echo "13 admin UI boundary tests passed.\n";
+echo "14 admin UI boundary tests passed.\n";
