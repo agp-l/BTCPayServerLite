@@ -72,8 +72,8 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
       <span class="muted">Aktuální přijímací adresa</span>
       <code class="address-value" id="receiveAddress"><?php echo htmlspecialchars($receiveAddress, ENT_QUOTES, 'UTF-8'); ?></code>
       <div class="address-actions">
-        <button type="button" class="ghost-btn" data-copy="<?php echo $copyPayload($receiveAddress); ?>">
-          <i class="fa-regular fa-copy" aria-hidden="true"></i> Kopírovat
+        <button type="button" class="ghost-btn icon-btn" data-copy="<?php echo $copyPayload($receiveAddress); ?>" aria-label="Kopírovat přijímací adresu" title="Kopírovat přijímací adresu">
+          <i class="fa-regular fa-copy" aria-hidden="true"></i>
         </button>
         <form method="post" action="<?php echo $walletAction; ?>">
           <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
@@ -145,7 +145,7 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
     <div class="transaction-list">
     <?php foreach ($finalTxs as $transaction): ?>
       <?php $direction = $transaction['isInc'] ? 'incoming' : 'outgoing'; ?>
-      <article class="transaction-item">
+      <article class="transaction-item <?php echo $direction; ?>">
         <span class="transaction-icon <?php echo $direction; ?>"><i class="fa-solid <?php echo $transaction['isInc'] ? 'fa-arrow-down' : 'fa-arrow-up'; ?>" aria-hidden="true"></i></span>
         <div class="transaction-main">
           <strong><?php echo $transaction['isInc'] ? 'Přijatá platba' : 'Odeslaná platba'; ?></strong>
@@ -188,15 +188,19 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
     <?php else: ?>
       <div class="address-list">
       <?php foreach ($finalAddresses as $address): ?>
-        <div class="address-row">
+        <div class="address-row <?php echo $address['hasFunds'] ? 'has-utxo' : 'is-empty'; ?>">
           <span class="address-row-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
           <div class="address-row-main">
             <code title="<?php echo htmlspecialchars($address['address'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($address['address'], ENT_QUOTES, 'UTF-8'); ?></code>
-            <small><?php echo $address['type'] === 'change' ? 'Vratná adresa' : 'Přijímací adresa'; ?> · <?php echo $address['hasFunds'] ? 'obsahuje UTXO' : 'bez zůstatku'; ?></small>
+            <small>
+              <span><?php echo $address['type'] === 'change' ? 'Vratná adresa' : 'Přijímací adresa'; ?></span>
+              <span aria-hidden="true">·</span>
+              <span class="address-funds <?php echo $address['hasFunds'] ? 'has-utxo' : 'is-empty'; ?>"><?php echo $address['hasFunds'] ? 'obsahuje UTXO' : 'bez zůstatku'; ?></span>
+            </small>
           </div>
           <div class="address-row-value">
             <strong><?php echo htmlspecialchars($address['valStr'], ENT_QUOTES, 'UTF-8'); ?> BTC</strong>
-            <button type="button" class="ghost-btn" data-copy="<?php echo $copyPayload($address['address']); ?>"><i class="fa-regular fa-copy" aria-hidden="true"></i> Kopírovat</button>
+            <button type="button" class="ghost-btn icon-btn" data-copy="<?php echo $copyPayload($address['address']); ?>" aria-label="Kopírovat adresu" title="Kopírovat adresu"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
           </div>
         </div>
       <?php endforeach; ?>
@@ -211,7 +215,7 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
     <div class="field">
       <label>Master public key</label>
       <div class="key-box"><?php echo $mpk !== '' ? htmlspecialchars($mpk, ENT_QUOTES, 'UTF-8') : 'Nedostupné'; ?></div>
-      <?php if ($mpk !== ''): ?><button type="button" class="ghost-btn" data-copy="<?php echo $copyPayload($mpk); ?>"><i class="fa-regular fa-copy" aria-hidden="true"></i> Kopírovat veřejný klíč</button><?php endif; ?>
+      <?php if ($mpk !== ''): ?><button type="button" class="ghost-btn icon-btn" data-copy="<?php echo $copyPayload($mpk); ?>" aria-label="Kopírovat veřejný klíč" title="Kopírovat veřejný klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button><?php endif; ?>
     </div>
 
     <form method="post" action="<?php echo $walletAction; ?>" class="form-stack" autocomplete="off">
