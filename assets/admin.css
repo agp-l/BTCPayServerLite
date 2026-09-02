@@ -681,7 +681,6 @@ a { color: inherit; }
 .input-wrap input, .input-wrap select, .input-wrap textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--border-strong);
   border-radius: 0;
   outline: 0;
   background: transparent;
@@ -712,7 +711,12 @@ input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select {
   resize: vertical;
 }
 
-.input-wrap input, .input-wrap select, .input-wrap textarea { border: 0; }
+.input-wrap > input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+.input-wrap > select,
+.input-wrap > textarea {
+  border: 0;
+  border-radius: 0;
+}
 
 input:focus, select:focus, textarea:focus { border-color: var(--brand-primary); }
 input::placeholder, textarea::placeholder { color: var(--placeholder-text); }
