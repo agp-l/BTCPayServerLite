@@ -64,7 +64,7 @@ echo "[PASS] avoids external QR disclosure and unsafe JavaScript interpolation\n
 
 if (
     !str_contains($adminCss, 'color-scheme: light')
-    || !str_contains($adminCss, '--admin-bg: #f3f4f3')
+    || !str_contains($adminCss, '--admin-bg: #F8F9FA')
     || !str_contains($adminCss, '--admin-accent: #20c875')
     || !str_contains($adminCss, '--admin-text: #111413')
     || str_contains($adminCss, '#a855f7')
@@ -74,25 +74,26 @@ if (
 echo "[PASS] uses the light, high-contrast green admin design system\n";
 
 if (
-    str_contains($adminCss, 'box-shadow')
-    || str_contains($adminCss, 'text-shadow')
+    !str_contains($adminCss, '--admin-card-shadow: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1)')
+    || !str_contains($adminCss, '--admin-card-radius: 0.5rem')
+    || !str_contains($adminCss, '.card,')
+    || !str_contains($adminCss, 'border: 0')
     || str_contains($adminCss, 'gradient(')
     || str_contains($adminCss, 'backdrop-filter')
-    || preg_match('/border-radius:\\s*(?:[5-9]|[1-9][0-9]+)px/', $adminCss)
 ) {
-    throw new RuntimeException('Admin design system still contains shadows, gradients or oversized corners.');
+    throw new RuntimeException('Admin cards do not use the requested clean elevated style.');
 }
-echo "[PASS] uses a flat design with corners no larger than four pixels\n";
+echo "[PASS] uses borderless elevated cards with the requested radius and shadow\n";
 
 if (
     !str_contains($adminCss, '.admin-nav-link.is-active::before')
-    || !str_contains($adminCss, 'background: var(--admin-surface-selected)')
-    || !str_contains($adminCss, 'color: #242825')
-    || !str_contains($adminCss, 'font-weight: 650')
+    || !str_contains($adminCss, '--admin-sidebar-bg: #1A1B1C')
+    || !str_contains($adminCss, 'color: #d7dbdd')
+    || !str_contains($adminCss, 'font-weight: 400')
 ) {
-    throw new RuntimeException('Admin navigation does not expose the professional high-contrast active state.');
+    throw new RuntimeException('Admin navigation does not use the requested dark, regular-weight treatment.');
 }
-echo "[PASS] uses a clear, borderless and high-contrast navigation state\n";
+echo "[PASS] uses dark, regular-weight and high-contrast navigation\n";
 
 if (
     !str_contains($adminCss, 'font-family: "Baloo 2"')
