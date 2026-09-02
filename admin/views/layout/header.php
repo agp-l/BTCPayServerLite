@@ -61,8 +61,8 @@ $navItem = static function (
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#090a0f">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,8 +74,8 @@ $navItem = static function (
 <div class="admin-shell">
   <aside class="admin-sidebar" id="adminSidebar" aria-label="Hlavní navigace">
     <a href="<?php echo $routeUrl('/admin/dashboard'); ?>" class="admin-brand">
-      <span class="admin-brand-mark"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
-      <span class="admin-brand-copy"><strong>BTCPay Lite</strong><span>Platební infrastruktura</span></span>
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Bitcoin payments</span></span>
     </a>
 
     <nav class="admin-nav">
