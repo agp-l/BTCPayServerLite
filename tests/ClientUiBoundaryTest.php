@@ -7,6 +7,9 @@ $paths = [
     'controller' => 'client/index.php',
     'view' => 'client/views/index_view.php',
     'header' => 'client/views/layout/header.php',
+    'footer' => 'client/views/layout/footer.php',
+    'css' => 'assets/admin.css',
+    'script' => 'assets/admin.js',
     'provisioner' => 'classes/ElectrumCliWalletProvisioner.php',
 ];
 $sources = [];
@@ -65,6 +68,19 @@ if (str_contains($sources['header'], '<style>') || !str_contains($sources['heade
 echo "[PASS] uses the shared responsive design system\n";
 
 if (
+    str_contains($sources['header'], 'admin-topbar')
+    || !str_contains($sources['header'], 'admin-mobile-bar')
+    || !str_contains($sources['header'], 'admin-system-status')
+    || !str_contains($sources['footer'], '/assets/admin.js')
+    || !str_contains($sources['css'], '.data-table.is-responsive td::before')
+    || !str_contains($sources['script'], 'cell.dataset.label')
+    || str_contains($sources['script'], 'innerHTML')
+) {
+    throw new RuntimeException('Client shell does not share the mobile navigation and responsive table behavior.');
+}
+echo "[PASS] shares the streamlined shell and labeled mobile tables\n";
+
+if (
     !str_contains($sources['header'], 'method="post"')
     || !str_contains($sources['header'], 'name="action" value="logout"')
     || !str_contains($sources['header'], 'name="csrf_token"')
@@ -93,4 +109,4 @@ if (
 }
 echo "[PASS] restricts wallet cleanup to managed store wallets\n";
 
-echo "9 client UI boundary tests passed.\n";
+echo "10 client UI boundary tests passed.\n";
