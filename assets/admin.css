@@ -1905,3 +1905,354 @@ table td strong {
   }
 }
 
+/* BTCPay Lite identity: cheerful flat ledger language. */
+:root {
+  --admin-coin: #f0d54f;
+  --admin-coin-soft: #fff7c7;
+  --admin-incoming: #08713a;
+  --admin-incoming-soft: #e8f8ee;
+  --admin-outgoing: #b42335;
+  --admin-outgoing-soft: #ffebed;
+  --admin-sky: #2176ae;
+  --admin-sky-soft: #e8f4fb;
+}
+
+.admin-brand {
+  position: relative;
+  border-bottom: 3px solid var(--admin-accent);
+}
+
+.admin-brand::after {
+  position: absolute;
+  right: 18px;
+  bottom: -3px;
+  width: 44px;
+  height: 3px;
+  background: var(--admin-coin);
+  content: "";
+}
+
+.admin-brand-mark {
+  position: relative;
+  background: var(--admin-accent);
+  color: #052216;
+}
+
+.admin-brand-mark::after {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--admin-surface);
+  background: var(--admin-coin);
+  content: "";
+}
+
+.admin-topbar {
+  border-top: 3px solid var(--admin-coin);
+}
+
+.admin-topbar-context > i {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--admin-radius);
+  background: var(--admin-incoming-soft);
+}
+
+.page-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.page-eyebrow::before {
+  width: 9px;
+  height: 9px;
+  background: var(--admin-coin);
+  content: "";
+}
+
+.card {
+  position: relative;
+}
+
+.card::before {
+  position: absolute;
+  top: -1px;
+  left: 21px;
+  display: block;
+  width: 34px;
+  height: 3px;
+  background: var(--admin-accent);
+  content: "";
+}
+
+.card.security-card::before {
+  background: var(--admin-coin);
+}
+
+.card-title-group > i,
+.card-title > i,
+.card-title > span i {
+  background: var(--admin-incoming-soft);
+  color: var(--admin-incoming) !important;
+}
+
+.card-title-group > i.fa-triangle-exclamation,
+.card-title > i.fa-triangle-exclamation,
+.card-title > span i.fa-triangle-exclamation,
+.card-title-group > i.fa-lock,
+.card-title > span i.fa-lock {
+  background: var(--admin-coin-soft);
+  color: #6b5100 !important;
+}
+
+.stats-grid .stat-card {
+  background: #f5fcf7;
+}
+
+.stats-grid .stat-card-blue {
+  background: var(--admin-sky-soft);
+}
+
+.stats-grid .stat-card-amber {
+  background: var(--admin-coin-soft);
+}
+
+.stat-card .stat-value {
+  color: var(--admin-incoming);
+}
+
+.stat-card-blue .stat-value {
+  color: #174f78;
+}
+
+.stat-card-amber .stat-value {
+  color: #654d00;
+}
+
+.primary {
+  border-color: #0ea457;
+  background: var(--admin-accent);
+}
+
+.primary:hover {
+  border-color: #08713a;
+  background: #2fd37e;
+}
+
+.primary:active {
+  background: #14b963;
+}
+
+.ghost:hover,
+.ghost-btn:hover,
+.action-link:hover {
+  border-color: #8ca097;
+  background: #f2f7f3;
+}
+
+.icon-btn {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  margin-top: 0 !important;
+  font-size: 14px;
+}
+
+.icon-btn i {
+  font-size: 14px;
+}
+
+.address-actions .icon-btn {
+  align-self: center;
+}
+
+.wallet-hero {
+  position: relative;
+  overflow: hidden;
+  background: #f4fcf7;
+  border-left-color: var(--admin-accent);
+}
+
+.wallet-hero::before {
+  position: absolute;
+  top: 0;
+  right: 58px;
+  display: block;
+  width: 70px;
+  height: 5px;
+  background: var(--admin-accent);
+  content: "";
+}
+
+.wallet-hero::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: block;
+  width: 58px;
+  height: 5px;
+  background: var(--admin-coin);
+  content: "";
+}
+
+.wallet-balance {
+  color: #0a2b1b;
+}
+
+.wallet-balance span {
+  color: var(--admin-incoming);
+}
+
+.address-row {
+  border-left: 3px solid transparent;
+  padding-left: 10px;
+}
+
+.address-row.has-utxo {
+  border-left-color: var(--admin-accent);
+  background: #f5fcf7;
+}
+
+.address-row-main small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--admin-muted);
+  font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.address-funds {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: 750;
+}
+
+.address-funds.has-utxo {
+  background: var(--admin-incoming-soft);
+  color: var(--admin-incoming);
+}
+
+.address-funds.is-empty {
+  background: #ecefed;
+  color: #454d48;
+}
+
+.address-row-value strong {
+  color: var(--admin-incoming);
+}
+
+.transaction-item {
+  margin: 3px 0;
+  padding-left: 12px;
+  border-left: 3px solid transparent;
+  background: #fafbfa;
+}
+
+.transaction-item.incoming {
+  border-left-color: var(--admin-accent);
+  background: #f4fcf7;
+}
+
+.transaction-item.outgoing {
+  border-left-color: #d34051;
+  background: #fff6f7;
+}
+
+.transaction-item.incoming .transaction-main strong,
+.transaction-amount.incoming {
+  color: var(--admin-incoming);
+}
+
+.transaction-item.outgoing .transaction-main strong,
+.transaction-amount.outgoing {
+  color: var(--admin-outgoing);
+}
+
+.transaction-item.incoming .transaction-status {
+  color: #126a3d;
+}
+
+.transaction-icon.incoming {
+  background: #cef0db;
+  color: var(--admin-incoming);
+}
+
+.transaction-icon.outgoing {
+  background: #ffd9de;
+  color: var(--admin-outgoing);
+}
+
+.transaction-details {
+  background: #ffffff;
+}
+
+.transaction-details summary {
+  color: #303833;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invoice-amount,
+.invoice-history-item code,
+.address-row-value strong,
+.credential-value code {
+  color: var(--admin-incoming);
+}
+
+.badge-New,
+.s-unpaid,
+.s-underpaid,
+.badge-Processing,
+.s-pending_mempool {
+  background: var(--admin-coin-soft);
+  color: #604800;
+}
+
+.alert-warning,
+.security-warning {
+  border-left-color: var(--admin-coin);
+  background: #fff9dc;
+  color: #5b4500;
+}
+
+.empty-state i {
+  color: #907000;
+}
+
+.operation-link:nth-child(3n + 1) .operation-icon {
+  background: var(--admin-incoming-soft);
+  color: var(--admin-incoming);
+}
+
+.operation-link:nth-child(3n + 2) .operation-icon {
+  background: var(--admin-coin-soft);
+  color: #6b5100;
+}
+
+.operation-link:nth-child(3n) .operation-icon {
+  background: var(--admin-sky-soft);
+  color: #174f78;
+}
+
+@media (max-width: 620px) {
+  .address-row-main small {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .transaction-item {
+    padding-left: 9px;
+  }
+}
+
