@@ -63,14 +63,24 @@ if (str_contains($walletView, 'api.qrserver.com') || str_contains($walletView, '
 echo "[PASS] avoids external QR disclosure and unsafe JavaScript interpolation\n";
 
 if (
-    !str_contains($adminCss, 'color-scheme: dark')
-    || !str_contains($adminCss, '--admin-bg: #090a0f')
-    || !str_contains($adminCss, '--admin-accent: #a855f7')
-    || str_contains($adminCss, 'color-scheme: light')
+    !str_contains($adminCss, 'color-scheme: light')
+    || !str_contains($adminCss, '--admin-bg: #f7f9f8')
+    || !str_contains($adminCss, '--admin-accent: #20c875')
+    || !str_contains($adminCss, '--admin-accent-dark: #0f9c45')
+    || str_contains($adminCss, '#a855f7')
 ) {
-    throw new RuntimeException('Admin design system is not consistently dark and purple.');
+    throw new RuntimeException('Admin design system is not consistently light and green.');
 }
-echo "[PASS] uses the dark graphite and purple admin design system\n";
+echo "[PASS] uses the light graphite and green admin design system\n";
+
+if (
+    !str_contains($adminCss, '.admin-nav-link.is-active::before')
+    || !str_contains($adminCss, 'border-color: transparent')
+    || !str_contains($adminCss, 'background: rgba(32, 200, 117, 0.105)')
+) {
+    throw new RuntimeException('Admin navigation does not expose the subtle borderless active state.');
+}
+echo "[PASS] uses a subtle borderless active navigation state\n";
 
 if (!str_contains($adminCss, '1680px') || !str_contains($dashboardView, 'dashboard-grid')) {
     throw new RuntimeException('Admin workspace does not use the wider responsive layout.');
@@ -103,4 +113,4 @@ if (
 }
 echo "[PASS] protects stateless invoice admin requests with CSRF\n";
 
-echo "11 admin UI boundary tests passed.\n";
+echo "12 admin UI boundary tests passed.\n";
