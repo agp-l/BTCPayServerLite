@@ -420,7 +420,7 @@ a { color: inherit; }
   place-items: center;
   border-radius: var(--admin-radius-sm);
   background: var(--admin-surface-soft);
-  color: var(--admin-muted) !important;
+  color: var(--admin-accent-dark) !important;
   font-size: 12.5px;
 }
 
@@ -430,7 +430,6 @@ a { color: inherit; }
   font-size: 13.5px;
 }
 
-.card.security-card { border-left: 3px solid var(--admin-warning); }
 
 /* ==========================================================================
    Stats
@@ -531,7 +530,7 @@ a { color: inherit; }
   font-weight: 650;
 }
 
-.badge-New, .s-unpaid, .s-underpaid { background: var(--admin-warning-soft); color: var(--admin-warning); }
+.badge-New, .s-unpaid, .s-underpaid { background: var(--admin-warning-soft); color: var(--admin-danger); }
 .badge-Processing, .s-pending_mempool { background: var(--admin-info-soft); color: var(--admin-info); }
 .badge-Settled, .s-paid, .s-paid_late { background: var(--admin-success-soft); color: var(--admin-success); }
 .badge-Expired, .s-expired { background: var(--admin-danger-soft); color: var(--admin-danger); }
@@ -1349,7 +1348,7 @@ select:focus-visible, textarea:focus-visible {
   place-items: center;
   border-radius: var(--admin-radius-sm);
   background: var(--admin-surface);
-  color: var(--admin-muted);
+  color: var(--admin-accent-dark);
 }
 
 .stateless-mode-item div { display: grid; gap: 4px; }
@@ -1378,7 +1377,7 @@ select:focus-visible, textarea:focus-visible {
 .inline-edit-form select { min-width: 126px; }
 
 .invoice-url { margin-top: 13px; padding: 10px 11px; word-break: break-all; }
-.invoice-url a { color: var(--admin-accent-dark); text-decoration: none; }
+.invoice-url a { color: var(--admin-text-soft); text-decoration: none; }
 .invoice-url a:hover { text-decoration: underline; }
 
 .danger-text { color: var(--admin-danger) !important; }
