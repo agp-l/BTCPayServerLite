@@ -64,23 +64,35 @@ echo "[PASS] avoids external QR disclosure and unsafe JavaScript interpolation\n
 
 if (
     !str_contains($adminCss, 'color-scheme: light')
-    || !str_contains($adminCss, '--admin-bg: #f7f9f8')
+    || !str_contains($adminCss, '--admin-bg: #f3f4f3')
     || !str_contains($adminCss, '--admin-accent: #20c875')
-    || !str_contains($adminCss, '--admin-accent-dark: #0f9c45')
+    || !str_contains($adminCss, '--admin-text: #111413')
     || str_contains($adminCss, '#a855f7')
 ) {
-    throw new RuntimeException('Admin design system is not consistently light and green.');
+    throw new RuntimeException('Admin design system is not consistently light, dark-text and green.');
 }
-echo "[PASS] uses the light graphite and green admin design system\n";
+echo "[PASS] uses the light, high-contrast green admin design system\n";
+
+if (
+    str_contains($adminCss, 'box-shadow')
+    || str_contains($adminCss, 'text-shadow')
+    || str_contains($adminCss, 'gradient(')
+    || str_contains($adminCss, 'backdrop-filter')
+    || preg_match('/border-radius:\\s*(?:[5-9]|[1-9][0-9]+)px/', $adminCss)
+) {
+    throw new RuntimeException('Admin design system still contains shadows, gradients or oversized corners.');
+}
+echo "[PASS] uses a flat design with corners no larger than four pixels\n";
 
 if (
     !str_contains($adminCss, '.admin-nav-link.is-active::before')
-    || !str_contains($adminCss, 'border-color: transparent')
-    || !str_contains($adminCss, 'background: rgba(32, 200, 117, 0.105)')
+    || !str_contains($adminCss, 'background: var(--admin-surface-selected)')
+    || !str_contains($adminCss, 'color: #242926')
+    || !str_contains($adminCss, 'font-weight: 600')
 ) {
-    throw new RuntimeException('Admin navigation does not expose the subtle borderless active state.');
+    throw new RuntimeException('Admin navigation does not expose the professional high-contrast active state.');
 }
-echo "[PASS] uses a subtle borderless active navigation state\n";
+echo "[PASS] uses a clear, borderless and high-contrast navigation state\n";
 
 if (!str_contains($adminCss, '1680px') || !str_contains($dashboardView, 'dashboard-grid')) {
     throw new RuntimeException('Admin workspace does not use the wider responsive layout.');
@@ -113,4 +125,4 @@ if (
 }
 echo "[PASS] protects stateless invoice admin requests with CSRF\n";
 
-echo "12 admin UI boundary tests passed.\n";
+echo "13 admin UI boundary tests passed.\n";
