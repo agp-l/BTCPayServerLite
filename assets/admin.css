@@ -350,6 +350,7 @@ a { color: inherit; }
 }
 
 .card {
+  margin-top: 20px;
   margin-bottom: 20px;
   padding: 22px;
   border: 1px solid var(--admin-line);
@@ -636,7 +637,6 @@ label {
 .input-wrap {
   display: flex;
   overflow: hidden;
-  border: 1px solid #bfc8c2;
   border-radius: var(--admin-radius);
   background: var(--admin-surface);
 }
@@ -1833,6 +1833,7 @@ textarea:focus-visible {
   min-height: 34px;
   padding: 7px 10px;
   font-size: 12px;
+  margin-top: 10px;
 }
 
 .filter-card {
