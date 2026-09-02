@@ -106,6 +106,10 @@ $navItem = static function (
     </nav>
 
     <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>Systém online</span>
+      </div>
       <div class="admin-profile">
         <span class="admin-profile-avatar" aria-hidden="true"><?php echo htmlspecialchars($adminInitial, ENT_QUOTES, 'UTF-8'); ?></span>
         <span class="admin-profile-copy">
@@ -127,16 +131,13 @@ $navItem = static function (
   <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
 
   <div class="admin-main">
-    <header class="admin-topbar">
-      <div class="admin-topbar-context">
-        <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="adminSidebar" aria-expanded="false">
-          <i class="fa-solid fa-bars" aria-hidden="true"></i>
-        </button>
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="adminSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
         <i class="fa-solid <?php echo htmlspecialchars($currentContext['icon'], ENT_QUOTES, 'UTF-8'); ?>" aria-hidden="true"></i>
-        <span>Administrace / <?php echo htmlspecialchars($currentContext['label'], ENT_QUOTES, 'UTF-8'); ?></span>
-      </div>
-      <div class="admin-topbar-actions">
-        <span class="badge s-paid"><i class="fa-solid fa-circle" aria-hidden="true"></i> Systém online</span>
-      </div>
+        <span><?php echo htmlspecialchars($currentContext['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+      </span>
     </header>
     <main class="admin-content">
