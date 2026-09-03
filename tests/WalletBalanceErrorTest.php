@@ -14,7 +14,7 @@ $transport = new ElectrumRPCException(
     1,
     curlCode: 7
 );
-if (!str_contains(WalletBalanceError::message($transport), 'unavailable')) {
+if (!str_contains(WalletBalanceError::message($transport), 'není dostupné')) {
     throw new RuntimeException('Transport failure does not have an actionable message.');
 }
 echo "[PASS] explains an unavailable Electrum daemon\n";
@@ -26,7 +26,7 @@ $missingWallet = new ElectrumRPCException(
     2,
     rpcCode: 1
 );
-if (!str_contains(WalletBalanceError::message($missingWallet), 'wallet file')) {
+if (!str_contains(WalletBalanceError::message($missingWallet), 'soubor peněženky')) {
     throw new RuntimeException('Wallet load failure does not identify the assigned file.');
 }
 echo "[PASS] explains an unavailable wallet file\n";

@@ -31,7 +31,7 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             $user = $statement->fetch(PDO::FETCH_ASSOC);
         } catch (Throwable $exception) {
             throw new AuthException(
-                'Login cannot be completed at this time. Please try again later.',
+                'Přihlášení nyní nelze dokončit. Zkuste to prosím později.',
                 previous: $exception
             );
         }
@@ -45,7 +45,7 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             || !is_string($user['password_hash'] ?? null)
             || !is_string($user['role'] ?? null)
         ) {
-            throw new AuthException('Login cannot be completed at this time. Please try again later.');
+            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
         }
 
         return [
@@ -71,7 +71,7 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             $statement->execute([$loggedInAt, $ipAddress, $loggedInAt, $ipAddress, $userId]);
         } catch (Throwable $exception) {
             throw new AuthException(
-                'Login cannot be completed at this time. Please try again later.',
+                'Přihlášení nyní nelze dokončit. Zkuste to prosím později.',
                 previous: $exception
             );
         }
@@ -87,17 +87,17 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             $userId = $this->pdo->lastInsertId();
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                throw new AuthException('Registration with these details cannot be completed.');
+                throw new AuthException('Registraci s těmito údaji nelze dokončit.');
             }
 
             throw new AuthException(
-                'Registration cannot be completed at this time. Please try again later.',
+                'Registraci nyní nelze dokončit. Zkuste to prosím později.',
                 previous: $exception
             );
         }
 
         if (!ctype_digit($userId) || (int) $userId < 1) {
-            throw new AuthException('Registration cannot be completed at this time. Please try again later.');
+            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
         }
 
         return (int) $userId;
@@ -125,7 +125,7 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             return (int) $statement->fetchColumn();
         } catch (Throwable $exception) {
             throw new AuthException(
-                'Login cannot be completed at this time. Please try again later.',
+                'Přihlášení nyní nelze dokončit. Zkuste to prosím později.',
                 previous: $exception
             );
         }
@@ -146,7 +146,7 @@ class PdoAuthUserRepository implements AuthUserRepository, LoginTelemetryReposit
             $statement->execute([$identityHash, $attemptedAt]);
         } catch (Throwable $exception) {
             throw new AuthException(
-                'Login cannot be completed at this time. Please try again later.',
+                'Přihlášení nyní nelze dokončit. Zkuste to prosím později.',
                 previous: $exception
             );
         }

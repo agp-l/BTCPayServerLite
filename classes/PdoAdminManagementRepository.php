@@ -68,7 +68,7 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
         $where = $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions);
         $statement = $this->pdo->prepare(
             "SELECT i.id, i.store_id, s.name AS store_name, s.user_id,
-                    COALESCE(u.email, 'System / no client') AS client_email,
+                    COALESCE(u.email, 'Systém / bez klienta') AS client_email,
                     i.amount, i.status, i.created_at, i.expires_at
              FROM invoices i
              INNER JOIN stores s ON s.id = i.store_id
@@ -89,7 +89,7 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
         [$where, $params] = $this->userWhere($userId, 's');
         $statement = $this->pdo->prepare(
             "SELECT s.id, s.name, s.api_key, s.wallet_path, s.user_id,
-                    COALESCE(u.email, 'System / no client') AS client_email,
+                    COALESCE(u.email, 'Systém / bez klienta') AS client_email,
                     (SELECT COUNT(*) FROM invoices i WHERE i.store_id = s.id) AS invoice_count,
                     (SELECT COUNT(*) FROM webhooks w WHERE w.store_id = s.id) AS webhook_count,
                     (SELECT COUNT(*) FROM payouts p WHERE p.store_id = s.id) AS payout_count
@@ -111,7 +111,7 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
         $where = $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions);
         $statement = $this->pdo->prepare(
             "SELECT w.id, w.store_id, s.name AS store_name, s.user_id,
-                    COALESCE(u.email, 'System / no client') AS client_email,
+                    COALESCE(u.email, 'Systém / bez klienta') AS client_email,
                     w.url, w.secret, w.created_at,
                     (SELECT MAX(COALESCE(wd.delivered_at, wd.created_at))
                        FROM webhook_deliveries wd WHERE wd.webhook_id = w.id) AS last_delivery_at

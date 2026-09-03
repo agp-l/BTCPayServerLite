@@ -141,7 +141,15 @@ class WebhookProcessor
                 );
             }
 
-            $statusData = $this->invoiceManager->checkDatabasePaymentStatus($invoice['id']);
+            $statusData = $this->database->withNamedLock(
+                self::ELECTRUM_LOCK_NAME,
+                self::ELECTRUM_LOCK_TIMEOUT_SECONDS,
+                function ($_pdo) use ($invoice): array {
+                    $this->wallet->loadWallet($invoice['wallet_path']);
+
+                    return $this->invoiceManager->checkDatabasePaymentStatus($invoice['id']);
+                }
+            );
             $newStatus = $statusData['status'] ?? null;
             if (!is_string($newStatus) || !$this->isInvoiceStatus($newStatus)) {
                 throw new WebhookDeliveryException(

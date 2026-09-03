@@ -233,7 +233,7 @@ class GreenfieldApiService
     }
 
     /** @param array<string,mixed> $input @return array<string,mixed> */
-    public function createInvoice(string $storeId, array $input, string $apiKey, ?string $idempotencyKey = null): array
+    public function createInvoice(string $storeId, array $input, string $apiKey): array
     {
         $store = $this->authenticateStore($storeId, $apiKey);
         $originalAmount = $this->decimalAmount($input['amount'] ?? null);
@@ -272,24 +272,20 @@ class GreenfieldApiService
             $storedMetadata[self::META_REDIRECT_AUTO] = $redirectAutomatically;
         }
 
-        $addressSource = (string) ($store['address_source'] ?? 'electrum');
-        if ($addressSource === 'electrum' && !empty($store['wallet_path'])) {
-            try {
-                $walletPath = $this->resolveWalletPath((string) $store['wallet_path']);
-                $this->wallet->loadWallet($walletPath);
-            } catch (Throwable $e) {
-                // If wallet cannot be loaded and no xpub is present, this will fail downstream cleanly
-            }
-        }
-
+        $walletPath = $this->resolveWalletPath($store['wallet_path']);
         try {
-            $invoice = $this->invoiceManager->createDatabaseInvoice(
-                $store['id'],
-                $btcAmount,
-                $storedMetadata,
-                $expiration,
-                $idempotencyKey,
-                $addressSource
+            $invoice = $this->database->withNamedLock(
+                'electrum_rpc',
+                10,
+                function () use ($walletPath, $store, $btcAmount, $storedMetadata, $expiration): array {
+                    $this->wallet->loadWallet($walletPath);
+                    return $this->invoiceManager->createDatabaseInvoice(
+                        $store['id'],
+                        $btcAmount,
+                        $storedMetadata,
+                        $expiration
+                    );
+                }
             );
         } catch (DatabaseException $exception) {
             throw new GreenfieldApiException(

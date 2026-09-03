@@ -9,13 +9,13 @@
     const CSRF_TOKEN = app.dataset.csrfToken || '';
     const allowedStatuses = new Set(['paid', 'paid_late', 'pending_mempool', 'unpaid', 'expired', 'underpaid', 'unknown']);
     const statusLabels = {
-        paid: 'Paid',
-        paid_late: 'Paid (Late)',
-        pending_mempool: 'In Mempool',
-        unpaid: 'Unpaid',
-        expired: 'Expired',
-        underpaid: 'Underpaid',
-        unknown: 'Unknown'
+        paid: 'Zaplaceno',
+        paid_late: 'Zaplaceno (zpožděně)',
+        pending_mempool: 'V síti',
+        unpaid: 'Nezaplaceno',
+        expired: 'Vypršela',
+        underpaid: 'Nedoplatek',
+        unknown: 'Neznámý stav'
     };
 
     const toast = document.getElementById('toast');
@@ -120,8 +120,8 @@
             body: formData
         });
         const data = await response.json().catch(() => null);
-        if (!data || typeof data !== 'object') throw new Error('Server returned invalid response.');
-        if (!response.ok && typeof data.message !== 'string') throw new Error('Request could not be completed.');
+        if (!data || typeof data !== 'object') throw new Error('Server vrátil neplatnou odpověď.');
+        if (!response.ok && typeof data.message !== 'string') throw new Error('Požadavek se nepodařilo dokončit.');
         return data;
     };
 
@@ -134,18 +134,18 @@
     const saveVerifiedToHistory = (invoice) => {
         const normalized = normalizeInvoice(invoice);
         if (!normalized) {
-            showToast('Unable to save invoice.');
+            showToast('Fakturu nelze uložit.');
             return;
         }
         const invoices = getInvoices();
         if (invoices.some((item) => item.token === normalized.token)) {
-            showToast('This invoice is already in history.');
+            showToast('Tato faktura již v historii je.');
             return;
         }
         invoices.unshift(normalized);
         saveInvoices(invoices);
         renderInvoices();
-        showToast('Invoice saved to history.');
+        showToast('Faktura byla uložena do historie.');
     };
 
     const renderVerification = (data) => {
@@ -155,7 +155,7 @@
 
         if (data.status !== 'ok') {
             const error = createElement('span', 'error-text');
-            error.append(createIcon('fa-circle-xmark'), document.createTextNode(` ${String(data.message || 'Verification failed.')}`));
+            error.append(createIcon('fa-circle-xmark'), document.createTextNode(` ${String(data.message || 'Ověření se nezdařilo.')}`));
             verifyResult.append(error);
             return;
         }
@@ -163,16 +163,16 @@
         const summary = createElement('div', 'verification-summary');
         summary.append(statusBadge(data.payment_status));
         const values = createElement('div', 'verification-data');
-        appendDefinition(values, 'Description', data.desc || '');
-        appendDefinition(values, 'Amount', `${String(data.amount || '')} BTC`);
-        if (data.order_id) appendDefinition(values, 'Order ID', data.order_id);
-        appendDefinition(values, 'Wallet', data.wallet || '');
+        appendDefinition(values, 'Popis', data.desc || '');
+        appendDefinition(values, 'Částka', `${String(data.amount || '')} BTC`);
+        if (data.order_id) appendDefinition(values, 'Interní ID', data.order_id);
+        appendDefinition(values, 'Peněženka', data.wallet || '');
         if (normalizeStatus(data.payment_status) === 'underpaid') {
-            values.append(createElement('div', 'underpaid-note', `Missing payment: ${String(data.missing_amount || '')} BTC`));
+            values.append(createElement('div', 'underpaid-note', `Chybí doplatit: ${String(data.missing_amount || '')} BTC`));
         }
 
         const actions = createElement('div', 'verification-actions');
-        const saveButton = createElement('button', 'ghost-btn', ' Save to History');
+        const saveButton = createElement('button', 'ghost-btn', ' Uložit do historie');
         saveButton.type = 'button';
         saveButton.prepend(createIcon('fa-floppy-disk'));
         saveButton.addEventListener('click', () => saveVerifiedToHistory({
@@ -189,7 +189,7 @@
 
         const verifiedUrl = safeHttpUrl(data.url);
         if (verifiedUrl) {
-            const openLink = createElement('a', 'ghost-btn', ' Open Invoice');
+            const openLink = createElement('a', 'ghost-btn', ' Otevřít fakturu');
             openLink.href = verifiedUrl;
             openLink.target = '_blank';
             openLink.rel = 'noopener';
@@ -204,18 +204,18 @@
         const invoices = getInvoices();
         const index = invoices.findIndex((invoice) => invoice.token === token);
         if (index < 0) return;
-        setButtonState(button, true, 'Checking', 'fa-spinner fa-spin');
+        setButtonState(button, true, 'Kontroluji', 'fa-spinner fa-spin');
         try {
             const formData = new URLSearchParams({ token });
             const data = await apiCall('check_status', formData);
-            if (data.status !== 'ok') throw new Error(String(data.message || 'Status check failed.'));
+            if (data.status !== 'ok') throw new Error(String(data.message || 'Kontrola stavu se nezdařila.'));
             invoices[index].lastStatus = normalizeStatus(data.payment_status);
             saveInvoices(invoices);
             renderInvoices();
-            showToast('Invoice status updated.');
+            showToast('Stav faktury byl aktualizován.');
         } catch (error) {
-            showToast(error instanceof Error ? error.message : 'Status check failed.');
-            setButtonState(button, false, 'Check Status', 'fa-rotate');
+            showToast(error instanceof Error ? error.message : 'Kontrola stavu se nezdařila.');
+            setButtonState(button, false, 'Zkontrolovat stav', 'fa-rotate');
         }
     };
 
@@ -226,7 +226,7 @@
         if (invoices.length === 0) {
             const empty = createElement('div', 'empty-state');
             const content = createElement('div');
-            content.append(createIcon('fa-inbox'), createElement('p', '', 'No stored URL invoices found.'));
+            content.append(createIcon('fa-inbox'), createElement('p', '', 'Zatím nemáte uložené žádné URL faktury.'));
             empty.append(content);
             invoiceList.append(empty);
             return;
@@ -238,7 +238,7 @@
             const main = createElement('div');
             main.append(createElement('strong', 'invoice-description', invoice.desc));
             const meta = createElement('div', 'invoice-meta');
-            const date = invoice.time > 0 ? new Date(invoice.time * 1000).toLocaleString('en-US') : 'Time not specified';
+            const date = invoice.time > 0 ? new Date(invoice.time * 1000).toLocaleString('cs-CZ') : 'Čas neuveden';
             meta.textContent = `${date} · ${invoice.wallet}${invoice.order_id ? ` · ID: ${invoice.order_id}` : ''}`;
             main.append(meta);
 
@@ -257,35 +257,35 @@
             urlBox.append(link);
 
             const actions = createElement('div', 'invoice-actions');
-            const copyButton = createElement('button', 'ghost-btn', ' Copy');
+            const copyButton = createElement('button', 'ghost-btn', ' Kopírovat');
             copyButton.type = 'button';
             copyButton.prepend(createIcon('fa-copy'));
             copyButton.addEventListener('click', async () => {
                 try {
                     await navigator.clipboard.writeText(invoice.url);
-                    showToast('URL copied to clipboard.');
+                    showToast('URL byla zkopírována.');
                 } catch (error) {
-                    showToast('Failed to copy URL.');
+                    showToast('Kopírování se nepodařilo.');
                 }
             });
 
-            const checkButton = createElement('button', 'primary push-right', ' Check Status');
+            const checkButton = createElement('button', 'primary push-right', ' Zkontrolovat stav');
             checkButton.type = 'button';
             checkButton.prepend(createIcon('fa-rotate'));
             checkButton.addEventListener('click', () => checkStatusByToken(invoice.token, checkButton));
 
             const deleteButton = createElement('button', 'danger-btn');
             deleteButton.type = 'button';
-            deleteButton.title = 'Delete invoice';
-            deleteButton.setAttribute('aria-label', `Delete invoice ${invoice.desc}`);
+            deleteButton.title = 'Smazat fakturu';
+            deleteButton.setAttribute('aria-label', `Smazat fakturu ${invoice.desc}`);
             deleteButton.append(createIcon('fa-trash'));
             deleteButton.addEventListener('click', () => {
-                if (!window.confirm('Delete this invoice from local history?')) return;
+                if (!window.confirm('Opravdu smazat tuto fakturu z historie?')) return;
                 const current = getInvoices();
                 current.splice(index, 1);
                 saveInvoices(current);
                 renderInvoices();
-                showToast('Invoice deleted.');
+                showToast('Faktura byla smazána.');
             });
             actions.append(copyButton, checkButton, deleteButton);
             item.append(header, urlBox, actions);
@@ -296,7 +296,7 @@
     createForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const button = document.getElementById('btnCreate');
-        setButtonState(button, true, 'Processing', 'fa-spinner fa-spin');
+        setButtonState(button, true, 'Zpracovávám', 'fa-spinner fa-spin');
         const formData = new URLSearchParams({
             wallet: document.getElementById('walletSelect')?.value || '',
             amount: document.getElementById('amount')?.value || '',
@@ -306,7 +306,7 @@
         });
         try {
             const data = await apiCall('create', formData);
-            if (data.status !== 'ok') throw new Error(String(data.message || 'Failed to create invoice.'));
+            if (data.status !== 'ok') throw new Error(String(data.message || 'Fakturu se nepodařilo vytvořit.'));
             const invoice = normalizeInvoice({
                 token: data.token,
                 url: data.url,
@@ -317,17 +317,17 @@
                 time: data.time,
                 lastStatus: 'unknown'
             });
-            if (!invoice) throw new Error('Server returned invalid invoice data.');
+            if (!invoice) throw new Error('Server vrátil neplatná data faktury.');
             const invoices = getInvoices();
             invoices.unshift(invoice);
             saveInvoices(invoices);
             renderInvoices();
-            showToast('Invoice generated and saved.');
+            showToast('Faktura byla vygenerována a uložena.');
             createForm.reset();
         } catch (error) {
-            showToast(error instanceof Error ? error.message : 'Failed to create invoice.');
+            showToast(error instanceof Error ? error.message : 'Fakturu se nepodařilo vytvořit.');
         } finally {
-            setButtonState(button, false, 'Generate Secure Link', 'fa-wand-magic-sparkles');
+            setButtonState(button, false, 'Vygenerovat zabezpečený odkaz', 'fa-wand-magic-sparkles');
         }
     });
 
@@ -342,7 +342,7 @@
         } catch (error) {
             token = input;
         }
-        setButtonState(button, true, 'Verifying', 'fa-spinner fa-spin');
+        setButtonState(button, true, 'Ověřuji', 'fa-spinner fa-spin');
         if (verifyResult) {
             verifyResult.style.display = 'none';
             verifyResult.replaceChildren();
@@ -350,20 +350,20 @@
         try {
             renderVerification(await apiCall('check_status', new URLSearchParams({ token })));
         } catch (error) {
-            renderVerification({ status: 'error', message: error instanceof Error ? error.message : 'Verification failed.' });
+            renderVerification({ status: 'error', message: error instanceof Error ? error.message : 'Ověření se nezdařilo.' });
         } finally {
-            setButtonState(button, false, 'Verify Invoice', 'fa-shield-halved');
+            setButtonState(button, false, 'Ověřit fakturu', 'fa-shield-halved');
         }
     });
 
     document.querySelector('[data-history-import]')?.addEventListener('click', () => importFile?.click());
 
     document.querySelector('[data-history-clear]')?.addEventListener('click', () => {
-        if (!window.confirm('Delete local invoice history from this browser?')) return;
+        if (!window.confirm('Smazat lokální historii URL faktur z tohoto prohlížeče?')) return;
         window.localStorage.removeItem(STORAGE_KEY);
         window.localStorage.removeItem(LEGACY_STORAGE_KEY);
         renderInvoices();
-        showToast('Browser storage cleared.');
+        showToast('Paměť prohlížeče byla vymazána.');
     });
 
     document.querySelector('[data-history-export]')?.addEventListener('click', () => {
@@ -380,7 +380,7 @@
         const file = importFile.files?.[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) {
-            showToast('File is too large.');
+            showToast('Soubor je příliš velký.');
             importFile.value = '';
             return;
         }
@@ -388,14 +388,14 @@
         reader.addEventListener('load', () => {
             try {
                 const parsed = JSON.parse(String(reader.result || '[]'));
-                if (!Array.isArray(parsed)) throw new Error('Invalid format.');
+                if (!Array.isArray(parsed)) throw new Error('Neplatný formát.');
                 const invoices = parsed.map(normalizeInvoice).filter(Boolean).slice(0, 500);
-                if (parsed.length > 0 && invoices.length === 0) throw new Error('Backup does not contain valid invoices.');
+                if (parsed.length > 0 && invoices.length === 0) throw new Error('Záloha neobsahuje platné faktury.');
                 saveInvoices(invoices);
                 renderInvoices();
-                showToast('Invoice backup imported.');
+                showToast('Záloha faktur byla importována.');
             } catch (error) {
-                showToast(error instanceof Error ? error.message : 'Failed to load file.');
+                showToast(error instanceof Error ? error.message : 'Soubor se nepodařilo načíst.');
             } finally {
                 importFile.value = '';
             }

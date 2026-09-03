@@ -47,26 +47,39 @@ final class DatabaseCheckoutFactory
                 $rpcScheme,
                 $secretKey
             ): array {
-                $rpc = new ElectrumRPC(
-                    $rpcHost,
-                    $rpcPort,
-                    $rpcUser,
-                    $rpcPass,
-                    30,
-                    5,
-                    strtolower($rpcScheme)
-                );
-                $blockchainProvider = new ElectrumBlockchainProvider($rpc);
-                $wallet = new ElectrumWallet($rpc);
+                return $database->withNamedLock(
+                    'electrum_rpc',
+                    10,
+                    static function () use (
+                        $database,
+                        $invoiceId,
+                        $walletPath,
+                        $rpcHost,
+                        $rpcPort,
+                        $rpcUser,
+                        $rpcPass,
+                        $rpcScheme,
+                        $secretKey
+                    ): array {
+                        $rpc = new ElectrumRPC(
+                            $rpcHost,
+                            $rpcPort,
+                            $rpcUser,
+                            $rpcPass,
+                            30,
+                            5,
+                            strtolower($rpcScheme)
+                        );
+                        $wallet = new ElectrumWallet($rpc);
+                        $wallet->loadWallet($walletPath);
 
-                return (new BtcInvoiceManager(
-                    $wallet,
-                    $secretKey,
-                    $database,
-                    null,
-                    null,
-                    $blockchainProvider
-                ))->checkDatabasePaymentStatus($invoiceId);
+                        return (new BtcInvoiceManager(
+                            $wallet,
+                            $secretKey,
+                            $database
+                        ))->checkDatabasePaymentStatus($invoiceId);
+                    }
+                );
             }
         );
     }

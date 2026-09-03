@@ -86,7 +86,7 @@ $service = new DatabaseCheckoutService(
 
 $model = $service->load(' inv_checkout123 ');
 checkoutSame('0.00000001', $model['amount'], 'Satoshi amount was not preserved');
-checkoutSame('Order <ORDER-42>', $model['title'], 'Order title mismatch');
+checkoutSame('Objednávka <ORDER-42>', $model['title'], 'Order title mismatch');
 checkoutSame(300, $model['seconds_remaining'], 'Remaining time mismatch');
 checkoutSame('store_1', $model['store_id'], 'Store ID mismatch');
 $passes[] = 'builds an exact validated checkout view model';

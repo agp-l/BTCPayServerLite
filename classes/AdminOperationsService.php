@@ -43,7 +43,7 @@ final class AdminOperationsService
     {
         $store = $this->repository->fetchDefaultStore();
         if ($store === null) {
-            throw new AdminOperationsException('Create at least one store first.', 404);
+            throw new AdminOperationsException('Nejprve vytvořte alespoň jeden obchod.', 404);
         }
 
         return $store;
@@ -78,7 +78,7 @@ final class AdminOperationsService
                 }
             }
             throw new AdminOperationsException(
-                'Could not create store and its wallet at this time.',
+                'Obchod a jeho peněženku se nyní nepodařilo vytvořit.',
                 503,
                 $exception
             );
@@ -91,7 +91,7 @@ final class AdminOperationsService
     public function createClientStore(int $userId, string $name): array
     {
         if ($userId < 1) {
-            throw new AdminOperationsException('Selected client is invalid.');
+            throw new AdminOperationsException('Vybraný klient není platný.');
         }
         $name = $this->storeName($name);
         $store = [
@@ -109,7 +109,7 @@ final class AdminOperationsService
             }
             $createdAt = ($this->clock)();
             if (!is_int($createdAt) || $createdAt < 1) {
-                throw new AdminOperationsException('Application clock is not available.', 500);
+                throw new AdminOperationsException('Čas aplikace není dostupný.', 500);
             }
             $walletPath = $this->repository->createClientStore(
                 $userId,
@@ -120,7 +120,7 @@ final class AdminOperationsService
                 $createdAt
             );
             if ($walletPath === null) {
-                throw new AdminOperationsException('Active client was not found.', 404);
+                throw new AdminOperationsException('Aktivní klient nebyl nalezen.', 404);
             }
             $store['wallet_path'] = $walletPath;
             if ($provisionedWallet !== null && $provisionedWallet !== $walletPath) {
@@ -133,7 +133,7 @@ final class AdminOperationsService
         } catch (Throwable $exception) {
             $this->discardProvisionedWallet($provisionedWallet);
             throw new AdminOperationsException(
-                'Could not create client store at this time.',
+                'Klientský obchod se nyní nepodařilo vytvořit.',
                 503,
                 $exception
             );
@@ -145,16 +145,16 @@ final class AdminOperationsService
     /** @return array{id:string,url:string,secret:string} */
     public function createWebhook(string $storeId, string $url): array
     {
-        $storeId = $this->identifier($storeId, 'Store');
+        $storeId = $this->identifier($storeId, 'Obchod');
         if (!$this->repository->storeExists($storeId)) {
-            throw new AdminOperationsException('Selected store was not found.', 404);
+            throw new AdminOperationsException('Vybraný obchod nebyl nalezen.', 404);
         }
 
         try {
             $endpoint = $this->webhookPolicy->inspect($url);
             $now = ($this->clock)();
             if (!is_int($now) || $now < 1) {
-                throw new AdminOperationsException('Application clock is not available.', 500);
+                throw new AdminOperationsException('Čas aplikace není dostupný.', 500);
             }
 
             return $this->repository->findOrCreateWebhook($storeId, $endpoint['url'], $now);
@@ -162,7 +162,7 @@ final class AdminOperationsService
             throw $exception;
         } catch (Throwable $exception) {
             throw new AdminOperationsException(
-                'Webhook URL is not secure or cannot be verified at this time.',
+                'Webhook URL není bezpečná nebo ji nyní nelze ověřit.',
                 400,
                 $exception
             );
@@ -173,7 +173,7 @@ final class AdminOperationsService
     {
         $webhookId = $this->identifier($webhookId, 'Webhook');
         if (!$this->repository->deleteWebhook($webhookId)) {
-            throw new AdminOperationsException('Webhook was not found.', 404);
+            throw new AdminOperationsException('Webhook nebyl nalezen.', 404);
         }
     }
 
@@ -181,7 +181,7 @@ final class AdminOperationsService
     {
         $value = trim($value);
         if ($value === '' || strlen($value) > 50 || !preg_match('/\A[a-zA-Z0-9_-]+\z/D', $value)) {
-            throw new AdminOperationsException($field . ' has an invalid identifier.');
+            throw new AdminOperationsException($field . ' má neplatný identifikátor.');
         }
 
         return $value;
@@ -191,7 +191,7 @@ final class AdminOperationsService
     {
         $name = trim($name);
         if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
-            throw new AdminOperationsException('Store name must contain 1 to 100 valid characters.');
+            throw new AdminOperationsException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
         }
         return $name;
     }

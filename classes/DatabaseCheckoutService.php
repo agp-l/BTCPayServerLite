@@ -61,14 +61,14 @@ final class DatabaseCheckoutService
         $wallet = $this->repository->findInvoiceWallet($invoiceId);
         if ($wallet === null) {
             throw new CheckoutException(
-                'Invoice was not found.',
+                'Faktura nebyla nalezena.',
                 404,
                 'find_invoice'
             );
         }
         if ($wallet['id'] !== $invoiceId) {
             throw new CheckoutException(
-                'Stored payment details are invalid.',
+                'Uložené platební údaje jsou neplatné.',
                 500,
                 'match_invoice'
             );
@@ -82,15 +82,15 @@ final class DatabaseCheckoutService
             $status = $exception->getCode() === 404 ? 404 : 503;
             throw new CheckoutException(
                 $status === 404
-                    ? 'Invoice was not found.'
-                    : 'Payment status cannot be verified at this time. Please try again.',
+                    ? 'Faktura nebyla nalezena.'
+                    : 'Stav platby nyní nelze ověřit. Zkuste to prosím znovu.',
                 $status,
                 'check_payment',
                 $exception
             );
         } catch (Throwable $exception) {
             throw new CheckoutException(
-                'Payment status cannot be verified at this time. Please try again.',
+                'Stav platby nyní nelze ověřit. Zkuste to prosím znovu.',
                 503,
                 'check_payment',
                 $exception
@@ -105,7 +105,7 @@ final class DatabaseCheckoutService
         $invoiceId = trim($invoiceId);
         if (!preg_match('/\A[A-Za-z0-9_-]{1,50}\z/D', $invoiceId)) {
             throw new CheckoutException(
-                'Invoice ID is invalid.',
+                'ID faktury není platné.',
                 400,
                 'validate_invoice_id'
             );
@@ -178,7 +178,7 @@ final class DatabaseCheckoutService
             throw new LogicException('Checkout clock must return a positive Unix timestamp.');
         }
 
-        $title = 'Invoice Payment';
+        $title = 'Faktura k úhradě';
         $redirectUrl = null;
         $redirectAutomatically = false;
         $metadata = $invoice['metadata'] ?? [];
@@ -207,7 +207,7 @@ final class DatabaseCheckoutService
             if (is_string($orderId)) {
                 $orderId = trim($orderId);
                 if ($orderId !== '' && strlen($orderId) <= 100 && !str_contains($orderId, "\0")) {
-                    $title = 'Order ' . $orderId;
+                    $title = 'Objednávka ' . $orderId;
                 }
             }
         }
@@ -303,7 +303,7 @@ final class DatabaseCheckoutService
             return BitcoinAmount::fromBtc($value);
         } catch (InvalidArgumentException $exception) {
             throw new CheckoutException(
-                'Stored payment details are invalid.',
+                'Uložené platební údaje jsou neplatné.',
                 500,
                 'validate_' . str_replace(' ', '_', $field),
                 $exception
@@ -314,7 +314,7 @@ final class DatabaseCheckoutService
     private function invalidResult(string $operation): CheckoutException
     {
         return new CheckoutException(
-            'Stored payment details are invalid.',
+            'Uložené platební údaje jsou neplatné.',
             500,
             $operation
         );

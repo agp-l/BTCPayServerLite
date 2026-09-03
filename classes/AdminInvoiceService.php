@@ -27,10 +27,10 @@ final class AdminInvoiceService
         try {
             $exactAmount = BitcoinAmount::fromBtc(trim($amount));
         } catch (Throwable $exception) {
-            throw new AdminOperationsException('Amount must be a valid positive BTC string with at most 8 decimal places.');
+            throw new AdminOperationsException('Částka musí být platný kladný BTC řetězec s nejvýše 8 desetinnými místy.');
         }
         if (!$exactAmount->isPositive()) {
-            throw new AdminOperationsException('Amount must be greater than zero.');
+            throw new AdminOperationsException('Částka musí být větší než nula.');
         }
 
         $description = trim($description);
@@ -40,15 +40,15 @@ final class AdminInvoiceService
             || strlen($description) > 200
             || preg_match('/[\x00-\x1F\x7F]/', $description)
         ) {
-            throw new AdminOperationsException('Description must contain 1 to 200 valid characters.');
+            throw new AdminOperationsException('Popis musí obsahovat 1 až 200 platných znaků.');
         }
         if (strlen($orderId) > 100 || preg_match('/[\x00-\x1F\x7F]/', $orderId)) {
-            throw new AdminOperationsException('Order ID can have at most 100 valid characters.');
+            throw new AdminOperationsException('ID objednávky může mít nejvýše 100 platných znaků.');
         }
 
         $storeId = $storeId !== null ? trim($storeId) : null;
         if ($storeId !== null && !preg_match('/\Astore_[a-f0-9]{32}\z/D', $storeId)) {
-            throw new AdminOperationsException('Selected store has an invalid identifier.');
+            throw new AdminOperationsException('Vybraný obchod má neplatný identifikátor.');
         }
 
         $store = $storeId === null
@@ -56,7 +56,7 @@ final class AdminInvoiceService
             : $this->repository->fetchStore($storeId);
         if ($store === null) {
             throw new AdminOperationsException(
-                $storeId === null ? 'Create at least one store first.' : 'Selected store does not exist.',
+                $storeId === null ? 'Nejprve vytvořte alespoň jeden obchod.' : 'Vybraný obchod neexistuje.',
                 404
             );
         }
@@ -70,19 +70,19 @@ final class AdminInvoiceService
         } catch (AdminOperationsException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
-            throw new AdminOperationsException('Could not create invoice at this time.', 503, $exception);
+            throw new AdminOperationsException('Fakturu se nyní nepodařilo vytvořit.', 503, $exception);
         }
 
         $id = $invoice['id'] ?? null;
         $createdAt = $invoice['created_at'] ?? null;
         if (!is_string($id) || !preg_match('/\Ainv_[a-f0-9]{32}\z/D', $id)) {
-            throw new AdminOperationsException('Invoice returned an invalid identifier.', 500);
+            throw new AdminOperationsException('Faktura vrátila neplatný identifikátor.', 500);
         }
         if (is_string($createdAt) && ctype_digit($createdAt)) {
             $createdAt = (int) $createdAt;
         }
         if (!is_int($createdAt) || $createdAt < 1) {
-            throw new AdminOperationsException('Invoice returned an invalid creation time.', 500);
+            throw new AdminOperationsException('Faktura vrátila neplatný čas vytvoření.', 500);
         }
 
         return [

@@ -144,12 +144,7 @@ class GreenfieldApiController
             $this->requireMethod($method, 'POST');
             return [
                 'status_code' => 200,
-                'body' => $this->service->createInvoice(
-                    $matches[1],
-                    $this->decodeJsonObject($rawBody),
-                    $apiKey,
-                    $idempotencyKey !== '' ? $idempotencyKey : null
-                ),
+                'body' => $this->service->createInvoice($matches[1], $this->decodeJsonObject($rawBody), $apiKey),
             ];
         }
 

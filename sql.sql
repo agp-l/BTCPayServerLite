@@ -55,9 +55,6 @@ CREATE TABLE `stores` (
     `api_key` VARCHAR(255)
         CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     `wallet_path` VARCHAR(255) NOT NULL,
-    `address_source` ENUM('xpub', 'electrum') NOT NULL DEFAULT 'electrum',
-    `xpub` TEXT DEFAULT NULL,
-    `derivation_path` VARCHAR(100) NOT NULL DEFAULT "m/84'/0'/0'/0",
     `user_id` INT UNSIGNED DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_stores_api_key` (`api_key`),
@@ -65,18 +62,6 @@ CREATE TABLE `stores` (
     CONSTRAINT `fk_stores_user`
         FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
         ON UPDATE CASCADE ON DELETE RESTRICT
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `store_address_indices` (
-    `store_id` VARCHAR(50) NOT NULL,
-    `last_index` INT UNSIGNED NOT NULL DEFAULT 0,
-    `updated_at` BIGINT UNSIGNED NOT NULL,
-    PRIMARY KEY (`store_id`),
-    CONSTRAINT `fk_store_address_indices_store`
-        FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`)
-        ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
@@ -118,26 +103,15 @@ CREATE TABLE `invoices` (
     `id` VARCHAR(50) NOT NULL,
     `store_id` VARCHAR(50) NOT NULL,
     `btc_address` VARCHAR(100) NOT NULL,
-    `address_source` VARCHAR(20) NOT NULL DEFAULT 'electrum',
-    `address_index` INT UNSIGNED DEFAULT NULL,
-    `derivation_path` VARCHAR(100) DEFAULT NULL,
-    `idempotency_key` VARCHAR(128) DEFAULT NULL,
     `amount` DECIMAL(16,8) NOT NULL,
-    `amount_sats` BIGINT UNSIGNED DEFAULT NULL,
-    `confirmed_received_sats` BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `unconfirmed_received_sats` BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `status` VARCHAR(50) NOT NULL DEFAULT 'New',
     `metadata` JSON DEFAULT NULL,
     `created_at` BIGINT UNSIGNED NOT NULL,
     `expires_at` BIGINT UNSIGNED NOT NULL,
-    `last_checked_at` BIGINT UNSIGNED DEFAULT NULL,
-    `next_check_at` BIGINT UNSIGNED DEFAULT NULL,
     PRIMARY KEY (`id`),
     KEY `store_id` (`store_id`),
     KEY `status` (`status`),
     KEY `idx_invoices_monitoring` (`status`, `expires_at`, `store_id`),
-    KEY `idx_invoices_payment_worker` (`status`, `next_check_at`),
-    UNIQUE KEY `uq_invoice_store_idempotency` (`store_id`, `idempotency_key`),
     CONSTRAINT `fk_invoices_store`
         FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`)
         ON UPDATE CASCADE ON DELETE RESTRICT

@@ -83,7 +83,14 @@ class BtcStatelessService
             throw new BtcStatelessServiceException('Invoice custom data is invalid.', 'check_status', 400);
         }
 
-        // Walletless payment evaluation - no loadWallet() call needed for checking status
+        $walletName = $customData['wallet'] ?? $this->defaultWalletName();
+        if (!is_string($walletName)) {
+            throw new BtcStatelessServiceException('Invoice wallet is invalid.', 'check_status', 400);
+        }
+
+        [, $walletPath] = $this->resolveWallet($walletName);
+        $this->wallet->loadWallet($walletPath);
+
         return $this->invoiceManager->checkStatelessPaymentStatus($token);
     }
 
@@ -99,12 +106,8 @@ class BtcStatelessService
         $orderId = $this->optionalString($input['order_id'] ?? '', 'Order ID', self::MAX_ORDER_ID_BYTES);
         $expirationMinutes = $this->normalizeExpiration($input['expiration_minutes'] ?? null);
 
-        // Attempt wallet load if needed; address generator fallback operates walletless
-        try {
-            $this->wallet->loadWallet($walletPath);
-        } catch (\Throwable) {
-            // Proceed; if address generator is present, wallet is not required
-        }
+        // All validation happens before the wallet is mutated.
+        $this->wallet->loadWallet($walletPath);
         $result = $this->invoiceManager->createStatelessInvoice(
             $amount,
             $description,

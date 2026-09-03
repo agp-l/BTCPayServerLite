@@ -55,7 +55,7 @@ final class ClientRegistrationService
                 $this->stores->createStore(
                     $userId,
                     $storeId,
-                    'My First Store',
+                    'Můj první e-shop',
                     $apiKey,
                     $walletPath
                 );
@@ -63,7 +63,7 @@ final class ClientRegistrationService
                 return $userId;
             });
             if (!is_int($userId) || $userId < 1) {
-                throw new AuthException('Registration cannot be completed at this time. Please try again later.');
+                throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
             }
         } catch (Throwable $exception) {
             if ($walletPath !== '') {
@@ -77,7 +77,7 @@ final class ClientRegistrationService
                 throw $exception;
             }
             throw new AuthException(
-                'Registration cannot be completed at this time. Please try again later.',
+                'Registraci nyní nelze dokončit. Zkuste to prosím později.',
                 0,
                 $exception
             );

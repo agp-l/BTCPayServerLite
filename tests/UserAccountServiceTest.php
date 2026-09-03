@@ -162,7 +162,7 @@ accountExpectError(
         'another secure passphrase',
         'another secure passphrase'
     ),
-    'Current password is incorrect.'
+    'Současné heslo není správné.'
 );
 
 $token = $service->requestPasswordReset('client@example.test', '203.0.113.8');
@@ -179,13 +179,13 @@ accountExpectError(
         'another reset passphrase',
         'another reset passphrase'
     ),
-    'Password reset link is invalid or has expired.'
+    'Odkaz pro obnovu hesla je neplatný nebo vypršel.'
 );
 
 $repository->accounts[1]['status'] = 'suspended';
 accountExpectError(
     static fn () => $service->validateSession(1, 'client', 3, '203.0.113.8', 0),
-    'Session is no longer valid.'
+    'Relace již není platná.'
 );
 
 echo '[PASS] controls registration policy' . PHP_EOL;

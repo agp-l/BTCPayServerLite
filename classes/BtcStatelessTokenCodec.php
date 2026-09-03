@@ -9,9 +9,6 @@ use JsonException;
 
 /**
  * Authenticates and validates the compact payload used by stateless invoices.
- *
- * Supports backwards-compatible decoding for legacy v1 tokens (with 'r' payment request ID)
- * and v2 tokens with 's' (address source: xpub/electrum) and 'i' (derivation index).
  */
 final class BtcStatelessTokenCodec
 {
@@ -160,18 +157,10 @@ final class BtcStatelessTokenCodec
         }
 
         $requestId = null;
-        if (array_key_exists('r', $payload) && $payload['r'] !== null && $payload['r'] !== '') {
+        if (array_key_exists('r', $payload)) {
             $requestId = $this->requireString($payload['r'], 'request ID', 128);
-        }
-
-        $source = 'electrum';
-        if (array_key_exists('s', $payload) && is_string($payload['s'])) {
-            $source = strtolower(trim($payload['s']));
-        }
-
-        $index = null;
-        if (array_key_exists('i', $payload) && is_int($payload['i'])) {
-            $index = $payload['i'];
+        } elseif ($version >= 2) {
+            throw $this->invalidToken('Invoice token is missing its payment request ID.');
         }
 
         $payload['a'] = $address;
@@ -180,11 +169,6 @@ final class BtcStatelessTokenCodec
         $payload['p'] = $customData;
         $payload['t'] = $createdAt;
         $payload['e'] = $expiresAt;
-        $payload['ver'] = $version;
-        $payload['s'] = $source;
-        if ($index !== null) {
-            $payload['i'] = $index;
-        }
         if ($requestId !== null) {
             $payload['r'] = $requestId;
         }
@@ -218,21 +202,17 @@ final class BtcStatelessTokenCodec
 
     private function requireString(
         mixed $value,
-        string $fieldName,
-        int $maxLength,
+        string $field,
+        int $maxBytes,
         bool $allowEmpty = false
     ): string {
-        if (!is_string($value) || str_contains($value, "\0")) {
-            throw $this->invalidToken("Invalid invoice token {$fieldName}.");
+        if (!is_string($value) || str_contains($value, "\0") || strlen($value) > $maxBytes) {
+            throw $this->invalidToken("Invalid invoice token {$field}.");
         }
 
         $value = trim($value);
         if (!$allowEmpty && $value === '') {
-            throw $this->invalidToken("Invalid invoice token {$fieldName}.");
-        }
-
-        if (strlen($value) > $maxLength) {
-            throw $this->invalidToken("Invoice token {$fieldName} is too long.");
+            throw $this->invalidToken("Invalid invoice token {$field}.");
         }
 
         return $value;
