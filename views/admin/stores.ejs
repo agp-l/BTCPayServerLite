@@ -1,0 +1,192 @@
+<%- include('layout/header', { pageTitle: 'Stores - BTCPay Server Lite', activeMenu: 'stores', currentContextLabel: 'Stores' }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Integrations</p>
+    <h1>Stores</h1>
+    <p>Separate payment identities, API credentials, and wallet configurations for each project.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin/invoices" class="ghost-btn">
+      <i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Go to Invoices
+    </a>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <span><%= pageError %></span>
+  </div>
+<% } %>
+
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status">
+    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+    <span><%= toastMsg %></span>
+  </div>
+<% } %>
+
+<div class="management-grid">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Active Stores</span>
+      <span class="badge s-unknown"><%= stores.length %></span>
+    </div>
+    <p class="card-subtitle">Store access credentials should be stored securely as server-side environment secrets.</p>
+
+    <% if (stores.length === 0) { %>
+      <div class="empty-state">
+        <i class="fa-solid fa-store-slash" aria-hidden="true"></i>
+        <p>No stores created yet.</p>
+      </div>
+    <% } else { %>
+      <div class="store-grid">
+        <% stores.forEach(store => { %>
+          <article class="store-card">
+            <div class="store-card-head">
+              <h3><%= store.name %></h3>
+              <span class="badge badge-Settled">Active</span>
+            </div>
+            <div class="credential">
+              <span class="credential-label">Owner</span>
+              <div class="credential-value"><strong><%= store.client_email %></strong></div>
+            </div>
+            <div class="credential">
+              <span class="credential-label">Store ID</span>
+              <div class="credential-value"><code><%= store.id %></code></div>
+            </div>
+            <div class="credential">
+              <span class="credential-label">API Key (Greenfield)</span>
+              <div class="credential-value">
+                <code><%= store.api_key %></code>
+              </div>
+            </div>
+            <div class="credential">
+              <span class="credential-label">Webhook URL</span>
+              <div class="credential-value">
+                <%= store.webhook_url || 'Not configured' %>
+              </div>
+            </div>
+            <div class="credential" style="background: rgba(247, 147, 26, 0.05); border-left: 3px solid #f7931a; padding-left: 0.5rem; margin-top: 0.5rem;">
+              <span class="credential-label">Address Generation</span>
+              <div class="credential-value" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <div>
+                  <span class="badge <%= store.address_source === 'xpub' ? 'badge-Settled' : 'badge-Processing' %>">
+                    <%= store.address_source === 'xpub' ? 'BIP84 XPUB (Stateless / Background Worker)' : 'Electrum RPC Wallet' %>
+                  </span>
+                  <% if (store.address_source === 'xpub') { %>
+                    <span class="badge s-unknown" title="Next address index">Index: #<%= store.address_index || 0 %></span>
+                  <% } %>
+                </div>
+                <% if (store.address_source === 'xpub' && store.xpub) { %>
+                  <div style="font-size: 0.75rem; color: var(--muted); word-break: break-all; font-family: monospace;">
+                    XPUB: <%= store.xpub.substring(0, 16) %>...<%= store.xpub.substring(store.xpub.length - 8) %>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--muted);">
+                    Path: <code><%= store.derivation_path || "m/84'/0'/0'/0" %></code>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+            <div class="store-card-actions" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <details style="width: 100%; margin-bottom: 0.5rem;">
+                <summary style="cursor: pointer; font-size: 0.85rem; color: var(--accent); font-weight: 500;">
+                  <i class="fa-solid fa-sliders"></i> Edit XPUB & Settings
+                </summary>
+                <form method="post" action="/admin/stores" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;">
+                  <input type="hidden" name="action" value="update_store">
+                  <input type="hidden" name="store_id" value="<%= store.id %>">
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600;">Store Name</label>
+                    <input type="text" name="name" value="<%= store.name %>" required style="width: 100%; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--line);">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600;">Address Source</label>
+                    <select name="address_source" style="width: 100%; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--line);">
+                      <option value="xpub" <%= store.address_source === 'xpub' ? 'selected' : '' %>>BIP84 XPUB (stateless derivation without wallet locks)</option>
+                      <option value="electrum" <%= store.address_source === 'electrum' ? 'selected' : '' %>>Electrum RPC daemon</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600;">Extended Public Key (XPUB / ZPUB)</label>
+                    <input type="text" name="xpub" value="<%= store.xpub || '' %>" placeholder="xpub6CUGRUonZSQ4TWt..." style="width: 100%; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--line); font-family: monospace; font-size: 0.8rem;">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600;">Derivation Path</label>
+                    <input type="text" name="derivation_path" value="<%= store.derivation_path || "m/84'/0'/0'/0" %>" placeholder="m/84'/0'/0'/0" style="width: 100%; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--line); font-family: monospace; font-size: 0.8rem;">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600;">Webhook URL</label>
+                    <input type="url" name="webhook_url" value="<%= store.webhook_url || '' %>" placeholder="https://..." style="width: 100%; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--line);">
+                  </div>
+                  <button type="submit" class="primary" style="align-self: flex-start; margin-top: 0.25rem; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                  </button>
+                </form>
+              </details>
+              <form method="post" action="/admin/stores" style="display: inline;">
+                <input type="hidden" name="action" value="rotate_key">
+                <input type="hidden" name="store_id" value="<%= store.id %>">
+                <button type="submit" class="ghost-btn" style="font-size: 0.85rem;">
+                  <i class="fa-solid fa-rotate" aria-hidden="true"></i> Regenerate API Key
+                </button>
+              </form>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-plus" aria-hidden="true"></i> Create New Store</span>
+    </div>
+    <p class="card-subtitle">Creates a new store and generates a unique Greenfield API key.</p>
+
+    <form method="post" action="/admin/stores" class="form-stack">
+      <input type="hidden" name="action" value="create_store">
+      <div class="field">
+        <label for="storeName">Store Name</label>
+        <div class="input-wrap">
+          <input id="storeName" type="text" name="name" placeholder="e.g. My Bitcoin Store" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="storeAddressSource">Address Generation Source</label>
+        <div class="input-wrap">
+          <select id="storeAddressSource" name="address_source">
+            <option value="xpub" selected>BIP84 XPUB (stateless derivation without wallet locks)</option>
+            <option value="electrum">Electrum RPC daemon</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="storeXpub">Extended Public Key (XPUB / ZPUB)</label>
+        <div class="input-wrap">
+          <input id="storeXpub" type="text" name="xpub" placeholder="xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz">
+        </div>
+      </div>
+      <div class="field">
+        <label for="storeDerivationPath">Derivation Path</label>
+        <div class="input-wrap">
+          <input id="storeDerivationPath" type="text" name="derivation_path" value="m/84'/0'/0'/0" placeholder="m/84'/0'/0'/0">
+        </div>
+      </div>
+      <div class="field">
+        <label for="storeWebhook">Webhook URL (optional)</label>
+        <div class="input-wrap">
+          <input id="storeWebhook" type="url" name="webhook_url" placeholder="https://example.com/api/btcpay-webhook">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary">
+          <i class="fa-solid fa-plus"></i> Create Store
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<%- include('layout/footer') %>

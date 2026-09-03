@@ -28,11 +28,11 @@ final class AdminUserService
     public function detail(int $userId): array
     {
         if ($userId < 1) {
-            throw new AuthException('Klient není platný.');
+            throw new AuthException('Client is invalid.');
         }
         $client = $this->users->findClient($userId);
         if ($client === null) {
-            throw new AuthException('Klient nebyl nalezen.');
+            throw new AuthException('Client was not found.');
         }
 
         $walletBalance = null;
@@ -45,9 +45,9 @@ final class AdminUserService
                 $walletError = WalletBalanceError::message($exception);
             }
         } elseif ($client['wallet_count'] > 1) {
-            $walletError = 'Klient má více historických peněženek; přiřazení je nutné vyřešit ručně.';
+            $walletError = 'Client has multiple historical wallets; assignment must be resolved manually.';
         } else {
-            $walletError = 'Klient zatím nemá jednoznačně přiřazenou peněženku.';
+            $walletError = 'Client does not yet have an unambiguously assigned wallet.';
         }
 
         return [
@@ -64,10 +64,10 @@ final class AdminUserService
     public function setStatus(int $userId, string $status): void
     {
         if ($userId < 1 || !in_array($status, ['active', 'suspended'], true)) {
-            throw new AuthException('Změna stavu klienta není platná.');
+            throw new AuthException('Client status change is invalid.');
         }
         if (!$this->users->setClientStatus($userId, $status)) {
-            throw new AuthException('Klient nebyl nalezen.');
+            throw new AuthException('Client was not found.');
         }
     }
 
@@ -79,23 +79,23 @@ final class AdminUserService
             || strlen($email) > 254
             || filter_var($email, FILTER_VALIDATE_EMAIL) === false
         ) {
-            throw new AuthException('E-mail klienta není platný.');
+            throw new AuthException('Client email is invalid.');
         }
         try {
             if (!$this->users->updateClientEmail($userId, $email)) {
-                throw new AuthException('Klient nebyl nalezen.');
+                throw new AuthException('Client was not found.');
             }
         } catch (AuthException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            throw new AuthException('E-mail již používá jiný účet nebo jej nyní nelze uložit.', 0, $exception);
+            throw new AuthException('Email is already in use by another account or cannot be saved at this time.', 0, $exception);
         }
     }
 
     public function revokeSessions(int $userId): void
     {
         if ($userId < 1 || !$this->users->revokeClientSessions($userId)) {
-            throw new AuthException('Klient nebyl nalezen.');
+            throw new AuthException('Client was not found.');
         }
     }
 
@@ -103,7 +103,7 @@ final class AdminUserService
     {
         if ($userId < 1 || !$this->users->adoptSingleWallet($userId, time())) {
             throw new AuthException(
-                'Peněženku nelze přiřadit automaticky. Klient musí mít právě jednu historickou peněženku.'
+                'Wallet cannot be assigned automatically. Client must have exactly one historical wallet.'
             );
         }
     }
@@ -112,10 +112,10 @@ final class AdminUserService
     {
         $walletPath = trim($walletPath);
         if ($userId < 1 || $walletPath === '' || strlen($walletPath) > 255 || str_contains($walletPath, "\0")) {
-            throw new AuthException('Přiřazení peněženky není platné.');
+            throw new AuthException('Wallet assignment is invalid.');
         }
         if (!$this->users->setClientWallet($userId, $walletPath, time())) {
-            throw new AuthException('Vybraná peněženka nepatří žádnému obchodu tohoto klienta.');
+            throw new AuthException('Selected wallet does not belong to any store of this client.');
         }
     }
 }

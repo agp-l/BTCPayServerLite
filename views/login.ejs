@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Sign In - BTCPay Server Lite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <a href="/" class="auth-brand">
+      <span class="auth-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+      <span class="auth-brand-copy"><strong>BTCPay Server Lite</strong><span>Self-hosted Bitcoin payments</span></span>
+    </a>
+    <section class="auth-card">
+      <header class="auth-card-header">
+        <h1>Welcome Back</h1>
+        <p>Sign in to your Bitcoin payment management portal.</p>
+      </header>
+      <% if (error) { %>
+        <div class="auth-alert auth-alert-error" role="alert">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <span><%= error %></span>
+        </div>
+      <% } %>
+      <form method="post" action="/login" class="auth-form">
+        <div class="auth-field">
+          <label for="loginEmail">Email Address</label>
+          <div class="auth-input">
+            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+            <input id="loginEmail" type="email" name="email" value="<%= email || 'admin@btcpayserver.local' %>" autocomplete="username" required>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="loginPassword">Password</label>
+          <div class="auth-input">
+            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            <input id="loginPassword" type="password" name="password" value="admin123" autocomplete="current-password" required>
+          </div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--muted, #666); margin: 0.25rem 0;">
+          <small>Default credentials: <code>admin@btcpayserver.local</code> / <code>admin123</code></small>
+        </div>
+        <button type="submit" class="auth-submit">
+          <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Sign In
+        </button>
+      </form>
+      <div class="auth-footer">Don't have an account? <a href="/registrace">Create an account</a></div>
+      <div class="auth-security-note">
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Session secured with encrypted cookies
+      </div>
+    </section>
+  </main>
+</body>
+</html>

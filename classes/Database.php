@@ -19,12 +19,21 @@ class Database
     private PDO $pdo;
 
     public function __construct(
-        string $host,
-        string $databaseName,
-        string $user,
-        string $password,
+        string|array $host,
+        string $databaseName = '',
+        string $user = '',
+        string $password = '',
         int $port = 3306
     ) {
+        if (is_array($host)) {
+            $config = $host;
+            $host = (string) ($config['host'] ?? $config['db_host'] ?? '127.0.0.1');
+            $databaseName = (string) ($config['database'] ?? $config['db_name'] ?? $config['name'] ?? '');
+            $user = (string) ($config['user'] ?? $config['db_user'] ?? $config['username'] ?? '');
+            $password = (string) ($config['password'] ?? $config['db_pass'] ?? $config['pass'] ?? '');
+            $port = (int) ($config['port'] ?? $config['db_port'] ?? 3306);
+        }
+
         $host = $this->validateHost($host);
         $databaseName = $this->validateDatabaseName($databaseName);
         $user = $this->validateUser($user);

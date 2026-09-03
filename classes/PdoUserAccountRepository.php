@@ -40,7 +40,7 @@ final class PdoUserAccountRepository implements UserAccountRepository
         );
         $statement->execute([$enabled ? '1' : '0', $changedAt, $adminUserId]);
         if ($statement->rowCount() < 1) {
-            throw new AuthException('Nastavení může změnit pouze aktivní administrátor.');
+            throw new AuthException('Only an active administrator can change settings.');
         }
     }
 
@@ -236,10 +236,10 @@ final class PdoUserAccountRepository implements UserAccountRepository
         } elseif (is_string($value) && ctype_digit($value)) {
             $number = (int) $value;
         } else {
-            throw new AuthException('Účet nyní nelze načíst.');
+            throw new AuthException('Account cannot be loaded at this time.');
         }
         if ($number < 1) {
-            throw new AuthException('Účet nyní nelze načíst.');
+            throw new AuthException('Account cannot be loaded at this time.');
         }
         return $number;
     }
@@ -247,7 +247,7 @@ final class PdoUserAccountRepository implements UserAccountRepository
     private function nonEmptyString(mixed $value): string
     {
         if (!is_string($value) || $value === '') {
-            throw new AuthException('Účet nyní nelze načíst.');
+            throw new AuthException('Account cannot be loaded at this time.');
         }
         return $value;
     }

@@ -22,7 +22,7 @@ final class InstallationManager
     {
         $rootDirectory = rtrim($rootDirectory, DIRECTORY_SEPARATOR);
         if ($rootDirectory === '' || !is_dir($rootDirectory)) {
-            throw new InstallerException('Kořenový adresář aplikace není dostupný.');
+            throw new InstallerException('Application root directory is not accessible.');
         }
 
         $this->rootDirectory = $rootDirectory;
@@ -55,33 +55,33 @@ final class InstallationManager
             [
                 'name' => 'PDO MySQL',
                 'ok' => $pdoMysql,
-                'detail' => $pdoMysql ? 'Dostupné' : 'Chybí rozšíření pdo_mysql',
+                'detail' => $pdoMysql ? 'Available' : 'Missing pdo_mysql extension',
                 'required' => true,
             ],
             [
                 'name' => 'JSON',
                 'ok' => extension_loaded('json'),
-                'detail' => extension_loaded('json') ? 'Dostupné' : 'Chybí rozšíření json',
+                'detail' => extension_loaded('json') ? 'Available' : 'Missing json extension',
                 'required' => true,
             ],
             [
                 'name' => 'cURL',
                 'ok' => extension_loaded('curl'),
-                'detail' => extension_loaded('curl') ? 'Dostupné' : 'Chybí rozšíření curl',
+                'detail' => extension_loaded('curl') ? 'Available' : 'Missing curl extension',
                 'required' => true,
             ],
             [
-                'name' => 'Databázové schéma',
+                'name' => 'Database Schema',
                 'ok' => is_file($this->schemaPath) && is_readable($this->schemaPath),
                 'detail' => 'sql.sql',
                 'required' => true,
             ],
             [
-                'name' => 'Zápis konfigurace',
+                'name' => 'Configuration Writable',
                 'ok' => is_writable($this->rootDirectory),
                 'detail' => is_writable($this->rootDirectory)
-                    ? 'Adresář aplikace je zapisovatelný'
-                    : 'Webový server nemůže vytvořit config.php',
+                    ? 'Application directory is writable'
+                    : 'Web server cannot create config.php',
                 'required' => true,
             ],
         ];
@@ -105,10 +105,10 @@ final class InstallationManager
     public function install(array $input): array
     {
         if ($this->isInstalled()) {
-            throw new InstallerException('Aplikace už je nainstalovaná.');
+            throw new InstallerException('Application is already installed.');
         }
         if (!$this->canInstall()) {
-            throw new InstallerException('Server nesplňuje všechny požadavky instalace.');
+            throw new InstallerException('Server does not meet all installation requirements.');
         }
 
         $lockHandle = @fopen($this->lockPath, 'c');
@@ -116,7 +116,7 @@ final class InstallationManager
             if (is_resource($lockHandle)) {
                 fclose($lockHandle);
             }
-            throw new InstallerException('Právě probíhá jiná instalace. Zkuste to za chvíli znovu.');
+            throw new InstallerException('Another installation is currently in progress. Please try again shortly.');
         }
 
         $temporaryConfig = null;
@@ -126,7 +126,7 @@ final class InstallationManager
 
         try {
             if ($this->isInstalled()) {
-                throw new InstallerException('Aplikace už je nainstalovaná.');
+                throw new InstallerException('Application is already installed.');
             }
 
             $values = $this->validateInput($input);
@@ -138,7 +138,7 @@ final class InstallationManager
             if (!$databaseExisted) {
                 if (!$values['create_database']) {
                     throw new InstallerException(
-                        'Databáze neexistuje. Povolte její vytvoření nebo ji nejprve vytvořte ručně.'
+                        'Database does not exist. Enable its creation or create it manually first.'
                     );
                 }
                 $server->exec(sprintf(
@@ -152,13 +152,13 @@ final class InstallationManager
             $databaseWasEmpty = $this->databaseIsEmpty($database);
             if (!$databaseWasEmpty) {
                 throw new InstallerException(
-                    'Zvolená databáze není prázdná. Pro novou instalaci použijte prázdnou databázi.'
+                    'The selected database is not empty. Please use an empty database for a new installation.'
                 );
             }
 
             $schema = file_get_contents($this->schemaPath);
             if (!is_string($schema) || trim($schema) === '') {
-                throw new InstallerException('Databázové schéma je prázdné nebo nečitelné.');
+                throw new InstallerException('Database schema is empty or unreadable.');
             }
             foreach (self::splitSqlStatements($schema) as $statement) {
                 $database->exec($statement);
@@ -166,7 +166,7 @@ final class InstallationManager
 
             $passwordHash = password_hash($values['admin_password'], PASSWORD_DEFAULT);
             if (!is_string($passwordHash)) {
-                throw new InstallerException('Heslo administrátora se nepodařilo bezpečně uložit.');
+                throw new InstallerException('Administrator password could not be securely saved.');
             }
             $statement = $database->prepare(
                 "INSERT INTO users (email, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
@@ -174,7 +174,7 @@ final class InstallationManager
             $statement->execute([$values['admin_email'], $passwordHash]);
 
             if (!@rename($temporaryConfig, $this->configPath)) {
-                throw new InstallerException('Nepodařilo se dokončit zápis config.php.');
+                throw new InstallerException('Failed to finish writing config.php.');
             }
             $temporaryConfig = null;
             @chmod($this->configPath, 0600);
@@ -199,7 +199,7 @@ final class InstallationManager
                 $this->dropDatabaseAfterFailure($input);
             }
             throw new InstallerException(
-                'Databázovou instalaci se nepodařilo dokončit. Ověřte přístupové údaje a oprávnění.',
+                'Database installation could not be completed. Verify credentials and permissions.',
                 previous: $exception
             );
         } catch (Throwable $exception) {
@@ -210,7 +210,7 @@ final class InstallationManager
                 $this->dropDatabaseAfterFailure($input);
             }
             throw new InstallerException(
-                'Instalaci se nepodařilo dokončit. Zkontrolujte serverový log.',
+                'Installation could not be completed. Check server logs.',
                 previous: $exception
             );
         } finally {
@@ -316,57 +316,57 @@ final class InstallationManager
     /** @param array<string, mixed> $input */
     private function validateInput(array $input): array
     {
-        $dbHost = $this->host($input['db_host'] ?? null, 'Host databáze');
-        $dbPort = $this->port($input['db_port'] ?? null, 'Port databáze');
+        $dbHost = $this->host($input['db_host'] ?? null, 'Database host');
+        $dbPort = $this->port($input['db_port'] ?? null, 'Database port');
         $dbName = trim(is_string($input['db_name'] ?? null) ? $input['db_name'] : '');
         if (!preg_match('/\A[A-Za-z0-9_$-]{1,64}\z/D', $dbName)) {
-            throw new InstallerException('Název databáze může obsahovat pouze písmena, čísla, _, $ a -.');
+            throw new InstallerException('Database name may only contain letters, numbers, _, $, and -.');
         }
         $dbUser = trim(is_string($input['db_user'] ?? null) ? $input['db_user'] : '');
         if ($dbUser === '' || strlen($dbUser) > 128 || str_contains($dbUser, "\0")) {
-            throw new InstallerException('Uživatel databáze není platný.');
+            throw new InstallerException('Database user is invalid.');
         }
         $dbPassword = is_string($input['db_pass'] ?? null) ? $input['db_pass'] : '';
         if (strlen($dbPassword) > 4096 || str_contains($dbPassword, "\0")) {
-            throw new InstallerException('Heslo databáze není platné.');
+            throw new InstallerException('Database password is invalid.');
         }
 
         $adminEmail = strtolower(trim(
             is_string($input['admin_email'] ?? null) ? $input['admin_email'] : ''
         ));
         if (strlen($adminEmail) > 254 || filter_var($adminEmail, FILTER_VALIDATE_EMAIL) === false) {
-            throw new InstallerException('E-mail administrátora není platný.');
+            throw new InstallerException('Administrator email is invalid.');
         }
         $adminPassword = is_string($input['admin_password'] ?? null)
             ? $input['admin_password']
             : '';
         if (strlen($adminPassword) < 12 || strlen($adminPassword) > 72) {
-            throw new InstallerException('Heslo administrátora musí mít 12 až 72 znaků.');
+            throw new InstallerException('Administrator password must be between 12 and 72 characters long.');
         }
         $adminPasswordConfirm = is_string($input['admin_password_confirm'] ?? null)
             ? $input['admin_password_confirm']
             : '';
         if (!hash_equals($adminPassword, $adminPasswordConfirm)) {
-            throw new InstallerException('Hesla administrátora se neshodují.');
+            throw new InstallerException('Administrator passwords do not match.');
         }
 
         $appUrl = $this->appUrl($input['app_url'] ?? null);
-        $rpcHost = $this->host($input['rpc_host'] ?? '127.0.0.1', 'Host Electrum RPC');
-        $rpcPort = $this->port($input['rpc_port'] ?? 7777, 'Port Electrum RPC');
+        $rpcHost = $this->host($input['rpc_host'] ?? '127.0.0.1', 'Electrum RPC host');
+        $rpcPort = $this->port($input['rpc_port'] ?? 7777, 'Electrum RPC port');
         $passwordResetFrom = trim(
             is_string($input['password_reset_from'] ?? null) ? $input['password_reset_from'] : ''
         );
         if ($passwordResetFrom !== ''
             && (strlen($passwordResetFrom) > 254
                 || filter_var($passwordResetFrom, FILTER_VALIDATE_EMAIL) === false)) {
-            throw new InstallerException('Adresa odesílatele pro obnovu hesla není platná.');
+            throw new InstallerException('Password reset sender address is invalid.');
         }
 
         $rpcUser = is_string($input['rpc_user'] ?? null) ? trim($input['rpc_user']) : '';
         $rpcPassword = is_string($input['rpc_pass'] ?? null) ? $input['rpc_pass'] : '';
         if (strlen($rpcUser) > 256 || str_contains($rpcUser, "\0")
             || strlen($rpcPassword) > 4096 || str_contains($rpcPassword, "\0")) {
-            throw new InstallerException('Přihlašovací údaje Electrum RPC nejsou platné.');
+            throw new InstallerException('Electrum RPC credentials are invalid.');
         }
 
         return [
@@ -385,18 +385,18 @@ final class InstallationManager
             'rpc_user' => $rpcUser,
             'rpc_pass' => $rpcPassword,
             'password_reset_from' => $passwordResetFrom,
-            'wallet_path' => $this->absolutePath($input['wallet_path'] ?? null, 'Admin peněženka'),
+            'wallet_path' => $this->absolutePath($input['wallet_path'] ?? null, 'Admin wallet'),
             'electrum_cli_path' => $this->absolutePath(
                 $input['electrum_cli_path'] ?? null,
                 'Electrum CLI'
             ),
             'electrum_data_dir' => $this->absolutePath(
                 $input['electrum_data_dir'] ?? null,
-                'Datový adresář Electrum'
+                'Electrum data directory'
             ),
             'store_wallets_dir' => $this->absolutePath(
                 $input['store_wallets_dir'] ?? null,
-                'Adresář peněženek obchodů'
+                'Store wallets directory'
             ),
         ];
     }
@@ -438,14 +438,14 @@ final class InstallationManager
     {
         $path = tempnam($this->rootDirectory, '.btcpay-config-');
         if ($path === false) {
-            throw new InstallerException('Do adresáře aplikace nelze zapsat dočasnou konfiguraci.');
+            throw new InstallerException('Cannot write temporary configuration to application directory.');
         }
         $content = "<?php\n\ndeclare(strict_types=1);\n\n"
             . "// Generated by the BTCPay Server Lite installer. Keep this file private.\n"
             . 'return ' . var_export($config, true) . ";\n";
         if (file_put_contents($path, $content, LOCK_EX) !== strlen($content)) {
             @unlink($path);
-            throw new InstallerException('Dočasnou konfiguraci se nepodařilo zapsat.');
+            throw new InstallerException('Temporary configuration could not be written.');
         }
         @chmod($path, 0600);
 
@@ -538,12 +538,12 @@ final class InstallationManager
     {
         $databaseName = trim(is_string($input['db_name'] ?? null) ? $input['db_name'] : '');
         if (!preg_match('/\A[A-Za-z0-9_$-]{1,64}\z/D', $databaseName)) {
-            throw new InstallerException('Název databáze není platný.');
+            throw new InstallerException('Database name is invalid.');
         }
 
         return [
-            'db_host' => $this->host($input['db_host'] ?? null, 'Host databáze'),
-            'db_port' => $this->port($input['db_port'] ?? null, 'Port databáze'),
+            'db_host' => $this->host($input['db_host'] ?? null, 'Database host'),
+            'db_port' => $this->port($input['db_port'] ?? null, 'Database port'),
             'db_name' => $databaseName,
             'db_user' => is_string($input['db_user'] ?? null) ? trim($input['db_user']) : '',
             'db_pass' => is_string($input['db_pass'] ?? null) ? $input['db_pass'] : '',
@@ -555,7 +555,7 @@ final class InstallationManager
         $host = trim(is_string($value) ? $value : '');
         if ($host === '' || strlen($host) > 253
             || !preg_match('/\A[A-Za-z0-9_.:-]+\z/D', $host)) {
-            throw new InstallerException($label . ' není platný.');
+            throw new InstallerException($label . ' is invalid.');
         }
 
         return $host;
@@ -568,10 +568,10 @@ final class InstallationManager
         } elseif (is_string($value) && ctype_digit($value)) {
             $port = (int) $value;
         } else {
-            throw new InstallerException($label . ' není platný.');
+            throw new InstallerException($label . ' is invalid.');
         }
         if ($port < 1 || $port > 65_535) {
-            throw new InstallerException($label . ' musí být v rozsahu 1 až 65535.');
+            throw new InstallerException($label . ' must be between 1 and 65535.');
         }
 
         return $port;
@@ -582,7 +582,7 @@ final class InstallationManager
         $url = rtrim(trim(is_string($value) ? $value : ''), '/');
         if ($url === '' || strlen($url) > 2048
             || filter_var($url, FILTER_VALIDATE_URL) === false) {
-            throw new InstallerException('Veřejná URL aplikace není platná.');
+            throw new InstallerException('Public application URL is invalid.');
         }
         $parts = parse_url($url);
         if (!is_array($parts)
@@ -592,7 +592,7 @@ final class InstallationManager
             || isset($parts['pass'])
             || isset($parts['query'])
             || isset($parts['fragment'])) {
-            throw new InstallerException('Veřejná URL smí obsahovat jen HTTP(S) origin a podadresář.');
+            throw new InstallerException('Public URL may only contain HTTP(S) origin and subdirectory.');
         }
 
         return $url;
@@ -604,7 +604,7 @@ final class InstallationManager
         $windowsAbsolute = preg_match('/\A[A-Za-z]:[\\\\\/]/D', $path) === 1;
         if ($path === '' || strlen($path) > 4096
             || ($path[0] !== '/' && !$windowsAbsolute) || str_contains($path, "\0")) {
-            throw new InstallerException($label . ' musí být absolutní cesta.');
+            throw new InstallerException($label . ' must be an absolute path.');
         }
 
         $trimmed = rtrim($path, '/\\');

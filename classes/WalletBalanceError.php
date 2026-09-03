@@ -12,18 +12,18 @@ final class WalletBalanceError
     {
         if ($exception instanceof ElectrumRPCException) {
             return match ($exception->getType()) {
-                ElectrumRPCException::TYPE_TRANSPORT => 'Electrum RPC není dostupné. Zkontrolujte, zda daemon běží a odpovídá na nastaveném hostu a portu.',
-                ElectrumRPCException::TYPE_AUTHENTICATION => 'Electrum RPC odmítlo přihlášení. Zkontrolujte RPC uživatele a heslo v konfiguraci.',
+                ElectrumRPCException::TYPE_TRANSPORT => 'Electrum RPC is unavailable. Please verify that the daemon is running and reachable on configured host and port.',
+                ElectrumRPCException::TYPE_AUTHENTICATION => 'Electrum RPC authentication failed. Check the RPC username and password in configuration.',
                 ElectrumRPCException::TYPE_REMOTE => $exception->getRpcMethod() === 'load_wallet'
-                    ? 'Electrum nemůže otevřít přiřazený soubor peněženky. Ověřte jeho cestu a oprávnění procesu Electrum.'
-                    : 'Electrum odmítlo požadavek na načtení zůstatku.',
-                default => 'Electrum vrátilo neplatnou odpověď při načítání zůstatku.',
+                    ? 'Electrum cannot open the specified wallet file. Verify the file path and file permissions for the Electrum process.'
+                    : 'Electrum rejected the balance request.',
+                default => 'Electrum returned an invalid response while fetching balance.',
             };
         }
         if ($exception instanceof ElectrumWalletException && $exception->getOperation() === 'load_wallet') {
-            return 'Přiřazenou peněženku se nepodařilo v Electrum načíst. Ověřte cestu k souboru.';
+            return 'Failed to load assigned wallet in Electrum. Verify the wallet file path.';
         }
-        return 'Zůstatek peněženky nyní nelze načíst. Podrobnost je zaznamenaná v serverovém logu.';
+        return 'Wallet balance cannot be retrieved at this moment. Details have been logged.';
     }
 
     public static function log(Throwable $exception, string $walletPath): void

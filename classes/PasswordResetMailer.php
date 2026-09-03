@@ -30,11 +30,11 @@ final class PasswordResetMailer
             return false;
         }
 
-        $subject = 'Obnova hesla BTCPay Lite';
-        $message = "Byla vyžádána obnova hesla k vašemu účtu.\n\n"
-            . "Odkaz je platný 30 minut a lze jej použít pouze jednou:\n"
+        $subject = 'BTCPay Lite Password Reset';
+        $message = "A password reset was requested for your account.\n\n"
+            . "This link is valid for 30 minutes and can only be used once:\n"
             . $resetUrl . "\n\n"
-            . "Pokud jste požadavek nevytvořili, zprávu ignorujte.\n";
+            . "If you did not request this, please ignore this message.\n";
         $headers = "From: BTCPay Lite <{$from}>\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n"
             . "X-Auto-Response-Suppress: All";

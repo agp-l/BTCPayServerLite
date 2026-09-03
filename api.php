@@ -2,20 +2,27 @@
 
 declare(strict_types=1);
 
+use BtcPayLite\AddressGeneratorFactory;
 use BtcPayLite\BtcInvoiceManager;
 use BtcPayLite\ApiRequestLogger;
 use BtcPayLite\Database;
+use BtcPayLite\ElectrumBlockchainProvider;
 use BtcPayLite\ElectrumRPC;
 use BtcPayLite\ElectrumWallet;
+use BtcPayLite\ElectrumWalletManager;
 use BtcPayLite\ExchangeQuoteService;
 use BtcPayLite\GreenfieldApiController;
 use BtcPayLite\GreenfieldApiException;
 use BtcPayLite\GreenfieldApiRepository;
 use BtcPayLite\GreenfieldApiService;
 use BtcPayLite\HttpBitcoinMarketDataProvider;
+use BtcPayLite\IdempotencyService;
 use BtcPayLite\PayoutRepository;
 use BtcPayLite\PayoutService;
+use BtcPayLite\StoreAddressGenerator;
 use BtcPayLite\UrlManager;
+use BtcPayLite\WalletLockManager;
+use BtcPayLite\WalletPathResolver;
 use BtcPayLite\WebhookEndpointPolicy;
 
 ini_set('display_errors', '0');
@@ -59,10 +66,33 @@ try {
         $config['rpc_pass'] ?? null
     );
     $wallet = new ElectrumWallet($rpc);
+    $blockchainProvider = new ElectrumBlockchainProvider($rpc);
+    $walletManager = new ElectrumWalletManager($rpc);
+    $walletLocks = new WalletLockManager();
+    $pathResolver = new WalletPathResolver(__DIR__ . '/wallets');
+    $addressGeneratorFactory = new AddressGeneratorFactory(
+        $rpc,
+        $walletManager,
+        $walletLocks,
+        $pathResolver,
+        $database
+    );
+    $addressGenerator = new StoreAddressGenerator(
+        $database,
+        $addressGeneratorFactory,
+        $config['default_xpub'] ?? null,
+        $config['default_wallet_path'] ?? null
+    );
+    $idempotencyService = new IdempotencyService($database);
+
     $invoiceManager = new BtcInvoiceManager(
         $wallet,
         $config['secret_key'] ?? '',
-        $database
+        $database,
+        null,
+        $addressGenerator,
+        $blockchainProvider,
+        $idempotencyService
     );
     $repository = new GreenfieldApiRepository($database);
     $adminApiKey = is_string($config['admin_api_key'] ?? null)

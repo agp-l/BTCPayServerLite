@@ -1,0 +1,82 @@
+<%- include('layout/header', { pageTitle: 'Clients - BTCPay Server Lite', activeMenu: 'users', currentContextLabel: 'Clients' }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">User Management</p>
+    <h1>Clients</h1>
+    <p>Client merchant accounts, assigned stores, wallets, and operational access.</p>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <span><%= pageError %></span>
+  </div>
+<% } %>
+
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status">
+    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+    <span><%= toastMsg %></span>
+  </div>
+<% } %>
+
+<section class="card">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-users" aria-hidden="true"></i> Client Accounts</span>
+    <span class="badge"><%= clients.length %></span>
+  </div>
+
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          <th>Wallet</th>
+          <th>Stores</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% clients.forEach(client => { %>
+          <tr>
+            <td>
+              <strong><%= client.email %></strong>
+              <div class="muted">#<%= client.id %></div>
+            </td>
+            <td><code><%= client.role %></code></td>
+            <td>
+              <span class="badge <%= client.status === 'active' ? 'badge-Settled' : 'badge-Expired' %>">
+                <%= client.status %>
+              </span>
+            </td>
+            <td class="muted">
+              <%= client.last_login_at ? new Date(client.last_login_at * 1000).toLocaleString('en-US') : 'Never' %>
+            </td>
+            <td>
+              <span class="badge badge-Settled">Assigned</span>
+            </td>
+            <td>
+              <%= client.store_count %> store(s)
+            </td>
+            <td>
+              <form method="post" action="/admin/users" style="display: inline;">
+                <input type="hidden" name="action" value="toggle_status">
+                <input type="hidden" name="user_id" value="<%= client.id %>">
+                <button type="submit" class="ghost-btn" style="font-size: 0.85rem;">
+                  <%= client.status === 'active' ? 'Suspend' : 'Activate' %>
+                </button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('layout/footer') %>

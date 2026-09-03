@@ -30,7 +30,7 @@ final class UserAccountService
     public function setRegistrationEnabled(bool $enabled, int $adminUserId): void
     {
         if ($adminUserId < 1) {
-            throw new AuthException('Administrátor není platný.');
+            throw new AuthException('Administrator is invalid.');
         }
         $this->accounts->setRegistrationEnabled($enabled, $adminUserId, $this->now());
     }
@@ -43,7 +43,7 @@ final class UserAccountService
         int $lastRecordedAt
     ): int {
         if ($userId < 1 || !in_array($role, ['admin', 'client'], true) || $sessionVersion < 1) {
-            throw new AuthException('Relace již není platná.');
+            throw new AuthException('Session is no longer valid.');
         }
 
         $now = $this->now();
@@ -56,7 +56,7 @@ final class UserAccountService
             $now,
             $writeLastSeen
         )) {
-            throw new AuthException('Relace již není platná.');
+            throw new AuthException('Session is no longer valid.');
         }
 
         return $writeLastSeen ? $now : $lastRecordedAt;
@@ -75,15 +75,15 @@ final class UserAccountService
             || $account['status'] !== 'active'
             || !password_verify($currentPassword, $account['password_hash'])
         ) {
-            throw new AuthException('Současné heslo není správné.');
+            throw new AuthException('Current password is incorrect.');
         }
         if (password_verify($newPassword, $account['password_hash'])) {
-            throw new AuthException('Nové heslo musí být jiné než současné.');
+            throw new AuthException('New password must be different from current password.');
         }
 
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
         if (!is_string($newHash)) {
-            throw new AuthException('Heslo nyní nelze změnit.');
+            throw new AuthException('Password cannot be changed at this time.');
         }
         $newVersion = $this->accounts->changePassword(
             $userId,
@@ -91,7 +91,7 @@ final class UserAccountService
             $newHash
         );
         if ($newVersion === null) {
-            throw new AuthException('Účet se mezitím změnil. Přihlaste se znovu.');
+            throw new AuthException('Account has changed in the meantime. Please log in again.');
         }
 
         return $newVersion;
@@ -138,19 +138,19 @@ final class UserAccountService
         $this->validateNewPassword($newPassword, $newPasswordConfirm);
         $token = strtolower(trim($token));
         if (!preg_match('/\A[a-f0-9]{64}\z/D', $token)) {
-            throw new AuthException('Odkaz pro obnovu hesla je neplatný nebo vypršel.');
+            throw new AuthException('Password reset link is invalid or has expired.');
         }
 
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
         if (!is_string($newHash)) {
-            throw new AuthException('Heslo nyní nelze změnit.');
+            throw new AuthException('Password cannot be changed at this time.');
         }
         if (!$this->accounts->consumePasswordResetToken(
             hash('sha256', $token),
             $newHash,
             $this->now()
         )) {
-            throw new AuthException('Odkaz pro obnovu hesla je neplatný nebo vypršel.');
+            throw new AuthException('Password reset link is invalid or has expired.');
         }
     }
 
@@ -158,10 +158,10 @@ final class UserAccountService
     {
         $length = strlen($password);
         if ($length < self::MIN_PASSWORD_BYTES || $length > self::MAX_PASSWORD_BYTES) {
-            throw new AuthException('Heslo musí mít 12 až 72 znaků včetně mezer.');
+            throw new AuthException('Password must be between 12 and 72 characters long.');
         }
         if (!hash_equals($password, $confirmation)) {
-            throw new AuthException('Zadaná hesla se neshodují.');
+            throw new AuthException('Passwords do not match.');
         }
     }
 
@@ -169,7 +169,7 @@ final class UserAccountService
     {
         $now = ($this->clock)();
         if (!is_int($now) || $now < 1) {
-            throw new AuthException('Čas aplikace není dostupný.');
+            throw new AuthException('Application clock is not available.');
         }
         return $now;
     }

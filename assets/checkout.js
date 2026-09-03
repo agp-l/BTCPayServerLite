@@ -16,10 +16,10 @@
     };
 
     const statusMeta = {
-        New: ['Čekáme na platbu', 'new'],
-        Processing: ['Platba přijata, čekáme na potvrzení', 'processing'],
-        Settled: ['Platba potvrzena', 'settled'],
-        Expired: ['Platnost faktury vypršela', 'expired'],
+        New: ['Awaiting payment', 'new'],
+        Processing: ['Payment received, confirming', 'processing'],
+        Settled: ['Payment confirmed', 'settled'],
+        Expired: ['Invoice expired', 'expired'],
     };
 
     const statusBadge = document.getElementById('status-badge');
@@ -67,12 +67,12 @@
 
         timer.hidden = false;
         if (currentStatus === 'Processing') {
-            timer.textContent = 'Platba byla přijata; čekáme na potvrzení sítě.';
+            timer.textContent = 'Payment received; awaiting network confirmation.';
             return;
         }
         timer.textContent = currentStatus === 'Expired' || secondsRemaining <= 0
-            ? 'Čas pro platbu vypršel.'
-            : 'Zbývající čas: ' + formatTime(secondsRemaining);
+            ? 'Payment window has expired.'
+            : 'Time remaining: ' + formatTime(secondsRemaining);
     };
 
     const scheduleMerchantRedirect = () => {
@@ -197,7 +197,7 @@
             copied = fallbackCopy(value);
         }
 
-        showToast(copied ? 'Zkopírováno' : 'Kopírování se nezdařilo');
+        showToast(copied ? 'Copied' : 'Copy failed');
     };
 
     document.querySelectorAll('[data-copy-value], [data-copy-target]').forEach((button) => {

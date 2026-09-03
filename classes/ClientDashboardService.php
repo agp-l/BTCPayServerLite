@@ -59,7 +59,7 @@ final class ClientDashboardService
         $userId = $this->userId($userId);
         $name = trim($name);
         if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
-            throw new ClientDashboardException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
+            throw new ClientDashboardException('Store name must contain 1 to 100 valid characters.');
         }
 
         $walletPath = $this->repository->findAssignedWallet($userId);
@@ -71,8 +71,8 @@ final class ClientDashboardService
             if (count($walletPaths) !== 1) {
                 throw new ClientDashboardException(
                     $walletPaths === []
-                        ? 'Účet nemá přiřazenou peněženku. Kontaktujte administrátora.'
-                        : 'Účet má více historických peněženek. Administrátor musí zvolit jednu.',
+                        ? 'Account does not have an assigned wallet. Contact administrator.'
+                        : 'Account has multiple historical wallets. Administrator must choose one.',
                     409
                 );
             }
@@ -80,12 +80,12 @@ final class ClientDashboardService
             try {
                 $assignedAt = ($this->clock)();
                 if (!is_int($assignedAt) || $assignedAt < 1) {
-                    throw new ClientDashboardException('Čas aplikace není dostupný.', 500);
+                    throw new ClientDashboardException('Application clock is not available.', 500);
                 }
                 $this->repository->assignWallet($userId, $walletPath, $assignedAt);
             } catch (\Throwable $exception) {
                 throw new ClientDashboardException(
-                    'Přiřazení peněženky se nyní nepodařilo ověřit.',
+                    'Wallet assignment could not be verified at this time.',
                     409,
                     $exception
                 );
@@ -109,7 +109,7 @@ final class ClientDashboardService
             );
         } catch (Throwable $exception) {
             throw new ClientDashboardException(
-                'Obchod se nyní nepodařilo vytvořit. Zkuste to prosím později.',
+                'Could not create store at this time. Please try again later.',
                 503,
                 $exception
             );
@@ -122,16 +122,16 @@ final class ClientDashboardService
     public function createWebhook(int $userId, string $storeId, string $url): array
     {
         $userId = $this->userId($userId);
-        $storeId = $this->identifier($storeId, 'Obchod');
+        $storeId = $this->identifier($storeId, 'Store');
         if (!$this->repository->ownsStore($userId, $storeId)) {
-            throw new ClientDashboardException('Vybraný obchod není dostupný.', 404);
+            throw new ClientDashboardException('Selected store is not available.', 404);
         }
 
         try {
             $endpoint = $this->webhookPolicy->inspect($url);
             $now = ($this->clock)();
             if (!is_int($now) || $now < 1) {
-                throw new ClientDashboardException('Čas aplikace není dostupný.', 500);
+                throw new ClientDashboardException('Application clock is not available.', 500);
             }
 
             return $this->repository->findOrCreateWebhook($storeId, $endpoint['url'], $now);
@@ -139,7 +139,7 @@ final class ClientDashboardService
             throw $exception;
         } catch (Throwable $exception) {
             throw new ClientDashboardException(
-                'Webhook URL není bezpečná nebo ji nyní nelze ověřit.',
+                'Webhook URL is not secure or cannot be verified at this time.',
                 400,
                 $exception
             );
@@ -151,39 +151,39 @@ final class ClientDashboardService
         $userId = $this->userId($userId);
         $webhookId = $this->identifier($webhookId, 'Webhook');
         if (!$this->repository->deleteWebhook($userId, $webhookId)) {
-            throw new ClientDashboardException('Webhook nebyl nalezen.', 404);
+            throw new ClientDashboardException('Webhook was not found.', 404);
         }
     }
 
     public function renameStore(int $userId, string $storeId, string $name): void
     {
         $userId = $this->userId($userId);
-        $storeId = $this->identifier($storeId, 'Obchod');
+        $storeId = $this->identifier($storeId, 'Store');
         $name = trim($name);
         if ($name === '' || strlen($name) > 100 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
-            throw new ClientDashboardException('Název obchodu musí obsahovat 1 až 100 platných znaků.');
+            throw new ClientDashboardException('Store name must contain 1 to 100 valid characters.');
         }
         if (!$this->repository->updateStoreName($userId, $storeId, $name)) {
-            throw new ClientDashboardException('Obchod nebyl nalezen.', 404);
+            throw new ClientDashboardException('Store was not found.', 404);
         }
     }
 
     public function rotateStoreApiKey(int $userId, string $storeId): void
     {
         $userId = $this->userId($userId);
-        $storeId = $this->identifier($storeId, 'Obchod');
+        $storeId = $this->identifier($storeId, 'Store');
         if (!$this->repository->rotateStoreApiKey($userId, $storeId, bin2hex(random_bytes(32)))) {
-            throw new ClientDashboardException('Obchod nebyl nalezen.', 404);
+            throw new ClientDashboardException('Store was not found.', 404);
         }
     }
 
     public function deleteStore(int $userId, string $storeId): void
     {
         $userId = $this->userId($userId);
-        $storeId = $this->identifier($storeId, 'Obchod');
+        $storeId = $this->identifier($storeId, 'Store');
         if (!$this->repository->deleteEmptyStore($userId, $storeId)) {
             throw new ClientDashboardException(
-                'Obchod nelze odstranit. Obchod s fakturami nebo výběry musí zůstat v historii.',
+                'Store cannot be deleted. Stores with invoices or payouts must remain in history.',
                 409
             );
         }
@@ -197,13 +197,13 @@ final class ClientDashboardService
             $endpoint = $this->webhookPolicy->inspect($url);
         } catch (Throwable $exception) {
             throw new ClientDashboardException(
-                'Webhook URL není bezpečná nebo ji nyní nelze ověřit.',
+                'Webhook URL is not secure or cannot be verified at this time.',
                 400,
                 $exception
             );
         }
         if (!$this->repository->updateWebhookUrl($userId, $webhookId, $endpoint['url'])) {
-            throw new ClientDashboardException('Webhook nebyl nalezen.', 404);
+            throw new ClientDashboardException('Webhook was not found.', 404);
         }
     }
 
@@ -216,14 +216,14 @@ final class ClientDashboardService
             $webhookId,
             bin2hex(random_bytes(32))
         )) {
-            throw new ClientDashboardException('Webhook nebyl nalezen.', 404);
+            throw new ClientDashboardException('Webhook was not found.', 404);
         }
     }
 
     private function userId(int $userId): int
     {
         if ($userId < 1) {
-            throw new ClientDashboardException('Přihlášený uživatel není platný.', 401);
+            throw new ClientDashboardException('Authenticated user is invalid.', 401);
         }
 
         return $userId;
@@ -237,7 +237,7 @@ final class ClientDashboardService
             || strlen($value) > 50
             || !preg_match('/\A[a-zA-Z0-9_-]+\z/D', $value)
         ) {
-            throw new ClientDashboardException($field . ' má neplatný identifikátor.');
+            throw new ClientDashboardException($field . ' has an invalid identifier.');
         }
 
         return $value;

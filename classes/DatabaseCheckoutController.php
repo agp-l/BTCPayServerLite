@@ -30,18 +30,18 @@ final class DatabaseCheckoutController
     {
         $method = strtoupper(trim($method));
         if (!in_array($method, ['GET', 'HEAD'], true)) {
-            return $this->error(405, 'Tato metoda není povolena.', false, ['GET', 'HEAD']);
+            return $this->error(405, 'This method is not allowed.', false, ['GET', 'HEAD']);
         }
 
         $action = $query['action'] ?? '';
         $wantsJson = $action === 'check';
         if (!is_string($action) || !in_array($action, ['', 'check'], true)) {
-            return $this->error(400, 'Požadovaná checkout operace není platná.', false);
+            return $this->error(400, 'Requested checkout operation is invalid.', false);
         }
 
         $invoiceId = $query['id'] ?? '';
         if (!is_string($invoiceId)) {
-            return $this->error(400, 'ID faktury není platné.', $wantsJson);
+            return $this->error(400, 'Invoice ID is invalid.', $wantsJson);
         }
 
         try {

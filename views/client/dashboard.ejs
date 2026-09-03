@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title>Merchant Portal - BTCPay Server Lite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar" id="clientSidebar" aria-label="Client Navigation">
+    <a href="/client" class="admin-brand">
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Merchant portal</span></span>
+    </a>
+
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">My Account</div>
+        <a href="/client" class="admin-nav-link is-active" aria-current="page">
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Overview & Stores</span>
+        </a>
+        <a href="/admin/dashboard" class="admin-nav-link">
+          <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Admin View</span>
+        </a>
+        <a href="/" class="admin-nav-link" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span>Open Website</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>System online</span>
+      </div>
+      <div class="admin-profile">
+        <span class="admin-profile-avatar" aria-hidden="true"><%= (clientUser?.email || 'M').charAt(0).toUpperCase() %></span>
+        <span class="admin-profile-copy">
+          <strong>Merchant</strong>
+          <span title="<%= clientUser?.email %>"><%= clientUser?.email %></span>
+        </span>
+      </div>
+      <form method="post" action="/logout" class="admin-logout">
+        <button type="submit" class="admin-nav-link">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Sign Out</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
+
+  <div class="admin-main">
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Open navigation">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
+        <i class="fa-solid fa-store" aria-hidden="true"></i>
+        <span>Merchant portal</span>
+      </span>
+    </header>
+    <main class="admin-content">
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Merchant Portal</p>
+    <h1>My Account Overview</h1>
+    <p>Manage your stores, Greenfield API keys, and monitor incoming payments in real time.</p>
+  </div>
+</section>
+
+<section class="stats-grid" aria-label="Account Statistics">
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+    <div class="stat-label">My Stores</div>
+    <div class="stat-value"><%= stores.length %></div>
+    <div class="stat-meta">Active payment identities</div>
+  </article>
+  <article class="stat-card stat-card-blue">
+    <span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span>
+    <div class="stat-label">Invoices</div>
+    <div class="stat-value"><%= invoices.length %></div>
+    <div class="stat-meta">Total requests issued</div>
+  </article>
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+    <div class="stat-label">Settled Invoices</div>
+    <div class="stat-value"><%= settledCount %></div>
+    <div class="stat-meta">Confirmed transactions</div>
+  </article>
+  <article class="stat-card stat-card-amber">
+    <span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
+    <div class="stat-label">BTC Volume</div>
+    <div class="stat-value code"><%= totalVolume %> BTC</div>
+    <div class="stat-meta">Confirmed payments</div>
+  </article>
+</section>
+
+<section class="card" style="margin-top: 2rem;">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-store"></i> My Stores & API Keys</span>
+  </div>
+  <div class="store-grid">
+    <% stores.forEach(store => { %>
+      <article class="store-card">
+        <div class="store-card-head">
+          <h3><%= store.name %></h3>
+          <span class="badge badge-Settled">Active</span>
+        </div>
+        <div class="credential">
+          <span class="credential-label">Store ID</span>
+          <div class="credential-value"><code><%= store.id %></code></div>
+        </div>
+        <div class="credential">
+          <span class="credential-label">Greenfield API Key</span>
+          <div class="credential-value"><code><%= store.api_key %></code></div>
+        </div>
+        <div class="credential">
+          <span class="credential-label">Webhook URL</span>
+          <div class="credential-value"><%= store.webhook_url || 'Not configured' %></div>
+        </div>
+        <div class="credential">
+          <span class="credential-label">Address Generation</span>
+          <div class="credential-value">
+            <span class="badge <%= store.address_source === 'xpub' ? 'badge-Settled' : 'badge-Processing' %>">
+              <%= store.address_source === 'xpub' ? 'BIP84 XPUB (stateless)' : 'Electrum RPC' %>
+            </span>
+            <% if (store.address_source === 'xpub') { %>
+              <span class="badge s-unknown">Index: #<%= store.address_index || 0 %></span>
+            <% } %>
+          </div>
+        </div>
+      </article>
+    <% }); %>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 2rem;">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-file-invoice"></i> Recent Invoices</span>
+  </div>
+  <% if (invoices.length === 0) { %>
+    <div class="empty-state"><p>No invoices created yet.</p></div>
+  <% } else { %>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Store</th>
+            <th>Item</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% invoices.forEach(inv => { %>
+            <tr>
+              <td class="muted"><%= new Date(inv.created_at * 1000).toLocaleString('en-US') %></td>
+              <td><strong><%= inv.store_name %></strong></td>
+              <td><%= inv.title %></td>
+              <td><code><%= inv.amount %> BTC</code></td>
+              <td><span class="badge badge-<%= inv.status %>"><%= inv.status %></span></td>
+              <td>
+                <a href="/pay?id=<%= inv.id %>" target="_blank" class="ghost-btn">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Checkout
+                </a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+    </main>
+  </div>
+</div>
+<script src="/assets/admin.js" defer></script>
+</body>
+</html>

@@ -3,3 +3,7 @@ config.php
 .install.lock
 english
 *.log
+*.zip
+node_modules/
+.env
+.DS_Store

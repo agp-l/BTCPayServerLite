@@ -100,7 +100,7 @@ $repository = new FakeAuthUserRepository();
 $auth = new AuthManager($repository);
 expectAuthException(
     static fn () => $auth->registerUser('person@example.test', 'short', 'short'),
-    'Heslo musí mít 12 až 72 znaků včetně mezer.'
+    'Password must be between 12 and 72 characters long.'
 );
 $passes[] = 'rejects a weak registration password';
 
@@ -113,7 +113,7 @@ assertSameValue(1, $userId, 'Unexpected user ID');
 assertSameValue(true, isset($repository->users['person@example.test']), 'Email was not normalized');
 $passes[] = 'normalizes email and hashes a registration password';
 
-$wrongMessage = 'Nesprávný e-mail nebo heslo.';
+$wrongMessage = 'Invalid email or password.';
 expectAuthException(
     static fn () => $auth->login('missing@example.test', 'wrong-password', '127.0.0.1'),
     $wrongMessage
@@ -138,7 +138,7 @@ expectAuthException(
         'correct horse battery staple',
         '127.0.0.1'
     ),
-    'Tento účet je pozastaven. Kontaktujte administrátora.'
+    'This account is suspended. Contact administrator.'
 );
 $passes[] = 'rejects a suspended account';
 
@@ -152,7 +152,7 @@ for ($attempt = 0; $attempt < 5; $attempt++) {
 }
 expectAuthException(
     static fn () => $throttledAuth->login('person@example.test', 'wrong-password', '203.0.113.10'),
-    'Příliš mnoho pokusů o přihlášení. Zkuste to znovu za 15 minut.'
+    'Too many login attempts. Please try again in 15 minutes.'
 );
 $passes[] = 'throttles repeated failures by email and client identity';
 
@@ -168,7 +168,7 @@ for ($registration = 1; $registration <= 3; $registration++) {
 }
 expectAuthException(
     static fn () => $registrationAuth->recordRegistrationAttempt('198.51.100.20'),
-    'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
+    'Too many registrations from this address. Please try again in an hour.'
 );
 $passes[] = 'limits wallet-producing registrations per client address';
 
@@ -194,7 +194,7 @@ $csrfToken = AuthManager::csrfToken();
 AuthManager::requireCsrfToken($csrfToken);
 expectAuthException(
     static fn () => AuthManager::requireCsrfToken('invalid-token'),
-    'Formulář vypršel. Obnovte stránku a zkuste to znovu.'
+    'Form expired. Please refresh the page and try again.'
 );
 $passes[] = 'creates and verifies a per-session CSRF token';
 

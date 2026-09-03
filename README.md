@@ -1,5 +1,5 @@
 # BTC Pay Server Lite
-
+test!
 Lehká samoobslužná Bitcoinová platební brána v PHP nad Electrum daemonem. Projekt poskytuje databázové Greenfield API, stateless faktury, checkout, administrační rozhraní a spolehlivé doručování podepsaných webhooků.
 
 > Stav dokumentace: správa uživatelů a provozní dohled, 1. září 2026. Produkční nasazení stále vyžaduje zálohu, migrace a smoke test proti skutečné databázi, poštovnímu systému a Electrum daemonu.

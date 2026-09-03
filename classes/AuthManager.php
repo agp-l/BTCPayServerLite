@@ -35,7 +35,7 @@ class AuthManager
     {
         $email = $this->normalizeEmail($email);
         if ($password === '' || strlen($password) > self::MAX_PASSWORD_BYTES) {
-            throw new AuthException('Nesprávný e-mail nebo heslo.');
+            throw new AuthException('Invalid email or password.');
         }
 
         $now = time();
@@ -53,7 +53,7 @@ class AuthManager
             $accountFailures >= self::MAX_LOGIN_FAILURES
             || $clientFailures >= self::MAX_CLIENT_FAILURES
         ) {
-            throw new AuthException('Příliš mnoho pokusů o přihlášení. Zkuste to znovu za 15 minut.');
+            throw new AuthException('Too many login attempts. Please try again in 15 minutes.');
         }
 
         $user = $this->users->findByEmail($email);
@@ -65,19 +65,19 @@ class AuthManager
             if ($clientIdentity !== '') {
                 $this->users->recordAttempt($clientHash, $now);
             }
-            throw new AuthException('Nesprávný e-mail nebo heslo.');
+            throw new AuthException('Invalid email or password.');
         }
         if (!in_array($user['role'], ['admin', 'client'], true)) {
-            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+            throw new AuthException('Login cannot be completed at this time. Please try again later.');
         }
         if (($user['status'] ?? 'active') !== 'active') {
-            throw new AuthException('Tento účet je pozastaven. Kontaktujte administrátora.');
+            throw new AuthException('This account is suspended. Contact administrator.');
         }
         $sessionVersion = is_int($user['session_version'] ?? null)
             ? $user['session_version']
             : 1;
         if ($sessionVersion < 1) {
-            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+            throw new AuthException('Login cannot be completed at this time. Please try again later.');
         }
 
         $this->users->clearAttempts($identityHash);
@@ -96,7 +96,7 @@ class AuthManager
 
         self::startSession();
         if (!session_regenerate_id(true)) {
-            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+            throw new AuthException('Login cannot be completed at this time. Please try again later.');
         }
 
         $_SESSION = [
@@ -121,19 +121,19 @@ class AuthManager
         $email = $this->normalizeEmail($email);
         $passwordLength = strlen($password);
         if ($passwordLength < self::MIN_PASSWORD_BYTES || $passwordLength > self::MAX_PASSWORD_BYTES) {
-            throw new AuthException('Heslo musí mít 12 až 72 znaků včetně mezer.');
+            throw new AuthException('Password must be between 12 and 72 characters long.');
         }
         if (!hash_equals($password, $passwordConfirm)) {
-            throw new AuthException('Zadaná hesla se neshodují.');
+            throw new AuthException('Passwords do not match.');
         }
 
         if ($this->users->findByEmail($email) !== null) {
-            throw new AuthException('Registraci s těmito údaji nelze dokončit.');
+            throw new AuthException('Registration with these details cannot be completed.');
         }
 
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
         if (!is_string($passwordHash)) {
-            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
+            throw new AuthException('Registration cannot be completed at this time. Please try again later.');
         }
 
         return $this->users->createClient($email, $passwordHash);
@@ -142,7 +142,7 @@ class AuthManager
     public function recordRegistrationAttempt(string $clientIdentity): void
     {
         if ($clientIdentity === '') {
-            throw new AuthException('Registraci nyní nelze dokončit. Zkuste to prosím později.');
+            throw new AuthException('Registration cannot be completed at this time. Please try again later.');
         }
 
         $now = time();
@@ -152,7 +152,7 @@ class AuthManager
             $now - self::REGISTRATION_WINDOW_SECONDS
         ) >= self::MAX_REGISTRATIONS) {
             throw new AuthException(
-                'Z této adresy bylo provedeno příliš mnoho registrací. Zkuste to znovu za hodinu.'
+                'Too many registrations from this address. Please try again in an hour.'
             );
         }
         $this->users->recordAttempt($registrationHash, $now);
@@ -184,7 +184,7 @@ class AuthManager
             return;
         }
         if (headers_sent()) {
-            throw new AuthException('Relaci nyní nelze bezpečně spustit.');
+            throw new AuthException('Session cannot be safely started.');
         }
 
         $secure ??= !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
@@ -202,7 +202,7 @@ class AuthManager
         ]);
 
         if (!session_start()) {
-            throw new AuthException('Relaci nyní nelze bezpečně spustit.');
+            throw new AuthException('Session cannot be safely started.');
         }
     }
 
@@ -225,7 +225,7 @@ class AuthManager
             || !is_string($_SESSION['csrf_token'])
             || !hash_equals($_SESSION['csrf_token'], $token)
         ) {
-            throw new AuthException('Formulář vypršel. Obnovte stránku a zkuste to znovu.');
+            throw new AuthException('Form expired. Please refresh the page and try again.');
         }
     }
 
@@ -280,7 +280,7 @@ class AuthManager
             || strlen($email) > self::MAX_EMAIL_BYTES
             || filter_var($email, FILTER_VALIDATE_EMAIL) === false
         ) {
-            throw new AuthException('Nesprávný e-mail nebo heslo.');
+            throw new AuthException('Invalid email or password.');
         }
 
         return $email;

@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JSON API Documentation | BTCPay Server Lite</title>
+    <meta name="description"
+        content="Developer documentation for BTCPay Server Lite: authentication, JSON API, Bitcoin invoices, checkout, webhooks, stateless mode, cURL and PHP examples.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#07150f">
+    <link rel="canonical" href="<%= canonicalUrl %>">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="BTCPay Server Lite – API Documentation">
+    <meta property="og:description"
+        content="Step-by-step guide to integrating your website with Bitcoin payments. JSON, webhooks, cURL and PHP.">
+    <meta property="og:url" content="<%= canonicalUrl %>">
+    <script type="application/ld+json">
+    <%- JSON.stringify(schema) %>
+    </script>
+    <style>
+    :root {
+        --ink: #07150f;
+        --ink-2: #12251c;
+        --paper: #fff;
+        --white: #fff;
+        --muted: #202020;
+        --line: #d8e0da;
+        --brand: #20c875;
+        --brand-soft: #e4f8ed;
+        --mint: #6cf0a7;
+        --blue: #72a7ff;
+        --red: #ff746c;
+        --code: #09110d;
+        --radius: 18px;
+        --shadow: 0 18px 60px rgba(7, 21, 15, .09);
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+    }
+
+    a {
+        color: inherit;
+    }
+
+    button {
+        font: inherit;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--brand);
+        outline-offset: 3px;
+    }
+
+    .skip-link {
+        position: fixed;
+        top: -5rem;
+        left: 1rem;
+        z-index: 100;
+        padding: .7rem 1rem;
+        border-radius: 10px;
+        background: var(--white);
+    }
+
+    .skip-link:focus {
+        top: 1rem;
+    }
+
+    .wrap {
+        width: min(1420px, calc(100% - 40px));
+        margin-inline: auto;
+    }
+
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(236, 236, 236, 0.92);
+        backdrop-filter: blur(16px);
+    }
+
+    .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 70px;
+        gap: 1.5rem;
+    }
+
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: .7rem;
+        font-weight: 850;
+        letter-spacing: -.03em;
+        text-decoration: none;
+    }
+
+    .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        color: var(--white);
+        background: var(--brand);
+        font-size: 1.18rem;
+    }
+
+    .docs-label {
+        margin-left: .45rem;
+        padding-left: .8rem;
+        border-left: 1px solid var(--line);
+        color: var(--muted);
+        font-size: .82rem;
+        font-weight: 750;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .top-links {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+    }
+
+    .top-links a {
+        color: var(--muted);
+        font-size: .9rem;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .top-links a:hover {
+        color: var(--ink);
+    }
+
+    .top-links .home-link {
+        padding: .6rem .9rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: var(--ink);
+        background: var(--white);
+    }
+
+    .layout {
+        display: grid;
+        grid-template-columns: 245px minmax(0, 770px) minmax(260px, 1fr);
+        gap: clamp(2rem, 4vw, 4.8rem);
+        align-items: start;
+        padding-block: 3rem 7rem;
+    }
+
+    .sidebar {
+        position: sticky;
+        top: 96px;
+        max-height: calc(100vh - 116px);
+        overflow: auto;
+        padding-right: 1rem;
+    }
+
+    .side-title {
+        margin: 0 0 .7rem;
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 850;
+        letter-spacing: .13em;
+        text-transform: uppercase;
+    }
+
+    .side-nav {
+        display: grid;
+        gap: .14rem;
+        margin-bottom: 1.6rem;
+    }
+
+    .side-nav a {
+        padding: .38rem .7rem;
+        border-left: 2px solid transparent;
+        color: var(--brand);
+        font-size: .88rem;
+        font-weight: 650;
+        text-decoration: none;
+    }
+
+    .side-nav a:hover {
+        border-left-color: var(--brand);
+        color: var(--ink);
+        background: rgba(255, 255, 255, .55);
+    }
+
+    .version {
+        display: inline-flex;
+        gap: .4rem;
+        align-items: center;
+        padding: .35rem .65rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        background: var(--white);
+        font-size: .72rem;
+    }
+
+    .version::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--mint);
+    }
+
+    .content {
+        min-width: 0;
+    }
+
+    .hero {
+        padding: 1.2rem 0 4.5rem;
+    }
+
+    .eyebrow {
+        margin: 0 0 .8rem;
+        color: var(--brand);
+        font-size: .78rem;
+        font-weight: 850;
+        letter-spacing: .13em;
+        text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        line-height: 1.16;
+        letter-spacing: -.03em;
+    }
+
+    h1 {
+        max-width: 760px;
+        margin: 0 0 1.2rem;
+        font-size: clamp(2.8rem, 6vw, 5.3rem);
+    }
+
+    h2 {
+        margin: 0 0 1rem;
+        font-size: clamp(2rem, 3.6vw, 3.1rem);
+    }
+
+    h3 {
+        margin: 2.2rem 0 .75rem;
+        font-size: 1.38rem;
+    }
+
+    h4 {
+        margin: 1.8rem 0 .55rem;
+        font-size: 1.05rem;
+    }
+
+    p {
+        margin-top: 0;
+    }
+
+    .lead {
+        max-width: 710px;
+        color: var(--code);
+        font-size: 1.13rem;
+    }
+
+    .hero-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .55rem;
+        margin-top: 1.6rem;
+    }
+
+    .hero-tags span {
+        padding: .38rem .65rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--white);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .75rem;
+    }
+
+    .doc-section {
+        padding: 4.2rem 0;
+        border-top: 1px solid var(--line);
+        scroll-margin-top: 5.5rem;
+    }
+
+    .section-intro {
+        max-width: 700px;
+        color: var(--muted);
+    }
+
+    .note {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: .8rem;
+        margin: 1.5rem 0;
+        padding: 1.15rem;
+        border: 1px solid #a6e7c5;
+        border-radius: 14px;
+        background: var(--brand-soft);
+    }
+
+    .note.info {
+        border-color: #c6d8fa;
+        background: #edf4ff;
+    }
+
+    .note.danger {
+        border-color: #ffc5c1;
+        background: #fff0ef;
+    }
+
+    .note-icon {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--brand);
+        font-weight: 900;
+    }
+
+    .note.info .note-icon {
+        background: var(--blue);
+    }
+
+    .note.danger .note-icon {
+        background: var(--red);
+    }
+
+    .note strong {
+        display: block;
+        margin-bottom: .15rem;
+    }
+
+    .note p {
+        margin: 0;
+        color: #4b5e54;
+        font-size: .9rem;
+    }
+
+    .quick-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .75rem;
+        margin: 1.8rem 0;
+    }
+
+    .quick-step {
+        padding: 1.15rem;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--white);
+    }
+
+    .quick-step span {
+        display: inline-grid;
+        place-items: center;
+        width: 27px;
+        height: 27px;
+        margin-bottom: .8rem;
+        border-radius: 8px;
+        background: var(--brand-soft);
+        color: #08713c;
+        font-size: .78rem;
+        font-weight: 900;
+    }
+
+    .quick-step strong {
+        display: block;
+        font-size: .92rem;
+    }
+
+    .quick-step p {
+        margin: .35rem 0 0;
+        color: var(--muted);
+        font-size: .82rem;
+    }
+
+    .code-block {
+        position: relative;
+        margin: 1.3rem 0 1.8rem;
+        overflow: hidden;
+        border: 1px solid #1f3329;
+        border-radius: var(--radius);
+        background: var(--code);
+        box-shadow: 0 13px 35px rgba(7, 21, 15, .12);
+    }
+
+    .code-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 44px;
+        padding: .5rem .65rem .5rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, .1);
+        color: #91a69a;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .72rem;
+    }
+
+    .copy-button {
+        min-height: 31px;
+        padding: .35rem .65rem;
+        border: 1px solid rgba(255, 255, 255, .14);
+        border-radius: 8px;
+        color: #d7e5dd;
+        background: rgba(255, 255, 255, .06);
+        cursor: pointer;
+        font-size: .72rem;
+        font-weight: 700;
+    }
+
+    .copy-button:hover {
+        background: rgba(255, 255, 255, .12);
+    }
+
+    pre {
+        margin: 0;
+        padding: 1.2rem;
+        overflow: auto;
+        color: #d9e7df;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: .82rem;
+        line-height: 1.7;
+        tab-size: 2;
+    }
+
+    .token-key {
+        color: #90b8ff;
+    }
+
+    .token-string {
+        color: #8cf0b4;
+    }
+
+    .token-number {
+        color: #ffbf6e;
+    }
+
+    code.inline {
+        padding: .14rem .34rem;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: #075c34;
+        background: var(--brand-soft);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .86em;
+    }
+
+    .endpoint {
+        margin: 2.2rem 0 3.4rem;
+    }
+
+    .endpoint-title {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .65rem;
+        margin-bottom: .8rem;
+    }
+
+    .method {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 54px;
+        padding: .28rem .5rem;
+        border-radius: 7px;
+        color: #07361e;
+        background: #baf5d2;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .72rem;
+        font-weight: 900;
+    }
+
+    .method.post {
+        color: #075c34;
+        background: #ccebdc;
+    }
+
+    .endpoint-path {
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .92rem;
+        font-weight: 750;
+    }
+
+    .endpoint p {
+        color: var(--muted);
+    }
+
+    .table-wrap {
+        width: 100%;
+        margin: 1.3rem 0 2rem;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--white);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .86rem;
+    }
+
+    th,
+    td {
+        padding: .82rem .9rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        color: var(--muted);
+        background: #edf2ee;
+        font-size: .72rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    tr:last-child td {
+        border-bottom: 0;
+    }
+
+    td code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .79rem;
+        overflow-wrap: anywhere;
+    }
+
+    .status {
+        display: inline-block;
+        padding: .17rem .46rem;
+        border-radius: 999px;
+        font-size: .7rem;
+        font-weight: 850;
+    }
+
+    .s-new {
+        background: #edf0ee;
+    }
+
+    .s-processing {
+        background: #fff0cf;
+    }
+
+    .s-settled {
+        background: #d9f8e5;
+    }
+
+    .s-expired {
+        background: #ffe0dd;
+    }
+
+    .param-list {
+        display: grid;
+        gap: 0;
+        margin: 1rem 0 1.8rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .param {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 1.2rem;
+        padding: .9rem 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .param dt {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .84rem;
+        font-weight: 800;
+    }
+
+    .param dd {
+        margin: 0;
+        color: var(--muted);
+        font-size: .88rem;
+    }
+
+    .required {
+        color: #08713c;
+        font-size: .68rem;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .rail {
+        position: sticky;
+        top: 96px;
+    }
+
+    .rail-card {
+        padding: 1.2rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--white);
+        box-shadow: var(--shadow);
+    }
+
+    .rail-card+.rail-card {
+        margin-top: 1rem;
+    }
+
+    .rail-label {
+        margin: 0 0 .7rem;
+        color: var(--muted);
+        font-size: .7rem;
+        font-weight: 850;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+    }
+
+    .base-url {
+        padding: .75rem;
+        overflow-wrap: anywhere;
+        border-radius: 10px;
+        color: #cff9df;
+        background: var(--code);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .76rem;
+    }
+
+    .rail-list {
+        display: grid;
+        gap: .6rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--muted);
+        font-size: .82rem;
+    }
+
+    .rail-list li {
+        display: flex;
+        gap: .5rem;
+    }
+
+    .rail-list li::before {
+        content: "✓";
+        color: #0d9c4f;
+        font-weight: 900;
+    }
+
+    .rail-link {
+        display: block;
+        margin-top: .9rem;
+        color: #08713c;
+        font-size: .82rem;
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .rail-link:hover {
+        text-decoration: underline;
+    }
+
+    .check-list {
+        display: grid;
+        gap: .75rem;
+        margin: 1.3rem 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .check-list li {
+        position: relative;
+        padding-left: 1.75rem;
+    }
+
+    .check-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        top: .05rem;
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: var(--mint);
+        font-size: .72rem;
+        font-weight: 900;
+    }
+
+    .footer {
+        padding: 2.5rem 0;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: .82rem;
+    }
+
+    .footer-inner {
+        display: flex;
+        justify-content: space-between;
+        gap: 2rem;
+    }
+
+    .footer-links {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .footer a {
+        text-decoration: none;
+    }
+
+    .footer a:hover {
+        color: var(--ink);
+    }
+
+    @media (max-width: 1140px) {
+        .layout {
+            grid-template-columns: 210px minmax(0, 1fr);
+        }
+
+        .rail {
+            display: none;
+        }
+    }
+
+    @media (max-width: 780px) {
+        .wrap {
+            width: min(100% - 26px, 1420px);
+        }
+
+        .top-links a:not(.home-link) {
+            display: none;
+        }
+
+        .docs-label {
+            display: none;
+        }
+
+        .layout {
+            display: block;
+            padding-top: 1.2rem;
+        }
+
+        .sidebar {
+            position: static;
+            max-height: none;
+            display: flex;
+            gap: .35rem;
+            margin: 0 -13px 2.5rem;
+            padding: .2rem 13px .8rem;
+            overflow-x: auto;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .sidebar>*:not(.side-nav) {
+            display: none;
+        }
+
+        .side-nav {
+            display: flex;
+            flex: 0 0 auto;
+            margin: 0;
+        }
+
+        .side-nav a {
+            flex: 0 0 auto;
+            padding: .48rem .65rem;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: var(--white);
+            white-space: nowrap;
+        }
+
+        .hero {
+            padding-top: 1rem;
+        }
+
+        .quick-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .param {
+            grid-template-columns: 1fr;
+            gap: .25rem;
+        }
+
+        .footer-inner {
+            flex-direction: column;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html {
+            scroll-behavior: auto;
+        }
+
+        * {
+            transition: none !important;
+        }
+    }
+    </style>
+</head>
+
+<body>
+    <a class="skip-link" href="#content">Skip to documentation</a>
+
+    <header class="topbar">
+        <div class="wrap topbar-inner">
+            <a class="brand" href="<%= baseUrl %>/"><span class="brand-mark"
+                    aria-hidden="true">₿</span><span>BTCPay Server Lite</span><span
+                    class="docs-label">Dokumentace</span></a>
+            <nav class="top-links" aria-label="Top navigation">
+                <a href="<%= githubUrl %>" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+                <a href="<%= baseUrl %>/login">Sign In</a>
+                <a class="home-link" href="<%= baseUrl %>/">Back to Website</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="wrap layout">
+        <aside class="sidebar" aria-label="Documentation Navigation">
+            <p class="side-title">Getting Started</p>
+            <nav class="side-nav">
+                <a href="#quickstart">Quickstart</a>
+                <a href="#authentication">Authentication</a>
+                <a href="#endpoints">Endpoints Overview</a>
+            </nav>
+            <p class="side-title">Accepting Payments</p>
+            <nav class="side-nav">
+                <a href="#invoices">Invoices</a>
+                <a href="#statuses">Payment Statuses</a>
+                <a href="#webhooks">Webhooks</a>
+                <a href="#stateless">Stateless API</a>
+            </nav>
+            <p class="side-title">Additional APIs</p>
+            <nav class="side-nav">
+                <a href="#rates">Exchange Rates</a>
+                <a href="#payouts">BTC Payouts</a>
+                <a href="#errors">Errors & Retries</a>
+                <a href="#security">Security</a>
+            </nav>
+            <span class="version">API v1x</span>
+        </aside>
+
+        <main id="content" class="content">
+            <header class="hero">
+                <p class="eyebrow">Public Developer Documentation</p>
+                <h1>Connect Your Website to Bitcoin Payments.</h1>
+                <p class="lead">BTCPay Server Lite provides a JSON API for invoices, checkout, signed webhooks, and lightweight stateless mode. This page documents the interface implemented in the current release.</p>
+                <div class="hero-tags">
+                    <span>application/json</span><span>BTC-CHAIN</span><span>HMAC-SHA256</span><span>PHP
+                        8+</span><span>Electrum</span></div>
+                <div class="note">
+                    <span class="note-icon" aria-hidden="true">!</span>
+                    <div><strong>Bitcoin On-Chain Only</strong>
+                        <p>The current API does not support Lightning Network, refunds, or pull payments. For accepting payments, use payment method <code class="inline">BTC-CHAIN</code>.</p>
+                    </div>
+                </div>
+            </header>
+
+            <section id="quickstart" class="doc-section">
+                <p class="eyebrow">01 — Quickstart</p>
+                <h2>Create Your First Invoice in Minutes.</h2>
+                <p class="section-intro">Create a store in the merchant portal, copy its Store ID and API key, then send a single JSON request.</p>
+                <div class="quick-grid">
+                    <div class="quick-step"><span>1</span><strong>Get Credentials</strong>
+                        <p>Server URL, Store ID, and Store API key.</p>
+                    </div>
+                    <div class="quick-step"><span>2</span><strong>Create Invoice</strong>
+                        <p>Submit amount, currency, and order ID.</p>
+                    </div>
+                    <div class="quick-step"><span>3</span><strong>Open Checkout</strong>
+                        <p>Redirect customer to the returned payment link.</p>
+                    </div>
+                </div>
+
+                <h3>Creating an Invoice via cURL</h3>
+                <div class="code-block">
+                    <div class="code-head"><span>shell</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>curl -X POST "<%= apiBaseUrl %>/stores/STORE_ID/invoices" \
+  -H "Authorization: token STORE_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "amount": "1990.00",
+    "currency": "CZK",
+    "metadata": {
+      "orderId": "OBJ-2026-084",
+      "customerEmail": "zakaznik@example.cz"
+    },
+    "checkout": {
+      "expirationMinutes": 20,
+      "redirectURL": "https://shop.example.cz/dekujeme",
+      "redirectAutomatically": true
+    }
+  }'</code></pre>
+                </div>
+
+                <h3>Typical Response</h3>
+                <div class="code-block">
+                    <div class="code-head"><span>200 · application/json</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>{
+  "id": "inv_8e9a31f7c20b",
+  "storeId": "STORE_ID",
+  "amount": "1990",
+  "currency": "CZK",
+  "type": "Standard",
+  "checkoutLink": "<%= baseUrl %>/pay?id=inv_8e9a31f7c20b",
+  "createdTime": 1788277200,
+  "expirationTime": 1788278400,
+  "monitoringTime": 1788278400,
+  "archived": false,
+  "status": "New",
+  "additionalStatus": "None",
+  "availableStatusesForManualMarking": [],
+  "metadata": {
+    "orderId": "OBJ-2026-084",
+    "customerEmail": "zakaznik@example.cz"
+  }
+}</code></pre>
+                </div>
+                <div class="note info"><span class="note-icon" aria-hidden="true">i</span>
+                    <div><strong>Send Amounts as Strings</strong>
+                        <p>Use <code class="inline">"1990.00"</code> or <code
+                                class="inline">"0.00100000"</code> rather than floating-point JSON numbers to prevent rounding errors in JavaScript, PHP, and databases.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="authentication" class="doc-section">
+                <p class="eyebrow">02 — API Keys & Authentication</p>
+                <h2>Authentication</h2>
+                <p class="section-intro">Transmit API keys exclusively in HTTP headers. Never include them in URL queries, frontend browser scripts, mobile apps, or public repositories.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Purpose</th>
+                                <th>Header</th>
+                                <th>Key Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Invoices, stores, webhooks, rates</td>
+                                <td><code>Authorization: token …</code><br>or <code>Bearer …</code></td>
+                                <td>Store API Key</td>
+                            </tr>
+                            <tr>
+                                <td>Stateless invoices</td>
+                                <td><code>Authorization: Bearer …</code></td>
+                                <td>Key from <code>api_clients</code></td>
+                            </tr>
+                            <tr>
+                                <td>Outgoing BTC Payouts</td>
+                                <td><code>Authorization: token …</code></td>
+                                <td>Dedicated Payout API Key</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="code-block">
+                    <div class="code-head"><span>HTTP</span><button class="copy-button" type="button">Copy</button>
+                    </div>
+                    <pre><code>Authorization: token YOUR_STORE_API_KEY
+Content-Type: application/json
+Accept: application/json</code></pre>
+                </div>
+                <div class="note danger"><span class="note-icon" aria-hidden="true">!</span>
+                    <div><strong>Payout Key Must Be Distinct</strong>
+                        <p>The payout key must not be identical to any Store or Admin API key. The payout module is disabled by default.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="endpoints" class="doc-section">
+                <p class="eyebrow">03 — Reference</p>
+                <h2>Endpoints Overview</h2>
+                <p class="section-intro">The Greenfield API base endpoint is <code class="inline"><%= apiBaseUrl %></code>.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Purpose</th>
+                                <th>Autentizace</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/health</code></td>
+                                <td>Service Health</td>
+                                <td>Ne</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/server/info</code></td>
+                                <td>Server Info & Payment Methods</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/api-keys/current</code></td>
+                                <td>Current Key Permissions</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}</code></td>
+                                <td>Store Settings</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}/payment-methods</code></td>
+                                <td>Store Payment Methods</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method post">POST</span></td>
+                                <td><code>/stores/{storeId}/invoices</code></td>
+                                <td>Create Invoice</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}/invoices/{invoiceId}</code></td>
+                                <td>Stav faktury</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}/invoices/{invoiceId}/payment-methods</code></td>
+                                <td>Address, BIP21 & Amount Due</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}/webhooks</code></td>
+                                <td>Webhook List</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method post">POST</span></td>
+                                <td><code>/stores/{storeId}/webhooks</code></td>
+                                <td>Registrace webhooku</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method post">POST</span></td>
+                                <td><code>/stores/{storeId}/exchange/quotes</code></td>
+                                <td>Fiat/BTC Rate Quote</td>
+                                <td>Store</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/stores/{storeId}/payouts</code></td>
+                                <td>List Payouts</td>
+                                <td>Payout</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method post">POST</span></td>
+                                <td><code>/stores/{storeId}/payouts</code></td>
+                                <td>Create Payout</td>
+                                <td>Payout</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method">GET</span></td>
+                                <td><code>/payouts/{payoutId}</code></td>
+                                <td>Payout Details</td>
+                                <td>Payout</td>
+                            </tr>
+                            <tr>
+                                <td><span class="method post">POST</span></td>
+                                <td><code>/payouts/{payoutId}</code></td>
+                                <td>Approve Payout</td>
+                                <td>Payout</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="invoices" class="doc-section">
+                <p class="eyebrow">04 — Invoices</p>
+                <h2>Creating & Fetching Invoices</h2>
+                <div class="endpoint">
+                    <div class="endpoint-title"><span class="method post">POST</span><span
+                            class="endpoint-path">/stores/{storeId}/invoices</span></div>
+                    <p>Creates a new Bitcoin invoice and generates a receiving address derived from your BIP84 XPUB or wallet daemon.</p>
+                    <dl class="param-list">
+                        <div class="param">
+                            <dt>amount <span class="required">required</span></dt>
+                            <dd>Decimal string. e.g. <code class="inline">"1990.00"</code> or <code class="inline">"0.001"</code>.</dd>
+                        </div>
+                        <div class="param">
+                            <dt>currency</dt>
+                            <dd><code class="inline">BTC</code>, <code class="inline">SAT</code>/<code
+                                    class="inline">SATS</code> or fiat currency supported by the exchange rate provider. Default is BTC.</dd>
+                        </div>
+                        <div class="param">
+                            <dt>metadata</dt>
+                            <dd>Optional JSON object with order ID and custom application metadata.</dd>
+                        </div>
+                        <div class="param">
+                            <dt>checkout.expirationMinutes</dt>
+                            <dd>Validity 1 to 43,200 minutes. Default is 15 minutes.</dd>
+                        </div>
+                        <div class="param">
+                            <dt>checkout.redirectURL</dt>
+                            <dd>Optional HTTP/HTTPS redirect address for customer return.</dd>
+                        </div>
+                        <div class="param">
+                            <dt>checkout.redirectAutomatically</dt>
+                            <dd>Boolean. Automatically redirect upon settlement.</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-title"><span class="method">GET</span><span
+                            class="endpoint-path">/stores/{storeId}/invoices/{invoiceId}</span></div>
+                    <p>Returns current status and invoice metadata. Invoices can only be fetched using the API key of their owning store.</p>
+                    <div class="code-block">
+                        <div class="code-head"><span>shell</span><button class="copy-button"
+                                type="button">Copy</button></div>
+                        <pre><code>curl "<%= apiBaseUrl %>/stores/STORE_ID/invoices/INVOICE_ID" \
+  -H "Authorization: token STORE_API_KEY"</code></pre>
+                    </div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-title"><span class="method">GET</span><span
+                            class="endpoint-path">/stores/{storeId}/invoices/{invoiceId}/payment-methods</span></div>
+                    <p>Returns the BTC address in <code class="inline">destination</code>, BIP21 URI in <code
+                            class="inline">paymentLink</code>, expected total, and remaining <code
+                            class="inline">due</code> amount.</p>
+                </div>
+
+                <h3>Standalone PHP Client (No Dependencies)</h3>
+                <div class="code-block">
+                    <div class="code-head"><span>PHP 8+</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>&lt;?php
+$apiBase = '<%= apiBaseUrl %>';
+$storeId = getenv('BTCPAY_STORE_ID');
+$apiKey = getenv('BTCPAY_STORE_API_KEY');
+
+$payload = [
+    'amount' =&gt; '1490.00',
+    'currency' =&gt; 'CZK',
+    'metadata' =&gt; ['orderId' =&gt; 'OBJ-2026-085'],
+    'checkout' =&gt; ['expirationMinutes' =&gt; 20],
+];
+
+$curl = curl_init($apiBase . '/stores/' . rawurlencode($storeId) . '/invoices');
+curl_setopt_array($curl, [
+    CURLOPT_POST =&gt; true,
+    CURLOPT_RETURNTRANSFER =&gt; true,
+    CURLOPT_TIMEOUT =&gt; 15,
+    CURLOPT_HTTPHEADER =&gt; [
+        'Authorization: token ' . $apiKey,
+        'Content-Type: application/json',
+        'Accept: application/json',
+    ],
+    CURLOPT_POSTFIELDS =&gt; json_encode($payload, JSON_THROW_ON_ERROR),
+]);
+
+$raw = curl_exec($curl);
+$status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+if ($raw === false || $status &lt; 200 || $status &gt;= 300) {
+    throw new RuntimeException('BTCPay API request failed: HTTP ' . $status);
+}
+$invoice = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
+                </div>
+            </section>
+
+            <section id="statuses" class="doc-section">
+                <p class="eyebrow">05 — Invoice Lifecycle</p>
+                <h2>Stavy faktury</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Stav</th>
+                                <th>Meaning</th>
+                                <th>Action for Merchant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="status s-new">New</span></td>
+                                <td>Invoice is awaiting payment.</td>
+                                <td>Keep order in unpaid/pending state.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status s-processing">Processing</span></td>
+                                <td>Payment detected in mempool, awaiting confirmation.</td>
+                                <td>Display "payment confirming"; do not ship order yet.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status s-settled">Settled</span></td>
+                                <td>Expected payment is fully confirmed on-chain.</td>
+                                <td>Mark order as paid. Implement idempotently.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status s-expired">Expired</span></td>
+                                <td>Invoice expired without full payment.</td>
+                                <td>Allow customer to create a new invoice.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Never rely solely on browser redirects. Authoritatively settle orders via the <code class="inline">InvoiceSettled</code> webhook, then optionally verify status via GET request.</p>
+            </section>
+
+            <section id="webhooks" class="doc-section">
+                <p class="eyebrow">06 — Asynchronous Webhooks</p>
+                <h2>Webhooky</h2>
+                <p class="section-intro">Webhooks notify your server of invoice state changes. Events are queued persistently and retried automatically on failure.</p>
+                <div class="endpoint">
+                    <div class="endpoint-title"><span class="method post">POST</span><span
+                            class="endpoint-path">/stores/{storeId}/webhooks</span></div>
+                    <div class="code-block">
+                        <div class="code-head"><span>shell</span><button class="copy-button"
+                                type="button">Copy</button></div>
+                        <pre><code>curl -X POST "<%= apiBaseUrl %>/stores/STORE_ID/webhooks" \
+  -H "Authorization: token STORE_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "url": "https://shop.example.cz/webhooks/btcpay",
+    "secret": "nahodny-tajny-retezec-minimalne-16-znaku"
+  }'</code></pre>
+                    </div>
+                    <p>If no <code class="inline">secret</code> is provided, the server generates one. Save the secret returned upon registration; it will not be displayed again.</p>
+                </div>
+                <h3>Webhook Payload</h3>
+                <div class="code-block">
+                    <div class="code-head"><span>application/json</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>{
+  "deliveryId": "wd_f03370d1c0214629a4bf4f716bafc681",
+  "webhookId": "wh_51c76e40c9d2",
+  "storeId": "STORE_ID",
+  "invoiceId": "inv_8e9a31f7c20b",
+  "type": "InvoiceSettled",
+  "timestamp": 1788277308
+}</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Trigger Condition</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>InvoiceProcessing</code></td>
+                                <td>Payment detected in mempool, awaiting confirmation.</td>
+                            </tr>
+                            <tr>
+                                <td><code>InvoiceSettled</code></td>
+                                <td>Payment is confirmed on-chain and amount is satisfied.</td>
+                            </tr>
+                            <tr>
+                                <td><code>InvoiceExpired</code></td>
+                                <td>Invoice expired without full payment.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>Verifying Signatures in PHP</h3>
+                <p>The signature is in header <code class="inline">BTCPay-Sig: sha256=…</code>. Compute HMAC over the exact raw HTTP request body bytes, never re-encoded JSON.</p>
+                <div class="code-block">
+                    <div class="code-head"><span>PHP 8+</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>&lt;?php
+$secret = getenv('BTCPAY_WEBHOOK_SECRET');
+$rawBody = file_get_contents('php://input');
+$received = $_SERVER['HTTP_BTCPAY_SIG'] ?? '';
+$expected = 'sha256=' . hash_hmac('sha256', $rawBody, $secret);
+
+if (!hash_equals($expected, $received)) {
+    http_response_code(401);
+    exit;
+}
+
+$event = json_decode($rawBody, true, 32, JSON_THROW_ON_ERROR);
+
+// Store deliveryId or invoiceId + type as idempotency key.
+if ($event['type'] === 'InvoiceSettled') {
+    markOrderAsPaidOnce($event['invoiceId']);
+}
+
+http_response_code(204);</code></pre>
+                </div>
+                <ul class="check-list">
+                    <li>Return HTTP 2xx promptly; offload long-running tasks to background queues.</li>
+                    <li>Ensure event handling is safe to execute multiple times (idempotent).</li>
+                    <li>Always verify HMAC signature before modifying order status.</li>
+                    <li>Webhook URL must be a public HTTPS address; private IP ranges are blocked in production.</li>
+                </ul>
+            </section>
+
+            <section id="stateless" class="doc-section">
+                <p class="eyebrow">07 — Stateless Mode</p>
+                <h2>Stateless faktury</h2>
+                <p class="section-intro">The Stateless API creates signed payment links without database storage. Ideal for lightweight links and static environments; does not support webhooks.</p>
+                <div class="endpoint">
+                    <div class="endpoint-title"><span class="method post">POST</span><span
+                            class="endpoint-path"><%= statelessUrl %></span></div>
+                </div>
+                <div class="code-block">
+                    <div class="code-head"><span>shell</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>curl -X POST "<%= statelessUrl %>" \
+  -H "Authorization: Bearer STATELESS_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "amount": "0.00100000",
+    "description": "Order OBJ-2026-086",
+    "order_id": "OBJ-2026-086",
+    "expiration_minutes": 60
+  }'</code></pre>
+                </div>
+                <div class="code-block">
+                    <div class="code-head"><span>200 · application/json</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>{
+  "status": "success",
+  "data": {
+    "token": "SIGNED_TOKEN",
+    "bip21_uri": "bitcoin:bc1q...?amount=0.00100000",
+    "amount": "0.00100000",
+    "description": "Order OBJ-2026-086",
+    "order_id": "OBJ-2026-086",
+    "wallet": "merchant_wallet",
+    "created_at": 1788277200,
+    "expires_at": 1788280800,
+    "expires_in_minutes": 60,
+    "url": "<%= baseUrl %>/url-invoice?token=SIGNED_TOKEN"
+  }
+}</code></pre>
+                </div>
+                <dl class="param-list">
+                    <div class="param">
+                        <dt>amount <span class="required">required</span></dt>
+                        <dd>Positive BTC amount with up to 8 decimal places.</dd>
+                    </div>
+                    <div class="param">
+                        <dt>description <span class="required">required</span></dt>
+                        <dd>Description up to 255 bytes.</dd>
+                    </div>
+                    <div class="param">
+                        <dt>order_id</dt>
+                        <dd>Optional order identifier up to 255 bytes.</dd>
+                    </div>
+                    <div class="param">
+                        <dt>expiration_minutes</dt>
+                        <dd>10 to 43,200 minutes; out-of-range values are clamped. Default is 15.</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section id="rates" class="doc-section">
+                <p class="eyebrow">08 — Exchange Rates</p>
+                <h2>Exchange Rate Quote</h2>
+                <p>Returns gross BTC amount, fee, and net payout based on the configured market rate provider.</p>
+                <div class="code-block">
+                    <div class="code-head"><span>shell</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>curl -X POST "<%= apiBaseUrl %>/stores/STORE_ID/exchange/quotes" \
+  -H "Authorization: token STORE_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"amount":"500.00","currency":"CZK"}'</code></pre>
+                </div>
+                <div class="note info"><span class="note-icon" aria-hidden="true">i</span>
+                    <div><strong>Spot Calculation, Not a Locked Rate</strong>
+                        <p>Quotes provide real-time calculation. Fiat currency availability depends on the configured rate provider.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="payouts" class="doc-section">
+                <p class="eyebrow">09 — Optional Module</p>
+                <h2>Outgoing BTC Payouts</h2>
+                <div class="note danger"><span class="note-icon" aria-hidden="true">!</span>
+                    <div><strong>Payouts Transfer Real Bitcoin</strong>
+                        <p>This module is disabled by default. Enable only after wallet backup, dedicated key configuration, and testing on testnet/regtest.</p>
+                    </div>
+                </div>
+                <h3>Secure Two-Step Workflow</h3>
+                <div class="code-block">
+                    <div class="code-head"><span>shell</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>curl -X POST "<%= apiBaseUrl %>/stores/STORE_ID/payouts" \
+  -H "Authorization: token PAYOUT_API_KEY" \
+  -H "Idempotency-Key: exchange-order-2026-000001" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "destination": "bc1q...",
+    "amount": "500.00",
+    "currency": "CZK",
+    "payoutMethodId": "BTC-CHAIN",
+    "approved": false,
+    "metadata": {"orderId":"EX-2026-000001"}
+  }'</code></pre>
+                </div>
+                <p>Response enters status <code class="inline">AwaitingApproval</code> with <code class="inline">id</code> and <code class="inline">revision</code>. After independent destination and amount verification, approve the payout:</p>
+                <div class="code-block">
+                    <div class="code-head"><span>shell</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>curl -X POST "<%= apiBaseUrl %>/payouts/PAYOUT_ID" \
+  -H "Authorization: token PAYOUT_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"revision":0}'</code></pre>
+                </div>
+                <ul class="check-list">
+                    <li>Every new financial operation must include a unique <code class="inline">Idempotency-Key</code> (16–128 characters).</li>
+                    <li>On network failure or timeout, retry the exact same request with the identical key.</li>
+                    <li>Status <code class="inline">InProgress</code> confirms transaction broadcast, not on-chain confirmation.</li>
+                    <li>Only use <code class="inline">approved: true</code> in strictly audited, limit-bounded automation.</li>
+                </ul>
+            </section>
+
+            <section id="errors" class="doc-section">
+                <p class="eyebrow">10 — Resilient Integration</p>
+                <h2>Errors & Retry Strategy</h2>
+                <p>Greenfield API returns errors in format <code class="inline">{"message":"…"}</code>. The Stateless API returns <code class="inline">{"status":"error","message":"…"}</code>.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>HTTP</th>
+                                <th>Meaning</th>
+                                <th>Recommended Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>400</code></td>
+                                <td>Invalid JSON, amount, currency, or parameter.</td>
+                                <td>Do not retry without fixing the input.</td>
+                            </tr>
+                            <tr>
+                                <td><code>401</code></td>
+                                <td>Missing or invalid API key.</td>
+                                <td>Check Authorization header and required key scope.</td>
+                            </tr>
+                            <tr>
+                                <td><code>404</code></td>
+                                <td>Endpoint, store, invoice, or payout not found.</td>
+                                <td>Verify resource ID and store scoping.</td>
+                            </tr>
+                            <tr>
+                                <td><code>405</code></td>
+                                <td>HTTP method not allowed.</td>
+                                <td>Use documented HTTP method.</td>
+                            </tr>
+                            <tr>
+                                <td><code>409</code></td>
+                                <td>Konflikt stavu, limitu nebo idempotence.</td>
+                                <td>Fetch current resource state; avoid duplicate operations.</td>
+                            </tr>
+                            <tr>
+                                <td><code>413</code></td>
+                                <td>Payload or metadata exceeds size limits.</td>
+                                <td>Reduce payload size; default maximum body size is 65,536 bytes.</td>
+                            </tr>
+                            <tr>
+                                <td><code>500</code></td>
+                                <td>Internal server error.</td>
+                                <td>Log request ID and retry with exponential backoff.</td>
+                            </tr>
+                            <tr>
+                                <td><code>503</code></td>
+                                <td>Server busy, rate provider or Electrum daemon unavailable.</td>
+                                <td>Respect <code>Retry-After</code> and apply exponential backoff.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="code-block">
+                    <div class="code-head"><span>JSON error</span><button class="copy-button"
+                            type="button">Copy</button></div>
+                    <pre><code>{"message":"Invalid API key or store."}</code></pre>
+                </div>
+            </section>
+
+            <section id="security" class="doc-section">
+                <p class="eyebrow">11 — Production Checklist</p>
+                <h2>Integration Security</h2>
+                <ul class="check-list">
+                    <li>Dispatch all API requests from your backend server over HTTPS.</li>
+                    <li>Store API keys in environment variables or a secret manager, never in source code.</li>
+                    <li>Do not share Store, Payout, or Stateless keys and rotate them regularly.</li>
+                    <li>Verify webhook signatures using constant-time comparison (<code class="inline">hash_equals</code>) over raw HTTP body bytes.</li>
+                    <li>Implement order settlement logic idempotently.</li>
+                    <li>Run a full end-to-end smoke test including webhook receipt and test transaction before production.</li>
+                    <li>Never expose Electrum RPC ports, wallet files, seeds, or private keys to the public internet.</li>
+                    <li>Only enable the Payout API with low thresholds and a dedicated key.</li>
+                </ul>
+                <h3>Standalone API Tester</h3>
+                <p>A standalone script is provided at <code class="inline">examples/btcpay_lite_api_tester.php</code>.
+                    It can be deployed independently outside your production app to verify all supported endpoints and webhook signatures.</p>
+                <p><a href="<%= githubUrl %>/blob/main/examples/btcpay_lite_api_tester.php" target="_blank"
+                        rel="noopener noreferrer"><strong>Open API Tester on GitHub ↗</strong></a></p>
+            </section>
+        </main>
+
+        <aside class="rail" aria-label="Quick Reference">
+            <div class="rail-card">
+                <p class="rail-label">API Base URL</p>
+                <div class="base-url"><%= apiBaseUrl %></div>
+                <a class="rail-link" href="#quickstart">Create First Invoice →</a>
+            </div>
+            <div class="rail-card">
+                <p class="rail-label">Kontrakt API</p>
+                <ul class="rail-list">
+                    <li>JSON objekty do 64 KiB</li>
+                    <li>Amounts formatted as strings</li>
+                    <li>Unix timestamps in seconds</li>
+                    <li>On-chain BTC-CHAIN</li>
+                    <li>Store-scoped authentication</li>
+                </ul>
+            </div>
+            <div class="rail-card">
+                <p class="rail-label">Source Code</p>
+                <ul class="rail-list">
+                    <li>Public MIT repository</li>
+                    <li>Sample PHP client</li>
+                    <li>API contract tests</li>
+                </ul>
+                <a class="rail-link" href="<%= githubUrl %>" target="_blank" rel="noopener noreferrer">Source
+                    Code ↗</a>
+            </div>
+        </aside>
+    </div>
+
+    <footer class="footer">
+        <div class="wrap footer-inner"><span>BTCPay Server Lite · Public API Documentation v1</span>
+            <div class="footer-links"><a href="<%= baseUrl %>/">Home</a><a
+                    href="<%= githubUrl %>" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+        </div>
+    </footer>
+
+    <script>
+    (() => {
+        const buttons = document.querySelectorAll('.copy-button');
+        buttons.forEach((button) => {
+            button.addEventListener('click', async () => {
+                const code = button.closest('.code-block')?.querySelector('code')?.innerText ||
+                    '';
+                if (!code) return;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    const previous = button.textContent;
+                    button.textContent = 'Copied';
+                    setTimeout(() => {
+                        button.textContent = previous;
+                    }, 1600);
+                } catch (_) {
+                    const area = document.createElement('textarea');
+                    area.value = code;
+                    area.setAttribute('readonly', '');
+                    area.style.position = 'fixed';
+                    area.style.opacity = '0';
+                    document.body.appendChild(area);
+                    area.select();
+                    document.execCommand('copy');
+                    area.remove();
+                    button.textContent = 'Copied';
+                    setTimeout(() => {
+                        button.textContent = 'Copy';
+                    }, 1600);
+                }
+            });
+        });
+    })();
+    </script>
+</body>
+
+</html>

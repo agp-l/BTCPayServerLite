@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bitcoin Payments for E-commerce | BTCPay Server Lite</title>
+    <meta name="description" content="Accept Bitcoin in your online store or digital service. Lightweight open-source payment gateway with Electrum wallet, production-ready hosting, and CMS integrations.">
+    <meta name="keywords" content="Bitcoin payments e-commerce, Bitcoin payment gateway, accept BTC, BTCPay Server Lite, Electrum, WooCommerce Bitcoin, open source payment gateway">
+    <meta name="author" content="BTCPay Server Lite">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#07150f">
+    <link rel="canonical" href="<%= canonicalUrl %>">
+
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:site_name" content="BTCPay Server Lite">
+    <meta property="og:title" content="Bitcoin payments for your store. Simple and direct.">
+    <meta property="og:description" content="A lightweight, efficient, and open payment gateway connecting your website to Bitcoin.">
+    <meta property="og:url" content="<%= canonicalUrl %>">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="BTCPay Server Lite">
+    <meta name="twitter:description" content="Add Bitcoin checkout to your online store easily.">
+
+    <script type="application/ld+json"><%- JSON.stringify(schema) %></script>
+
+    <style>
+        :root {
+            --ink: #2c2c2c;
+            --ink-soft: #202221;
+            --paper: #fff;
+            --paper-deep: #fff;
+            --white: #ffffff;
+            --muted: #080808;
+            --line: rgba(7, 21, 15, .13);
+            --brand: #20c875;
+            --brand-dark: #0f9c45;
+            --mint: #ebebc3;
+            --lime: #fdf16b;
+            --radius: 24px;
+            --shadow: 0 24px 70px rgba(7, 21, 15, .11);
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--paper);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 16px;
+            line-height: 1.65;
+            text-rendering: optimizeLegibility;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 82% 4%, rgba(54, 54, 54, 0.18), transparent 30rem),
+                radial-gradient(circle at 5% 30%, rgba(49, 49, 49, 0.18), transparent 34rem);
+        }
+        a { color: inherit; }
+        img, svg { display: block; }
+        button, a { -webkit-tap-highlight-color: transparent; }
+        :focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; }
+        .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; padding: .7rem 1rem; background: var(--white); border-radius: 10px; }
+        .skip-link:focus { top: 1rem; }
+        .wrap { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: .55rem;
+            margin: 0 0 1rem;
+            color: var(--ink-soft);
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+        }
+        .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--brand); }
+        h1, h2, h3, p { margin-top: 0; }
+        h1, h2, h3 { line-height: 1.08; letter-spacing: -.035em; }
+        h1 { margin-bottom: 1.5rem; font-size: clamp(3rem, 7.8vw, 6.8rem); font-weight: 850; }
+        h2 { margin-bottom: 1rem; font-size: clamp(2.15rem, 4.5vw, 4.2rem); font-weight: 830; }
+        h3 { font-size: 1.35rem; font-weight: 780; }
+        .muted { color: var(--muted); }
+        .brand-accent { color: var(--brand); }
+
+        .nav-shell { padding-top: 18px; }
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 70px;
+            padding: 10px 12px 10px 18px;
+            border: 1px solid rgba(255, 255, 255, .7);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, .78);
+            box-shadow: 0 12px 40px rgba(7, 21, 15, .07);
+            backdrop-filter: blur(16px);
+        }
+        .brand { display: inline-flex; align-items: center; gap: .7rem; text-decoration: none; font-weight: 850; letter-spacing: -.03em; }
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 38px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            color: var(--white);
+            background: var(--brand);
+            font-size: 0.9rem;
+            font-weight: 900;
+        }
+        .brand small { display: block; margin-top: -4px; color: var(--muted); font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+        .nav-links { display: flex; align-items: center; gap: 1.6rem; }
+        .nav-links > a:not(.button) { color: var(--ink-soft); font-size: .92rem; font-weight: 700; text-decoration: none; }
+        .nav-links > a:not(.button):hover { color: var(--brand-dark); }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .65rem;
+            min-height: 52px;
+            padding: .78rem 1.25rem;
+            border: 1px solid transparent;
+            border-radius: 13px;
+            font-weight: 800;
+            text-decoration: none;
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .button:hover { transform: translateY(-2px); }
+        .button-primary { color: var(--white); background: var(--ink); box-shadow: 0 14px 30px rgba(7, 21, 15, .18); }
+        .button-primary:hover { background: #102b1e; box-shadow: 0 18px 36px rgba(7, 21, 15, .24); }
+        .button-brand { color: #041b10; background: var(--brand); box-shadow: 0 14px 30px rgba(32, 200, 117, .24); }
+        .button-brand:hover { background: #ffffff; }
+        .button-ghost { border-color: var(--line); background: rgb(255, 255, 255); }
+
+        .hero { padding: clamp(4.5rem, 2vw, 8rem) 0 5rem; overflow: hidden; }
+        .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(3rem, 7vw, 7rem); align-items: center; }
+        .hero-copy { position: relative; z-index: 1; }
+        .hero-lead { max-width: 700px; margin-bottom: 2rem; color: var(--muted); font-size: clamp(1.08rem, 1.8vw, 1.3rem); }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: .85rem; margin-bottom: 2rem; }
+        .trust-row { display: flex; flex-wrap: wrap; gap: .7rem 1.2rem; color: var(--ink-soft); font-size: .86rem; font-weight: 700; }
+        .trust-row span { display: inline-flex; align-items: center; gap: .4rem; }
+        .check { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--mint); font-size: .7rem; }
+
+        .payment-stage { position: relative; min-height: 590px; }
+        .payment-stage::before {
+            content: "";
+            position: absolute;
+            width: 370px;
+            height: 370px;
+            right: -70px;
+            top: 35px;
+            border-radius: 50%;
+            background: var(--brand);
+            filter: saturate(.95);
+        }
+        .checkout {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: min(390px, 88%);
+            padding: 27px;
+            border: 1px solid rgba(255, 255, 255, .3);
+            border-radius: 30px;
+            color: var(--white);
+            background: var(--ink);
+            box-shadow: 0 34px 90px rgba(7, 21, 15, .28);
+            transform: rotate(-2deg);
+        }
+        .checkout-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.2rem; font-size: .78rem; color: #b9cbc1; }
+        .checkout-top strong { color: var(--white); font-size: .93rem; }
+        .status-pill { padding: .38rem .7rem; border-radius: 999px; color: #12271b; background: var(--mint); font-weight: 800; }
+        .amount { margin-bottom: .15rem; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 850; letter-spacing: -.06em; }
+        .fiat { color: #a9bbb1; }
+        .qr {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+            width: 154px;
+            padding: 13px;
+            margin: 2rem auto;
+            border-radius: 18px;
+            background: var(--white);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, .2);
+        }
+        .qr i { aspect-ratio: 1; border-radius: 1px; background: transparent; }
+        .qr i:nth-child(3n), .qr i:nth-child(5n+1), .qr i:nth-child(7n+2), .qr i:nth-child(11n) { background: var(--ink); }
+        .address { padding: .85rem 1rem; overflow: hidden; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; color: #b9cbc1; background: rgba(255, 255, 255, .06); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+        .confirmation {
+            position: absolute;
+            z-index: 2;
+            right: -5px;
+            bottom: 38px;
+            width: min(305px, 75%);
+            padding: 22px;
+            border-radius: 22px;
+            background: var(--white);
+            box-shadow: var(--shadow);
+            transform: rotate(3deg);
+        }
+        .confirmation-head { display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem; }
+        .confirmation-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 15px; background: var(--lime); font-weight: 900; }
+        .confirmation p { margin: 0; color: var(--muted); font-size: .86rem; }
+        .confirmation strong { display: block; }
+        .progress { height: 8px; margin-top: 1rem; overflow: hidden; border-radius: 99px; background: var(--paper-deep); }
+        .progress span { display: block; width: 78%; height: 100%; border-radius: inherit; background: var(--brand); }
+        .float-badge { position: absolute; z-index: 3; top: 67px; right: -14px; padding: .7rem 1rem; border-radius: 999px; background: var(--lime); box-shadow: 0 12px 30px rgba(7, 21, 15, .15); font-size: .82rem; font-weight: 850; transform: rotate(7deg); }
+
+        .proof { padding: 1rem 0 6rem; }
+        .proof-line { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 1.2rem; padding: 1.5rem 0; border-block: 1px solid var(--line); }
+        .proof-item { text-align: center; }
+        .proof-item strong { display: block; font-size: 1.1rem; }
+        .proof-item span { color: var(--muted); font-size: .84rem; }
+        .proof-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); }
+
+        section { scroll-margin-top: 7rem; }
+        .section { padding: clamp(5rem, 9vw, 8rem) 0; }
+        .section-head { display: grid; grid-template-columns: .75fr 1.25fr; gap: 3rem; align-items: end; margin-bottom: 3.5rem; }
+        .section-head p { max-width: 620px; margin-bottom: .35rem; color: var(--muted); font-size: 1.08rem; }
+
+        .steps { background: var(--ink); color: var(--white); }
+        .steps .eyebrow { color: var(--mint); }
+        .steps .section-head p { color: #a9bbb1; }
+        .step-list { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255, 255, 255, .14); }
+        .step { position: relative; padding: 2.3rem 2.3rem 0 0; }
+        .step + .step { padding-left: 2.3rem; border-left: 1px solid rgba(255, 255, 255, .14); }
+        .step-number { display: block; margin-bottom: 3rem; color: var(--brand); font-size: .9rem; font-weight: 850; letter-spacing: .12em; }
+        .step p { color: #a9bbb1; }
+
+        .benefit-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(3rem, 8vw, 8rem); align-items: start; }
+        .sticky-copy { position: sticky; top: 2rem; }
+        .benefit-list { border-top: 1px solid var(--line); }
+        .benefit { display: grid; grid-template-columns: 50px 1fr; gap: 1.2rem; padding: 2rem 0; border-bottom: 1px solid var(--line); }
+        .benefit-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: var(--ink); background: var(--mint); font-size: 1.2rem; font-weight: 900; }
+        .benefit p { margin-bottom: 0; color: var(--muted); }
+
+        .tech-band { padding: 0 0 clamp(5rem, 9vw, 8rem); }
+        .tech-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            padding: clamp(2rem, 5vw, 4.5rem);
+            border-radius: 34px;
+            color: var(--white);
+            background: linear-gradient(135deg, #2e2e2e 0%, #1e1e1e 70%);
+            box-shadow: var(--shadow);
+        }
+        .tech-panel p { color: #b8c9bf; }
+        .code-flow { align-self: center; }
+        .flow-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .8rem; }
+        .flow-box { flex: 1; padding: .9rem 1rem; border: 1px solid rgba(255, 255, 255, .14); border-radius: 12px; background: rgba(255, 255, 255, .06); font-size: .88rem; font-weight: 750; text-align: center; }
+        .flow-arrow { color: var(--brand); font-weight: 900; }
+        .tech-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.5rem; }
+        .tech-tags span { padding: .45rem .7rem; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; color: var(--mint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; }
+
+        .pricing { background: var(--white); }
+        .pricing-intro { max-width: 760px; margin-bottom: 3.5rem; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .price-card { position: relative; display: flex; flex-direction: column; min-height: 520px; padding: 2rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+        .price-card.featured { color: var(--white); background: var(--ink); transform: translateY(-12px); box-shadow: var(--shadow); }
+        .price-card .plan { color: var(--muted); font-size: .79rem; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+        .price-card.featured .plan, .price-card.featured .price-note { color: #ebde9a; }
+        .popular { position: absolute; top: 1.2rem; right: 1.2rem; padding: .35rem .65rem; border-radius: 999px; color: var(--ink); background: var(--lime); font-size: .68rem; font-weight: 900; text-transform: uppercase; }
+        .price { margin: 1.2rem 0 .2rem; font-size: clamp(2.3rem, 4vw, 3.7rem); font-weight: 850; letter-spacing: -.06em; }
+        .price sup { font-size: .9rem; letter-spacing: 0; }
+        .price-note { min-height: 3.3rem; color: var(--muted); font-size: .86rem; }
+        .price-card ul { display: grid; gap: .8rem; margin: 1.6rem 0 2rem; padding: 1.5rem 0 0; border-top: 1px solid currentColor; border-color: var(--line); list-style: none; }
+        .price-card.featured ul { border-color: rgba(255, 255, 255, .15); }
+        .price-card li { position: relative; padding-left: 1.6rem; font-size: .92rem; }
+        .price-card li::before { content: "✓"; position: absolute; left: 0; color: var(--brand); font-weight: 900; }
+        .price-card .button { margin-top: auto; }
+        .pricing-foot { margin: 1.8rem 0 0; color: var(--muted); font-size: .84rem; text-align: center; }
+
+        .open-source { overflow: hidden; }
+        .open-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 4rem; align-items: center; }
+        .terminal { padding: 1.4rem; border-radius: 22px; color: #e8fff2; background: #09110d; box-shadow: var(--shadow); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+        .terminal-top { display: flex; align-items: center; gap: .4rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+        .terminal-top i { width: 9px; height: 9px; border-radius: 50%; background: #ff655f; }
+        .terminal-top i:nth-child(2) { background: #ffbd2e; }
+        .terminal-top i:nth-child(3) { background: #27c840; }
+        .terminal pre { margin: 1.2rem 0 0; overflow: auto; color: #a9bbb1; line-height: 1.8; white-space: pre-wrap; }
+        .terminal .cmd { color: var(--mint); }
+        .open-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; }
+
+        .faq { background: var(--paper-deep); }
+        .faq-grid { display: grid; grid-template-columns: .72fr 1.28fr; gap: clamp(3rem, 8vw, 8rem); }
+        details { padding: 1.3rem 0; border-bottom: 1px solid var(--line); }
+        details:first-child { border-top: 1px solid var(--line); }
+        summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; font-size: 1.05rem; font-weight: 800; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        summary::after { content: "+"; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 50%; flex: 0 0 auto; }
+        details[open] summary::after { content: "−"; background: var(--brand); }
+        details p { max-width: 700px; margin: 1rem 2.8rem 0 0; color: var(--muted); }
+
+        .cta { padding: clamp(5rem, 9vw, 8rem) 0 2.2rem; color: var(--white); background: var(--ink); }
+        .cta-box { position: relative; overflow: hidden; padding: clamp(2.3rem, 6vw, 5.5rem); border-radius: 34px; background: var(--brand); color: #041b10; }
+        .cta-box::after { content: "₿"; position: absolute; right: -3rem; bottom: -7rem; color: rgba(255, 255, 255, 0.72); font-size: 22rem; font-weight: 900; line-height: 1; transform: rotate(12deg); }
+        .cta-box h2, .cta-box p, .cta-box .hero-actions { position: relative; z-index: 1; }
+        .cta-box p { max-width: 650px; font-size: 1.12rem; }
+        .footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding-top: 4rem; color: #96aa9f; font-size: .85rem; }
+        .footer-links { display: flex; flex-wrap: wrap; gap: 1rem; }
+        .footer a { text-decoration: none; }
+        .footer a:hover { color: var(--white); }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
+        @media (max-width: 920px) {
+            .nav-links > a:not(.button) { display: none; }
+            .hero-grid, .section-head, .benefit-layout, .tech-panel, .open-grid, .faq-grid { grid-template-columns: 1fr; }
+            .hero { padding-top: 4rem; }
+            .payment-stage { width: min(620px, 100%); margin-inline: auto; }
+            .section-head { gap: .5rem; }
+            .step-list, .pricing-grid { grid-template-columns: 1fr; }
+            .step { padding: 2rem 0; }
+            .step + .step { padding-left: 0; border-left: 0; border-top: 1px solid rgba(255, 255, 255, .14); }
+            .step-number { margin-bottom: 1rem; }
+            .sticky-copy { position: static; }
+            .price-card { min-height: 0; }
+            .price-card.featured { transform: none; }
+        }
+        @media (max-width: 620px) {
+            .wrap { width: min(100% - 26px, 1180px); }
+            .nav { padding-left: 12px; }
+            .brand span:last-child { font-size: .92rem; }
+            .nav .button { min-height: 44px; padding: .65rem .8rem; font-size: .8rem; }
+            h1 { font-size: clamp(2.75rem, 15vw, 4.4rem); }
+            .hero-actions { display: grid; }
+            .hero-actions .button { width: 100%; }
+            .payment-stage { min-height: 510px; }
+            .payment-stage::before { width: 270px; height: 270px; right: -50px; }
+            .checkout { width: 88%; padding: 20px; }
+            .qr { width: 125px; margin: 1.4rem auto; }
+            .confirmation { right: 0; bottom: 15px; padding: 17px; }
+            .float-badge { right: 0; top: 40px; }
+            .proof-line { grid-template-columns: 1fr; }
+            .proof-dot { margin-inline: auto; }
+            .benefit { grid-template-columns: 42px 1fr; }
+            .tech-panel, .cta-box { border-radius: 24px; }
+            .flow-row { align-items: stretch; flex-direction: column; }
+            .flow-arrow { transform: rotate(90deg); text-align: center; }
+            .footer { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to main content</a>
+
+<div class="nav-shell wrap">
+    <nav class="nav" aria-label="Main navigation">
+        <a class="brand" href="<%= canonicalUrl %>" aria-label="BTCPay Server Lite – Home">
+            <span class="brand-mark" aria-hidden="true">BTC</span>
+            <span>Pay Server Lite<small>Bitcoin payments</small></span>
+        </a>
+        <div class="nav-links">
+            <a href="#how-it-works">How It Works</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="<%= baseUrl %>/dokumentace">Documentation</a>
+            <a class="button button-primary" href="<%= registerUrl %>">Get Started</a>
+        </div>
+    </nav>
+</div>
+
+<main id="content">
+    <header class="hero">
+        <div class="wrap hero-grid">
+            <div class="hero-copy">
+                <p class="eyebrow">Bitcoin for Modern Commerce</p>
+                <h1>Payments without cards.<br><span class="brand-accent">Directly in Bitcoin.</span></h1>
+                <p class="hero-lead">Give your customers a direct, self-sovereign way to pay. BTCPay Server Lite connects your online store, booking system, or digital service with Bitcoin — simple, transparent, and without bloated infrastructure.</p>
+                <div class="hero-actions">
+                    <a class="button button-brand" href="<%= registerUrl %>">Accept Bitcoin <span aria-hidden="true">→</span></a>
+                    <a class="button button-ghost" href="#how-it-works">How it works</a>
+                </div>
+                <div class="trust-row" aria-label="Core advantages">
+                    <span><i class="check" aria-hidden="true">✓</i> Open source</span>
+                    <span><i class="check" aria-hidden="true">✓</i> 0% processing fee</span>
+                    <span><i class="check" aria-hidden="true">✓</i> Non-custodial wallet</span>
+                </div>
+            </div>
+
+            <div class="payment-stage" aria-label="Bitcoin payment walkthrough preview">
+                <div class="float-badge">Instant checkout</div>
+                <div class="checkout">
+                    <div class="checkout-top"><strong>Order #2026-084</strong><span class="status-pill">Awaiting payment</span></div>
+                    <div class="amount">0.00042 BTC</div>
+                    <div class="fiat">≈ $42.00 USD</div>
+                    <div class="qr" aria-hidden="true">
+                        <% for (let i = 0; i < 49; i++) { %><i></i><% } %>
+                    </div>
+                    <div class="address">bc1q8x7k2m9v4…p3n6r0a</div>
+                </div>
+                <div class="confirmation">
+                    <div class="confirmation-head">
+                        <span class="confirmation-icon" aria-hidden="true">✓</span>
+                        <div><strong>Payment Received</strong><p>Order status updates automatically.</p></div>
+                    </div>
+                    <div class="progress" aria-hidden="true"><span></span></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="proof">
+        <div class="wrap proof-line">
+            <div class="proof-item"><strong>Open Source</strong><span>MIT license & public repository</span></div>
+            <i class="proof-dot" aria-hidden="true"></i>
+            <div class="proof-item"><strong>Electrum</strong><span>Battle-tested wallet engine</span></div>
+            <i class="proof-dot" aria-hidden="true"></i>
+            <div class="proof-item"><strong>REST API</strong><span>For e-commerce and web apps</span></div>
+        </div>
+    </div>
+
+    <section id="how-it-works" class="section steps">
+        <div class="wrap">
+            <div class="section-head">
+                <div><p class="eyebrow">Simple workflow</p><h2>Three steps.<br>Settled payment.</h2></div>
+                <p>The customer shops as usual. Instead of a credit card, they select Bitcoin, scan the QR code, and your store receives instant confirmation.</p>
+            </div>
+            <div class="step-list">
+                <article class="step">
+                    <span class="step-number">01 — CHECKOUT</span>
+                    <h3>Customer selects Bitcoin</h3>
+                    <p>At checkout or on the payment page, they choose to pay with BTC.</p>
+                </article>
+                <article class="step">
+                    <span class="step-number">02 — QR CODE</span>
+                    <h3>Opens wallet app</h3>
+                    <p>Scans the QR code. Amount and unique address are filled in automatically.</p>
+                </article>
+                <article class="step">
+                    <span class="step-number">03 — CONFIRMED</span>
+                    <h3>Store receives webhook</h3>
+                    <p>The system monitors the blockchain and notifies your website of the order state.</p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <div class="wrap benefit-layout">
+            <div class="sticky-copy">
+                <p class="eyebrow">Focused & Powerful</p>
+                <h2>Only what you truly need for Bitcoin payments.</h2>
+                <p class="muted">BTCPay Server Lite was built without massive overhead. It is a lightweight, reliable path to accept on-chain BTC and sync status directly with your platform.</p>
+            </div>
+            <div class="benefit-list">
+                <article class="benefit">
+                    <span class="benefit-icon" aria-hidden="true">₿</span>
+                    <div><h3>Bitcoin directly into your wallet</h3><p>Each invoice generates a unique address derived from your BIP84 XPUB or wallet daemon. Full transparency for new, pending, and settled transactions.</p></div>
+                </article>
+                <article class="benefit">
+                    <span class="benefit-icon" aria-hidden="true">↗</span>
+                    <div><h3>Connect with any store or API</h3><p>Greenfield-compatible REST API and signed webhooks connect payments with orders, subscriptions, digital downloads, and bookings.</p></div>
+                </article>
+                <article class="benefit">
+                    <span class="benefit-icon" aria-hidden="true">◎</span>
+                    <div><h3>Lightweight, low-footprint daemon</h3><p>High performance with low resource usage. Ideal for standard VPS, Raspberry Pi, mini PCs, or cloud containers without heavy system requirements.</p></div>
+                </article>
+                <article class="benefit">
+                    <span class="benefit-icon" aria-hidden="true">⌁</span>
+                    <div><h3>100% Open source, no lock-in</h3><p>Released under the permissive MIT license. Audit the code, customize it, self-host with total sovereignty, or use hosted services.</p></div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="tech-band" aria-labelledby="tech-title">
+        <div class="wrap tech-panel">
+            <div>
+                <p class="eyebrow">For Your Engineering Team</p>
+                <h2 id="tech-title">Simple on the outside.<br>Clean on the inside.</h2>
+                <p>For customers, it is an intuitive payment modal with a QR code. For developers, it provides a Greenfield-compatible API, signed webhooks, and stateless BIP84 XPUB mode.</p>
+                <div class="tech-tags"><span>Node.js / Express</span><span>REST API</span><span>Webhooks</span><span>Electrum RPC</span><span>BIP84 Native SegWit</span></div>
+            </div>
+            <div class="code-flow" aria-label="System architecture diagram">
+                <div class="flow-row"><div class="flow-box">Your Store / CMS</div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-box">BTCPay Lite API</div></div>
+                <div class="flow-row"><div class="flow-box">Order Status</div><span class="flow-arrow" aria-hidden="true">←</span><div class="flow-box">Webhook</div></div>
+                <div class="flow-row"><div class="flow-box">Bitcoin Network</div><span class="flow-arrow" aria-hidden="true">↔</span><div class="flow-box">Electrum / Mempool</div></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="section pricing">
+        <div class="wrap">
+            <div class="pricing-intro">
+                <p class="eyebrow">Choose Your Deployment</p>
+                <h2>Hosted service, self-hosted server, or custom integration.</h2>
+                <p class="muted">The source code is free under the MIT license. Support and managed options are available for hassle-free operation.</p>
+            </div>
+            <div class="pricing-grid">
+                <article class="price-card featured">
+                    <span class="popular">Easiest Start</span>
+                    <span class="plan">Managed Cloud Service</span>
+                    <div class="price"><%= pricing.hosted %><sup> / month</sup></div>
+                    <p class="price-note">For merchants who want Bitcoin payments without managing server infrastructure.</p>
+                    <ul>
+                        <li>Full cloud deployment & maintenance</li>
+                        <li>Store configuration & wallet setup</li>
+                        <li>Automatic security updates</li>
+                        <li>Priority technical support</li>
+                    </ul>
+                    <a class="button button-brand" href="<%= registerUrl %>">Start Accepting BTC</a>
+                </article>
+                <article class="price-card">
+                    <span class="plan">Self-Hosted Setup</span>
+                    <div class="price"><sup>from </sup><%= pricing.hardware %></div>
+                    <p class="price-note">One-time installation and configuration on your own server or mini PC.</p>
+                    <ul>
+                        <li>BTCPay Server Lite installation</li>
+                        <li>Electrum daemon setup</li>
+                        <li>Security hardening & verification</li>
+                        <li>Full handover & documentation</li>
+                    </ul>
+                    <a class="button button-primary" href="<%= contactUrl %>?title=Inquiry%3A%20BTCPay%20Lite%20Self-Hosted%20Setup" target="_blank" rel="noopener noreferrer">Request Installation</a>
+                </article>
+                <article class="price-card">
+                    <span class="plan">Custom CMS / API Integration</span>
+                    <div class="price"><sup>from </sup><%= pricing.cms %></div>
+                    <p class="price-note">Turnkey implementation into your custom e-commerce system or web app.</p>
+                    <ul>
+                        <li>Checkout flow analysis</li>
+                        <li>API & webhook integration</li>
+                        <li>End-to-end payment testing</li>
+                        <li>Tailored frontend adjustments</li>
+                    </ul>
+                    <a class="button button-primary" href="<%= contactUrl %>?title=Inquiry%3A%20BTCPay%20Lite%20Custom%20Integration" target="_blank" rel="noopener noreferrer">Request Integration</a>
+                </article>
+            </div>
+            <p class="pricing-foot">Prices shown are indicative. Final rates depend on project scope, website architecture, and custom requirements.</p>
+        </div>
+    </section>
+
+    <section class="section open-source">
+        <div class="wrap open-grid">
+            <div>
+                <p class="eyebrow">Open Source Under MIT License</p>
+                <h2>Don't trust, verify.<br>Inspect the code.</h2>
+                <p class="muted">BTCPay Server Lite is an open-source project. Developers can audit every line, run tests, and contribute. Choose between fully self-hosted freedom or managed convenience.</p>
+                <div class="open-actions">
+                    <a class="button button-primary" href="<%= githubUrl %>" target="_blank" rel="noopener noreferrer">View on GitHub <span aria-hidden="true">↗</span></a>
+                    <a class="button button-ghost" href="<%= loginUrl %>">Sign In</a>
+                </div>
+            </div>
+            <div class="terminal" aria-label="Technical demonstration">
+                <div class="terminal-top" aria-hidden="true"><i></i><i></i><i></i></div>
+                <pre><span class="cmd">$</span> npm install
+<span class="cmd">✓</span> Payment application ready
+
+<span class="cmd">$</span> electrum daemon status
+<span class="cmd">✓</span> connected
+
+Store       → invoice
+Electrum    → BTC address
+Blockchain  → payment status
+Webhook     → order settled</pre>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="section faq">
+        <div class="wrap faq-grid">
+            <div><p class="eyebrow">Frequently Asked Questions</p><h2>Clear answers, zero fine print.</h2></div>
+            <div>
+                <details open>
+                    <summary>Do I need deep Bitcoin or programming knowledge?</summary>
+                    <p>No. You can use our hosted service or request assisted installation. Daily store management is as simple as managing traditional orders.</p>
+                </details>
+                <details>
+                    <summary>Where do customer payments go?</summary>
+                    <p>Payments go directly to your configured Electrum wallet or addresses generated by your extended public key (XPUB). The system is strictly non-custodial.</p>
+                </details>
+                <details>
+                    <summary>Is the software truly free?</summary>
+                    <p>Yes. The core codebase is distributed under the MIT license. Fees apply only for managed hosting, custom installation, and dedicated engineering support.</p>
+                </details>
+                <details>
+                    <summary>Are there percentage fees taken from sales?</summary>
+                    <p>No. BTCPay Server Lite takes 0% commission from your sales. Standard on-chain miner network fees apply only when you spend from your wallet.</p>
+                </details>
+                <details>
+                    <summary>Does it integrate with WooCommerce or other platforms?</summary>
+                    <p>Yes. The system provides a Greenfield-compatible API, standard webhooks, and sample clients. It connects smoothly to modern e-commerce systems.</p>
+                </details>
+                <details>
+                    <summary>Does it support the Lightning Network?</summary>
+                    <p>The core engine is optimized for native SegWit Bitcoin on-chain transactions (BTC-CHAIN) via Electrum and BIP84 XPUBs.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta" id="contact">
+        <div class="wrap">
+            <div class="cta-box">
+                <h2>Your first Bitcoin customer may be closer than you think.</h2>
+                <p>Tell us about your store or online service. Together we will find the easiest path to start accepting Bitcoin payments.</p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="<%= contactUrl %>?title=Inquiry%3A%20Accepting%20Bitcoin" target="_blank" rel="noopener noreferrer">Get in Touch</a>
+                    <a class="button button-ghost" href="<%= registerUrl %>">Create Account</a>
+                </div>
+            </div>
+            <footer class="footer">
+                <span>© <%= new Date().getFullYear() %> BTCPay Server Lite. Open-source software under MIT license.</span>
+                <div class="footer-links">
+                    <a href="<%= baseUrl %>/dokumentace">API Documentation</a>
+                    <a href="<%= githubUrl %>" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <a href="<%= contactUrl %>" target="_blank" rel="noopener noreferrer">Contact</a>
+                    <a href="<%= loginUrl %>">Sign In</a>
+                </div>
+            </footer>
+        </div>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<%- include('layout/header', { pageTitle: 'Wallet - BTCPay Server Lite', activeMenu: 'wallet', currentContextLabel: 'Wallet' }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Electrum Wallet</p>
+    <h1>Wallet</h1>
+    <p>Secure payment sending, Bitcoin receiving, and transaction history for the active Electrum daemon wallet.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin/wallet" class="ghost-btn" aria-label="Refresh data">
+      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Refresh Data
+    </a>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <span><%= pageError %></span>
+  </div>
+<% } %>
+
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status">
+    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+    <span><%= toastMsg %></span>
+  </div>
+<% } %>
+
+<section class="wallet-hero">
+  <div class="wallet-hero-copy">
+    <div class="wallet-kicker"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i> Confirmed Balance</div>
+    <div class="wallet-balance" id="balanceValue"><%= walletBalance.confirmed %> <span>BTC</span></div>
+    <div class="wallet-fiat" id="fiatValue">
+      ≈ $<%= (parseFloat(walletBalance.confirmed) * 65000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> USD · €<%= (parseFloat(walletBalance.confirmed) * 60000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> EUR
+    </div>
+  </div>
+  <div class="wallet-hero-meta">
+    <span class="connection-pill"><i class="fa-solid fa-circle" style="color: #20c875; font-size: 0.6rem;"></i> Electrum daemon connected</span>
+    <span class="wallet-name" title="default_electrum">default_electrum</span>
+  </div>
+</section>
+
+<div class="management-grid" style="margin-top: 2rem;">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-arrow-down-to-bracket"></i> Generate New Receiving Address</span>
+    </div>
+    <p class="card-subtitle">Derives a fresh on-chain Bitcoin SegWit (Bech32) receiving address from the Electrum wallet.</p>
+
+    <form method="post" action="/admin/wallet" class="form-stack">
+      <input type="hidden" name="action" value="generate_address">
+      <div class="form-actions">
+        <button type="submit" class="primary">
+          <i class="fa-solid fa-qrcode"></i> Generate New Address
+        </button>
+      </div>
+    </form>
+
+    <% if (generatedAddress) { %>
+      <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-alt, #f7f9f8); border-radius: 12px; border: 1px solid var(--line);">
+        <div style="font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem;">New Address:</div>
+        <code style="font-size: 1rem; word-break: break-all;"><%= generatedAddress %></code>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-paper-plane"></i> Send Bitcoin Payment</span>
+    </div>
+    <p class="card-subtitle">Direct transaction broadcast from Electrum wallet to the Bitcoin network.</p>
+
+    <form method="post" action="/admin/wallet" class="form-stack">
+      <input type="hidden" name="action" value="send_payment">
+      <div class="field">
+        <label for="sendAddress">Destination Bitcoin Address</label>
+        <div class="input-wrap">
+          <input id="sendAddress" type="text" name="address" placeholder="bc1q..." required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="sendAmount">Amount in BTC</label>
+        <div class="input-wrap">
+          <input id="sendAmount" type="text" name="amount" placeholder="0.00500000" pattern="[0-9]*\.?[0-9]+" required>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary">
+          <i class="fa-solid fa-paper-plane"></i> Broadcast Transaction
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<section class="card" style="margin-top: 2rem;">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-list-check"></i> Recent Transactions</span>
+    <span class="badge s-unknown"><%= transactions.length %></span>
+  </div>
+
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Transaction ID (TXID)</th>
+          <th>Amount</th>
+          <th>Block Height</th>
+          <th>Confirmations</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% transactions.forEach(tx => { %>
+          <tr>
+            <td class="muted"><%= new Date(tx.time * 1000).toLocaleString('en-US') %></td>
+            <td><code title="<%= tx.txid %>"><%= tx.txid.substring(0, 16) %>...<%= tx.txid.substring(tx.txid.length - 8) %></code></td>
+            <td><strong style="color: <%= tx.amount.startsWith('+') ? '#20c875' : '#ff746c' %>;"><%= tx.amount %> BTC</strong></td>
+            <td><%= tx.height %></td>
+            <td><span class="badge badge-Settled"><%= tx.confirmations %> conf.</span></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('layout/footer') %>

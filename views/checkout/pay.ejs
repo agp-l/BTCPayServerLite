@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title><%= checkout.title %> · Bitcoin Payment</title>
+    <link rel="stylesheet" href="/assets/checkout.css">
+    <script src="/assets/checkout.js" defer></script>
+</head>
+<body>
+<main id="checkout-app"
+      class="checkout-shell"
+      data-status-url="/pay?id=<%= checkout.id %>&action=check"
+      data-initial-status="<%= checkout.status %>"
+      data-seconds-remaining="<%= checkout.seconds_remaining %>"
+      data-redirect-url="<%= checkout.redirect_url || '' %>"
+      data-redirect-automatically="<%= checkout.redirect_automatically ? 'true' : 'false' %>">
+    <section class="checkout-card" aria-labelledby="checkout-title">
+        <header class="checkout-header">
+            <div class="checkout-brand">
+                <span class="brand-mark" aria-hidden="true">₿</span>
+                <span>
+                    <strong>BTCPay Server Lite</strong>
+                    <small>Secure Bitcoin Checkout</small>
+                </span>
+            </div>
+            <div class="secure-pill">
+                <span class="secure-dot" aria-hidden="true"></span>
+                Local QR · Zero trackers
+            </div>
+        </header>
+
+        <div class="checkout-summary">
+            <p class="eyebrow">Payment Request</p>
+            <h1 id="checkout-title"><%= checkout.title %></h1>
+            <p class="invoice-id">ID <%= checkout.id %></p>
+
+            <div id="status-badge"
+                 class="status-badge status-<%= statusTone %>"
+                 role="status"
+                 aria-live="polite">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="status-label"><%= statusLabel %></span>
+            </div>
+        </div>
+
+        <section id="success-panel" class="success-panel<%= isSettled ? ' is-visible' : '' %>" aria-live="polite">
+            <span class="success-symbol" aria-hidden="true">✓</span>
+            <div>
+                <p class="eyebrow">Settled</p>
+                <h2>Payment Confirmed, Thank You</h2>
+                <p>The invoice was successfully confirmed on the Bitcoin network.</p>
+                <% if (checkout.redirect_url) { %>
+                    <a class="secondary-button" href="<%= checkout.redirect_url %>">
+                        Return to Store
+                    </a>
+                    <% if (checkout.redirect_automatically) { %>
+                        <small id="redirect-notice" class="redirect-notice">Redirecting you to the store shortly…</small>
+                    <% } %>
+                <% } else { %>
+                    <a class="secondary-button" href="/admin/invoices">
+                        Back to Administration
+                    </a>
+                <% } %>
+            </div>
+        </section>
+
+        <section id="payment-panel" class="payment-panel<%= isSettled ? ' is-hidden' : '' %>">
+            <div class="payment-grid">
+                <div class="qr-column">
+                    <p class="section-label">Scan with wallet</p>
+                    <% if (qrCodeDataUri) { %>
+                        <a id="qr-payment-link"
+                           class="qr-payment-link<%= isExpired ? ' is-disabled' : '' %>"
+                           href="<%= isExpired ? '#' : checkout.bip21_uri %>"
+                           <%= isExpired ? 'aria-disabled="true" tabindex="-1"' : '' %>
+                           aria-label="Open Bitcoin payment in wallet">
+                            <span class="qr-frame">
+                                <img src="<%= qrCodeDataUri %>"
+                                     width="248"
+                                     height="248"
+                                     alt="Bitcoin Payment QR Code">
+                            </span>
+                        </a>
+                    <% } else { %>
+                        <div class="qr-placeholder">
+                            <span aria-hidden="true">₿</span>
+                            <strong>QR Code Unavailable</strong>
+                            <small>Use the button below to open your wallet.</small>
+                        </div>
+                    <% } %>
+                    <p class="qr-help">QR code contains recipient address and exact amount.</p>
+                </div>
+
+                <div class="payment-details">
+                    <div class="amount-section">
+                        <span>Amount to Pay</span>
+                        <strong id="payment-amount"><%= checkout.amount %></strong>
+                        <small>BTC</small>
+                        <button class="text-button" type="button" data-copy-value="<%= checkout.amount %>">
+                            Copy Amount
+                        </button>
+                    </div>
+
+                    <p id="checkout-timer" class="checkout-timer" aria-live="polite">
+                        <%= isExpired ? 'Payment window expired.' : 'Calculating remaining time…' %>
+                    </p>
+
+                    <div id="partial-notice" class="notice notice-warning<%= isPartial ? ' is-visible' : '' %>" role="alert">
+                        Partial payment detected. Remaining balance:
+                        <strong id="missing-amount"><%= checkout.missing_amount %> BTC</strong>.
+                    </div>
+
+                    <div class="address-section">
+                        <div class="section-heading">
+                            <span>Bitcoin Address</span>
+                            <button class="text-button" type="button" data-copy-target="payment-address">Copy</button>
+                        </div>
+                        <code id="payment-address"><%= checkout.address %></code>
+                    </div>
+
+                    <a id="wallet-link"
+                       class="wallet-button<%= isExpired ? ' is-disabled' : '' %>"
+                       href="<%= isExpired ? '#' : checkout.bip21_uri %>"
+                       <%= isExpired ? 'aria-disabled="true" tabindex="-1"' : '' %>>
+                        <span aria-hidden="true">₿</span>
+                        Open Bitcoin Wallet
+                    </a>
+
+                    <% if (!isSettled && !isExpired) { %>
+                      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.15); text-align: center;">
+                        <form method="post" action="/pay/simulate" style="margin: 0;">
+                          <input type="hidden" name="invoice_id" value="<%= checkout.id %>">
+                          <button type="submit" class="secondary-button" style="width: 100%; font-size: 0.85rem; padding: 0.5rem; background: rgba(32, 200, 117, 0.15); color: #20c875; border: 1px solid #20c875;">
+                            ⚡ Simulate Payment Settlement
+                          </button>
+                        </form>
+                      </div>
+                    <% } %>
+                </div>
+            </div>
+        </section>
+
+        <footer class="checkout-footer">
+            <div class="checkout-steps" aria-label="Payment Steps">
+                <span><strong>1</strong> Scan QR</span>
+                <span><strong>2</strong> Send exact amount</span>
+                <span><strong>3</strong> Await confirmation</span>
+            </div>
+            <p>Send native on-chain BTC only. The status updates automatically.</p>
+            <div class="privacy-note">
+                <span aria-hidden="true">◆</span>
+                Direct peer-to-peer Bitcoin settlement. Payment parameters are verified locally.
+            </div>
+        </footer>
+
+        <noscript>
+            <p class="notice notice-static">
+                Please enable JavaScript to allow automated payment status updates.
+            </p>
+        </noscript>
+    </section>
+</main>
+<div id="copy-toast" class="copy-toast" role="status" aria-live="polite">Copied to clipboard</div>
+</body>
+</html>

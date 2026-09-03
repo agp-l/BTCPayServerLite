@@ -89,7 +89,7 @@ class GreenfieldApiRepository
         }
     }
 
-    /** @return array{id:string,name:string,api_key:string,wallet_path:string}|null */
+    /** @return array{id:string,name:string,api_key:string,wallet_path:string,address_source:string,xpub:?string,derivation_path:string}|null */
     private function findStoreBy(string $column, string $value): ?array
     {
         if (!in_array($column, ['id', 'api_key'], true)) {
@@ -97,7 +97,7 @@ class GreenfieldApiRepository
         }
         try {
             $statement = $this->database->getPdo()->prepare(
-                "SELECT id, name, api_key, wallet_path FROM stores WHERE {$column} = ? LIMIT 1"
+                "SELECT id, name, api_key, wallet_path, address_source, xpub, derivation_path FROM stores WHERE {$column} = ? LIMIT 1"
             );
             $statement->execute([$value]);
             $store = $statement->fetch(PDO::FETCH_ASSOC);
@@ -121,6 +121,9 @@ class GreenfieldApiRepository
             'name' => $store['name'],
             'api_key' => $store['api_key'],
             'wallet_path' => $store['wallet_path'],
+            'address_source' => (string) ($store['address_source'] ?? 'electrum'),
+            'xpub' => isset($store['xpub']) && is_string($store['xpub']) && $store['xpub'] !== '' ? $store['xpub'] : null,
+            'derivation_path' => (string) ($store['derivation_path'] ?? "m/84'/0'/0'/0"),
         ];
     }
 

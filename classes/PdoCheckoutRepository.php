@@ -33,7 +33,7 @@ final class PdoCheckoutRepository implements CheckoutRepository
             $row = $statement->fetch();
         } catch (Throwable $exception) {
             throw new CheckoutException(
-                'Platební údaje nyní nelze načíst.',
+                'Payment details cannot be loaded at this time.',
                 503,
                 'load_invoice_wallet',
                 $exception
@@ -55,7 +55,7 @@ final class PdoCheckoutRepository implements CheckoutRepository
     {
         if (!is_string($value)) {
             throw new CheckoutException(
-                'Uložené platební údaje jsou neplatné.',
+                'Stored payment details are invalid.',
                 500,
                 'validate_' . str_replace(' ', '_', $field)
             );
@@ -64,7 +64,7 @@ final class PdoCheckoutRepository implements CheckoutRepository
         $value = trim($value);
         if ($value === '' || strlen($value) > $maxBytes || str_contains($value, "\0")) {
             throw new CheckoutException(
-                'Uložené platební údaje jsou neplatné.',
+                'Stored payment details are invalid.',
                 500,
                 'validate_' . str_replace(' ', '_', $field)
             );

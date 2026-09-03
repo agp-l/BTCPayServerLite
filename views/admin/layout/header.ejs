@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitle || 'BTCPay Server Lite' %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar" id="adminSidebar" aria-label="Main Navigation">
+    <a href="/admin/dashboard" class="admin-brand">
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Bitcoin payments</span></span>
+    </a>
+
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Overview</div>
+        <a href="/admin/dashboard" class="admin-nav-link<%= activeMenu === 'dashboard' ? ' is-active' : '' %>" <%= activeMenu === 'dashboard' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/admin/users" class="admin-nav-link<%= activeMenu === 'users' ? ' is-active' : '' %>" <%= activeMenu === 'users' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-users" aria-hidden="true"></i>
+          <span>Clients</span>
+        </a>
+        <a href="/admin/wallet" class="admin-nav-link<%= activeMenu === 'wallet' ? ' is-active' : '' %>" <%= activeMenu === 'wallet' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-wallet" aria-hidden="true"></i>
+          <span>Wallet</span>
+        </a>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Payments</div>
+        <a href="/admin/stores" class="admin-nav-link<%= activeMenu === 'stores' ? ' is-active' : '' %>" <%= activeMenu === 'stores' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-store" aria-hidden="true"></i>
+          <span>Stores</span>
+        </a>
+        <a href="/admin/invoices" class="admin-nav-link<%= activeMenu === 'invoices' ? ' is-active' : '' %>" <%= activeMenu === 'invoices' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-file-invoice" aria-hidden="true"></i>
+          <span>Invoices</span>
+        </a>
+        <a href="/admin/webhooks" class="admin-nav-link<%= activeMenu === 'webhooks' ? ' is-active' : '' %>" <%= activeMenu === 'webhooks' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+          <span>Webhooks</span>
+        </a>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Tools</div>
+        <a href="/admin/url_invoices" class="admin-nav-link<%= activeMenu === 'url_invoices' ? ' is-active' : '' %>" <%= activeMenu === 'url_invoices' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-link" aria-hidden="true"></i>
+          <span>URL Invoices</span>
+        </a>
+        <a href="/admin/settings" class="admin-nav-link<%= activeMenu === 'settings' ? ' is-active' : '' %>" <%= activeMenu === 'settings' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-gear" aria-hidden="true"></i>
+          <span>Settings</span>
+        </a>
+        <a href="/download-zip" class="admin-nav-link" download="btcpayserverlitevs2.zip">
+          <i class="fa-solid fa-file-zipper" aria-hidden="true"></i>
+          <span>Download ZIP</span>
+        </a>
+        <a href="/" class="admin-nav-link" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          <span>Public Site</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>System Online</span>
+      </div>
+      <div class="admin-profile">
+        <span class="admin-profile-avatar" aria-hidden="true"><%= (adminUser?.email || 'A').charAt(0).toUpperCase() %></span>
+        <span class="admin-profile-copy">
+          <strong><%= adminUser?.role === 'admin' ? 'Administrator' : 'Merchant' %></strong>
+          <span title="<%= adminUser?.email || 'admin@btcpayserver.local' %>"><%= adminUser?.email || 'admin@btcpayserver.local' %></span>
+        </span>
+      </div>
+      <form method="post" action="/logout" class="admin-logout">
+        <button type="submit" class="admin-nav-link">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Log out</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
+
+  <div class="admin-main">
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Open navigation" aria-controls="adminSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span><%= currentContextLabel || 'Administration' %></span>
+      </span>
+    </header>
+    <main class="admin-content">

@@ -45,9 +45,33 @@ final class BtcStatelessFactory
     public function invoiceManager(): BtcStatelessInvoiceManager
     {
         if ($this->invoiceManager === null) {
+            $rpc = new ElectrumRPC(
+                $this->requiredString('rpc_host'),
+                $this->requiredPort('rpc_port'),
+                $this->requiredString('rpc_user'),
+                $this->requiredString('rpc_pass', true, false)
+            );
+            $blockchain = new ElectrumBlockchainProvider($rpc);
+
+            $xpub = $this->config['default_xpub'] ?? $this->config['xpub'] ?? null;
+            $addressGenerator = null;
+            if (is_string($xpub) && trim($xpub) !== '') {
+                $indexStore = new FileAddressIndexStore();
+                $addressGenerator = new XpubAddressGenerator(
+                    $xpub,
+                    $indexStore,
+                    'stateless',
+                    (string) ($this->config['script_type'] ?? 'p2wpkh'),
+                    (string) ($this->config['network'] ?? 'mainnet')
+                );
+            }
+
             $this->invoiceManager = new BtcStatelessInvoiceManager(
                 $this->wallet(),
-                $this->requiredString('secret_key')
+                $this->requiredString('secret_key'),
+                null,
+                $addressGenerator,
+                $blockchain
             );
         }
 

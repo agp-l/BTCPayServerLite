@@ -1,0 +1,6 @@
+{
+  "name": "BTCPay Server Lite",
+  "description": "Lightweight self-hosted Bitcoin payment gateway with Greenfield API, invoices, wallet overview, and checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

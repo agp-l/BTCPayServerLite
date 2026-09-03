@@ -82,12 +82,12 @@ final class ApplicationRouter
     {
         $definition = $this->routes[$path] ?? null;
         if ($definition === null) {
-            throw new RouterException('Stránka nebyla nalezena.', 404);
+            throw new RouterException('Page not found.', 404);
         }
 
         $method = strtoupper($method);
         if (!in_array($method, $definition['methods'], true)) {
-            throw new RouterException('Metoda není pro tuto cestu povolena.', 405, $definition['methods']);
+            throw new RouterException('Method is not allowed for this route.', 405, $definition['methods']);
         }
 
         if (isset($definition['redirect'])) {

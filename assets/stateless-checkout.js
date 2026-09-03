@@ -14,11 +14,11 @@
   let pollHandle = 0;
 
   const labels = {
-    unpaid: 'Čeká na platbu',
-    underpaid: 'Částečná platba',
-    pending_mempool: 'Platba zachycena v síti',
-    paid: 'Zaplaceno',
-    expired: 'Platnost vypršela'
+    unpaid: 'Awaiting payment',
+    underpaid: 'Partial payment',
+    pending_mempool: 'Seen in mempool',
+    paid: 'Paid',
+    expired: 'Expired'
   };
 
   const terminal = (value) => value === 'paid' || value === 'expired';
@@ -50,12 +50,12 @@
   const renderTimer = () => {
     if (!(timer instanceof HTMLElement)) return;
     if (status === 'paid') {
-      timer.textContent = 'Platba byla úspěšně přijata.';
+      timer.textContent = 'Payment was successfully received.';
     } else if (status === 'expired' || seconds <= 0) {
-      timer.textContent = 'Čas pro úhradu vypršel.';
+      timer.textContent = 'Payment window has expired.';
       if (status !== 'paid') renderStatus('expired');
     } else {
-      timer.textContent = `Zbývající čas: ${formatDuration(seconds)}`;
+      timer.textContent = `Time remaining: ${formatDuration(seconds)}`;
     }
   };
 
@@ -66,11 +66,11 @@
       if (!value) return;
       try {
         await navigator.clipboard.writeText(value);
-        button.textContent = 'Zkopírováno';
+        button.textContent = 'Copied';
       } catch (_error) {
-        button.textContent = 'Nelze kopírovat';
+        button.textContent = 'Failed to copy';
       }
-      window.setTimeout(() => { button.textContent = 'Kopírovat'; }, 1800);
+      window.setTimeout(() => { button.textContent = 'Copy'; }, 1800);
     });
   });
 
