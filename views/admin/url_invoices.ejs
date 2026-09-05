@@ -1,0 +1,100 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+    <div class="page-header-copy">
+        <p class="page-eyebrow">Bez databáze</p>
+        <h1>Stateless URL faktury</h1>
+        <p>Podepsané platební odkazy bez databázového úložiště. Historie zůstává pouze v tomto prohlížeči.</p>
+    </div>
+    <div class="page-actions">
+        <a href="/admin/invoices" class="ghost-btn"><i class="fa-solid fa-database" aria-hidden="true"></i> Databázové faktury</a>
+    </div>
+</section>
+
+<section class="stateless-mode-grid" aria-label="Vlastnosti stateless režimu">
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-database" aria-hidden="true"></i>
+        <div><strong>Bez tabulky faktur</strong><span>Server neukládá částku, popis ani historii vystavených odkazů.</span></div>
+    </article>
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-signature" aria-hidden="true"></i>
+        <div><strong>Podepsaný obsah</strong><span>Změna adresy, částky nebo expirace zneplatní celý token.</span></div>
+    </article>
+    <article class="stateless-mode-item">
+        <i class="fa-solid fa-feather" aria-hidden="true"></i>
+        <div><strong>Přenosné jádro</strong><span>Režim používá pouze Electrum, stateless třídy a společné BTC výpočty.</span></div>
+    </article>
+</section>
+
+<div class="url-invoice-workspace" data-url-invoices-app data-csrf-token="<%= csrfToken %>">
+<section class="card">
+    <div class="card-title">
+        <span class="card-title-group"><i class="fa-solid fa-plus-circle" aria-hidden="true"></i> Vystavit URL fakturu</span>
+    </div>
+    <p class="card-subtitle">Server podepíše parametry faktury a vrátí přenositelný platební odkaz.</p>
+    <form id="createForm">
+        <div class="form-grid">
+            <div class="field">
+                <label for="walletSelect">Cílová peněženka</label>
+                <div class="input-wrap">
+                    <select id="walletSelect" required>
+                        <% availableWallets.forEach(w => { %>
+                            <option value="<%= w %>" <%= w === defaultWallet ? 'selected' : '' %>>📁 <%= w %></option>
+                        <% }); %>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label for="amount">Částka (BTC)</label>
+                <div class="input-wrap"><input type="text" id="amount" inputmode="decimal" autocomplete="off" placeholder="0.00100000" required><div class="unit">BTC</div></div>
+            </div>
+        </div>
+        <div class="form-grid form-grid-wide">
+            <div class="field">
+                <label for="desc">Popis / Název položky</label>
+                <div class="input-wrap"><input type="text" id="desc" placeholder="Např. Osobní konzultace" required></div>
+            </div>
+            <div class="field">
+                <label for="order_id">Interní ID (volitelné)</label>
+                <div class="input-wrap"><input type="text" id="order_id" placeholder="Např. ORD-123"></div>
+            </div>
+            <div class="field">
+                <label for="expiration_minutes">Expirace platby</label>
+                <div class="input-wrap">
+                    <select id="expiration_minutes">
+                        <option value="15">15 minut (E-shopy)</option>
+                        <option value="60">1 hodina</option>
+                        <option value="1440">1 den (24 hodin)</option>
+                        <option value="10080">1 týden (7 dní)</option>
+                        <option value="43200">1 měsíc (30 dní)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="primary" id="btnCreate"><i class="fa-solid fa-magic"></i> Vygenerovat zabezpečený odkaz</button>
+    </form>
+    <div id="createResult" style="margin-top: 1rem;"></div>
+</section>
+
+<section class="card">
+    <div class="card-title">
+        <span class="card-title-group"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Ověřit URL fakturu</span>
+    </div>
+    <p class="card-subtitle">Ověří podpis, platnost a odpovídající peněženku bez uložení faktury do databáze.</p>
+    <form id="verifyForm">
+        <div class="field">
+            <label for="verifyInput">Vložte odkaz (nebo token) od zákazníka</label>
+            <div class="input-wrap">
+                <input type="text" id="verifyInput" placeholder="https://..." required>
+            </div>
+        </div>
+        <button type="submit" class="primary" id="btnVerify"><i class="fa-solid fa-radar"></i> Ověřit a detekovat peněženku</button>
+    </form>
+    <div id="verifyResult" class="result-panel"></div>
+    <div class="surface-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Nikdy nedůvěřujte ručně upravenému odkazu. Platný kryptografický podpis je podmínkou zobrazení údajů.</span></div>
+</section>
+</div>
+
+<script src="/assets/url-invoices.js" defer></script>
+
+<%- include('layout/footer') %>

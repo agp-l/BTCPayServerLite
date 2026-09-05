@@ -1,0 +1,103 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Notifikace</p>
+    <h1>Webhooky</h1>
+    <p>Správa podepsaných notifikací o změnách stavu faktur.</p>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= pageError %></span></div>
+<% } %>
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= toastMsg %></span></div>
+<% } %>
+
+<section class="card filter-card">
+  <form method="get" action="/admin/webhooks" class="filter-bar">
+    <div class="field"><label for="webhookClientFilter">Zákazník</label><div class="input-wrap"><select id="webhookClientFilter" name="user_id"><option value="">Všichni zákazníci</option><option value="0" <%= selectedUserId === 0 ? 'selected' : '' %>>Systém / bez klienta</option><% clients.forEach(client => { %><option value="<%= client.id %>" <%= selectedUserId === client.id ? 'selected' : '' %>><%= client.email %></option><% }); %></select></div></div>
+    <div class="field"><label for="webhookStoreFilter">Obchod</label><div class="input-wrap"><select id="webhookStoreFilter" name="store_id"><option value="">Všechny obchody</option><% filterStores.forEach(store => { %><option value="<%= store.id %>" <%= selectedStoreId === store.id ? 'selected' : '' %>><%= store.name %></option><% }); %></select></div></div>
+    <div class="filter-actions"><button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button><a class="ghost-btn" href="/admin/webhooks">Zrušit</a></div>
+  </form>
+</section>
+
+<div class="merchant-grid">
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-plus" aria-hidden="true"></i> Přidat webhook</span></div>
+    <p class="card-subtitle">Endpoint se před uložením ověří proti nebezpečným adresám.</p>
+    <% if (stores.length === 0) { %>
+      <div class="alert alert-warning"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>Nejprve vytvořte obchod.</span></div>
+    <% } else { %>
+      <form method="post" action="/admin/webhooks" class="form-stack">
+        <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="create">
+        <div class="field"><label for="webhookStore">Obchod</label><div class="input-wrap"><select id="webhookStore" name="store_id" required><option value="">Vyberte obchod</option><% stores.forEach(store => { %><option value="<%= store.id %>"><%= store.name %></option><% }); %></select></div></div>
+        <div class="field"><label for="webhookUrl">HTTPS URL</label><div class="input-wrap"><input id="webhookUrl" type="url" name="url" maxlength="2048" placeholder="https://shop.example/webhook" required></div></div>
+        <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Uložit webhook</button></div>
+      </form>
+    <% } %>
+  </section>
+
+  <section class="card security-card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Bezpečné doručování</span></div>
+    <p class="card-subtitle">Webhook secret ověřuje HMAC podpis (SHA256). Neodesílejte jej v URL ani jej nezveřejňujte ve zdrojovém kódu.</p>
+    <div class="alert alert-warning"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Při změně stavu faktury odešle server podepsaný HTTP POST požadavek na cílový endpoint.</span></div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Aktivní webhooky</span><span class="badge s-unknown"><%= webhooks.length %></span></div>
+  <% if (webhooks.length === 0) { %>
+    <div class="empty-state"><p>Žádné aktivní webhooky.</p></div>
+  <% } else { %>
+    <div class="webhook-list">
+    <% webhooks.forEach(webhook => { %>
+      <article class="webhook-item">
+        <div class="webhook-main">
+          <strong><%= webhook.store_name %></strong>
+          <span class="muted"><%= webhook.client_email %></span>
+          <code title="<%= webhook.url %>"><%= webhook.url %></code>
+          <div class="credential">
+            <span class="credential-label">Podpisový secret</span>
+            <div class="credential-value">
+              <input type="password" readonly value="<%= webhook.secret %>" aria-label="Webhook secret">
+              <button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
+              <button type="button" class="ghost-btn" data-copy="<%= webhook.secret %>" aria-label="Kopírovat webhook secret"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <span class="muted code">ID: <%= webhook.id %></span>
+          <span class="muted">Poslední doručení: <%= webhook.last_delivery_at ? new Date(webhook.last_delivery_at * 1000).toLocaleString('cs-CZ') : '—' %></span>
+        </div>
+        <details class="disclosure compact-disclosure webhook-actions">
+          <summary><i class="fa-solid fa-pen"></i> Upravit</summary>
+          <div class="disclosure-body form-stack">
+            <form method="post" action="/admin/webhooks" class="form-stack">
+              <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="update">
+              <input type="hidden" name="webhook_id" value="<%= webhook.id %>">
+              <div class="field"><label>HTTPS URL</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<%= webhook.url %>" required></div></div>
+              <button type="submit" class="ghost-btn"><i class="fa-solid fa-floppy-disk"></i> Uložit URL</button>
+            </form>
+            <form method="post" action="/admin/webhooks" data-confirm="Vyměnit webhook secret? Příjemce musí okamžitě dostat nový secret.">
+              <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="regenerate_secret">
+              <input type="hidden" name="webhook_id" value="<%= webhook.id %>">
+              <button type="submit" class="ghost-btn"><i class="fa-solid fa-key"></i> Vyměnit secret</button>
+            </form>
+            <form method="post" action="/admin/webhooks" data-confirm="Opravdu smazat tento webhook?">
+              <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="webhook_id" value="<%= webhook.id %>">
+              <button type="submit" class="danger-btn"><i class="fa-solid fa-trash"></i> Smazat webhook</button>
+            </form>
+          </div>
+        </details>
+      </article>
+    <% }); %>
+    </div>
+  <% } %>
+</section>
+
+<%- include('layout/footer') %>

@@ -1,0 +1,134 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Integrace</p>
+    <h1>Obchody</h1>
+    <p>Oddělené platební identity, API přístupy a Electrum peněženky pro každý napojený projekt.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin/invoices" class="ghost-btn">
+      <i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Přejít na faktury
+    </a>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= pageError %></span></div>
+<% } %>
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= toastMsg %></span></div>
+<% } %>
+
+<section class="card filter-card">
+  <form method="get" action="/admin/stores" class="filter-bar">
+    <div class="field"><label for="storesClient">Zákazník</label><div class="input-wrap"><select id="storesClient" name="user_id">
+      <option value="">Všichni zákazníci</option>
+      <option value="0" <%= selectedUserId === 0 ? 'selected' : '' %>>Systém / bez klienta</option>
+      <% clients.forEach(client => { %>
+        <option value="<%= client.id %>" <%= selectedUserId === client.id ? 'selected' : '' %>><%= client.email %></option>
+      <% }); %>
+    </select></div></div>
+    <div class="filter-actions">
+      <button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button>
+      <% if (selectedUserId !== null && selectedUserId !== undefined && selectedUserId !== '') { %>
+        <a class="ghost-btn" href="/admin/stores">Zrušit filtr</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<div class="management-grid">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Aktivní obchody</span>
+      <span class="badge s-unknown"><%= stores.length %></span>
+    </div>
+    <p class="card-subtitle">Přístupové údaje uchovávejte jako tajné hodnoty na straně serveru vašeho obchodu.</p>
+
+    <% if (stores.length === 0) { %>
+      <div class="empty-state"><div><i class="fa-solid fa-store-slash" aria-hidden="true"></i><p>Zatím není vytvořený žádný obchod.</p></div></div>
+    <% } else { %>
+      <div class="store-grid">
+      <% stores.forEach(store => { %>
+        <article class="store-card">
+          <div class="store-card-head">
+            <h3><%= store.name %></h3>
+            <span class="badge s-paid">Aktivní</span>
+          </div>
+          <div class="credential">
+            <span class="credential-label">Zákazník</span>
+            <div class="credential-value"><strong><%= store.client_email %></strong></div>
+          </div>
+          <div class="credential">
+            <span class="credential-label">Store ID</span>
+            <div class="credential-value">
+              <code><%= store.id %></code>
+              <button type="button" class="ghost-btn" data-copy="<%= store.id %>" aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <div class="credential">
+            <span class="credential-label">API klíč</span>
+            <div class="credential-value">
+              <input type="password" readonly value="<%= store.api_key %>" aria-label="API klíč">
+              <button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit API klíč"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
+              <button type="button" class="ghost-btn" data-copy="<%= store.api_key %>" aria-label="Kopírovat API klíč"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <div class="credential">
+            <span class="credential-label">Soubor peněženky</span>
+            <div class="credential-value"><code><%= store.wallet_path %></code></div>
+          </div>
+          <div class="store-metrics muted">
+            Faktury: <%= store.invoice_count %> · Webhooky: <%= store.webhook_count %> · Výběry: <%= store.payout_count %>
+          </div>
+          <details class="disclosure compact-disclosure">
+            <summary><i class="fa-solid fa-pen"></i> Správa obchodu</summary>
+            <div class="disclosure-body form-stack">
+              <form method="post" action="/admin/stores" class="form-stack">
+                <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+                <input type="hidden" name="action" value="rename">
+                <input type="hidden" name="store_id" value="<%= store.id %>">
+                <div class="field"><label>Název obchodu</label><div class="input-wrap"><input name="store_name" maxlength="100" value="<%= store.name %>" required></div></div>
+                <button type="submit" class="ghost-btn"><i class="fa-solid fa-floppy-disk"></i> Uložit název</button>
+              </form>
+              <form method="post" action="/admin/stores" data-confirm="Opravdu vygenerovat nový API klíč? Starý klíč přestane okamžitě fungovat.">
+                <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+                <input type="hidden" name="action" value="regenerate_key">
+                <input type="hidden" name="store_id" value="<%= store.id %>">
+                <button type="submit" class="danger-btn"><i class="fa-solid fa-key"></i> Přegenerovat API klíč</button>
+              </form>
+            </div>
+          </details>
+        </article>
+      <% }); %>
+      </div>
+    <% } %>
+  </section>
+
+  <aside class="card management-aside">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit obchod</span></div>
+    <p class="card-subtitle">Vytvořte nový obchod pro oddělené vystavování faktur a příjem plateb.</p>
+    <form method="post" action="/admin/stores" class="form-stack">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <input type="hidden" name="action" value="create">
+      <div class="field">
+        <label for="storeClient">Přiřadit zákazníkovi</label>
+        <div class="input-wrap"><select id="storeClient" name="user_id" required>
+          <option value="">Vyberte zákazníka</option>
+          <option value="1">Administrátor (systémový obchod)</option>
+          <% clients.forEach(client => { %>
+            <option value="<%= client.id %>"><%= client.email %></option>
+          <% }); %>
+        </select></div>
+      </div>
+      <div class="field">
+        <label for="storeNameInput">Název obchodu</label>
+        <div class="input-wrap"><input id="storeNameInput" type="text" name="store_name" maxlength="100" placeholder="Např. E-shop Elektronika" required></div>
+      </div>
+      <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit obchod</button></div>
+    </form>
+  </aside>
+</div>
+
+<%- include('layout/footer') %>

@@ -22,6 +22,28 @@ class ElectrumRPC
     private const DEFAULT_CONNECT_TIMEOUT = 5;
     private const USER_AGENT = 'BTCPayServerLite/ElectrumRPC';
 
+    public const SCOPE_DAEMON = 'daemon';
+    public const SCOPE_WALLET = 'wallet';
+    public const SCOPE_NETWORK = 'network';
+    public const SCOPE_UNKNOWN = 'unknown';
+
+    private const DAEMON_COMMANDS = [
+        'version', 'commands', 'help', 'ping', 'list_wallets', 'load_wallet', 'close_wallet', 'stop', 'daemon'
+    ];
+
+    private const NETWORK_COMMANDS = [
+        'getaddressbalance', 'getaddresshistory', 'getaddressunspent', 'broadcast',
+        'validateaddress', 'deserialize', 'getfeerate', 'server.version', 'blockchain.estimatefee'
+    ];
+
+    private const WALLET_COMMANDS = [
+        'getbalance', 'createnewaddress', 'listaddresses', 'listunspent',
+        'onchain_history', 'history', 'gettransaction', 'payto', 'signtransaction',
+        'add_request', 'get_request', 'delete_request', 'clear_requests',
+        'list_requests', 'getmpk', 'getseed', 'getmasterprivate', 'is_mine',
+        'importaddress', 'export_private_key'
+    ];
+
     private string $rpcUrl;
     private ?string $rpcUser;
     private ?string $rpcPass;
@@ -30,6 +52,7 @@ class ElectrumRPC
     private string $scheme;
     private ?string $activeWallet = null;
     private int $requestSequence = 0;
+    private string $walletParamKey = 'wallet_path';
 
     public function __construct(
         string $host,
@@ -74,6 +97,73 @@ class ElectrumRPC
     public function getEndpoint(): string
     {
         return $this->rpcUrl;
+    }
+
+    /**
+     * Determines whether a command is a daemon, wallet, or network command.
+     */
+    public function getCommandScope(string $method): string
+    {
+        $normalized = strtolower(trim($method));
+        if (in_array($normalized, self::DAEMON_COMMANDS, true)) {
+            return self::SCOPE_DAEMON;
+        }
+        if (in_array($normalized, self::NETWORK_COMMANDS, true)) {
+            return self::SCOPE_NETWORK;
+        }
+        if (in_array($normalized, self::WALLET_COMMANDS, true)) {
+            return self::SCOPE_WALLET;
+        }
+
+        return self::SCOPE_UNKNOWN;
+    }
+
+    /**
+     * Sets the compatibility parameter key for wallet scoping ('wallet_path' or 'wallet').
+     */
+    public function setWalletParamKey(string $key): void
+    {
+        $key = trim($key);
+        if ($key !== 'wallet_path' && $key !== 'wallet') {
+            throw new InvalidArgumentException("Invalid wallet param key '{$key}', expected 'wallet_path' or 'wallet'.");
+        }
+        $this->walletParamKey = $key;
+    }
+
+    public function getWalletParamKey(): string
+    {
+        return $this->walletParamKey;
+    }
+
+    /**
+     * Executes a daemon-level command (e.g. version, list_wallets, load_wallet).
+     *
+     * @throws ElectrumRPCException
+     */
+    public function callDaemon(string $method, array $params = []): mixed
+    {
+        return $this->call($method, $params);
+    }
+
+    /**
+     * Executes a network-level command (e.g. getaddressbalance, broadcast) without wallet scoping.
+     *
+     * @throws ElectrumRPCException
+     */
+    public function callNetwork(string $method, array $params = []): mixed
+    {
+        return $this->call($method, $params);
+    }
+
+    /**
+     * Executes a wallet-scoped command using explicit wallet parameter passing.
+     * Guarantees no cross-wallet state pollution.
+     *
+     * @throws ElectrumRPCException
+     */
+    public function callWallet(string $method, string $walletPath, array $params = []): mixed
+    {
+        return $this->callForWallet($method, $walletPath, $params);
     }
 
     /**
@@ -134,13 +224,16 @@ class ElectrumRPC
 
         $walletPath = $this->validateWalletPath($walletPath);
 
+        // Check compatibility: if caller provided conflicting wallet_path or wallet, validate
         if (array_key_exists('wallet_path', $params) && $params['wallet_path'] !== $walletPath) {
-            throw new InvalidArgumentException(
-                'The wallet_path parameter conflicts with the requested wallet.'
-            );
+            throw new InvalidArgumentException('The wallet_path parameter conflicts with the requested wallet.');
+        }
+        if (array_key_exists('wallet', $params) && $params['wallet'] !== $walletPath) {
+            throw new InvalidArgumentException('The wallet parameter conflicts with the requested wallet.');
         }
 
-        $params['wallet_path'] = $walletPath;
+        // Apply primary wallet parameter
+        $params[$this->walletParamKey] = $walletPath;
 
         return $this->call($method, $params);
     }

@@ -19,7 +19,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
     public function fetchStores(): array
     {
         $statement = $this->database->getPdo()->query(
-            'SELECT id, name, api_key, wallet_path FROM stores ORDER BY name, id'
+            'SELECT id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores ORDER BY name, id'
         );
 
         return array_map(
@@ -31,7 +31,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
     public function fetchDefaultStore(): ?array
     {
         $statement = $this->database->getPdo()->query(
-            'SELECT id, wallet_path FROM stores ORDER BY id LIMIT 1'
+            'SELECT id, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores ORDER BY id LIMIT 1'
         );
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
@@ -43,14 +43,18 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
 
         return [
             'id' => $this->requiredString($row['id'] ?? null, 'store id'),
-            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'wallet path'),
+            'wallet_path' => (string) ($row['wallet_path'] ?? ''),
+            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
+            'xpub' => (string) ($row['xpub'] ?? ''),
+            'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
+            'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),
         ];
     }
 
     public function fetchStore(string $storeId): ?array
     {
         $statement = $this->database->getPdo()->prepare(
-            'SELECT id, wallet_path FROM stores WHERE id = ? LIMIT 1'
+            'SELECT id, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores WHERE id = ? LIMIT 1'
         );
         $statement->execute([$storeId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
@@ -63,16 +67,27 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
 
         return [
             'id' => $this->requiredString($row['id'] ?? null, 'store id'),
-            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'wallet path'),
+            'wallet_path' => (string) ($row['wallet_path'] ?? ''),
+            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
+            'xpub' => (string) ($row['xpub'] ?? ''),
+            'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
+            'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),
         ];
     }
 
-    public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
-    {
+    public function createStore(
+        string $id,
+        string $name,
+        string $apiKey,
+        ?string $walletPath = null,
+        string $addressSource = 'xpub',
+        ?string $xpub = null,
+        string $xpubScriptType = 'p2wpkh'
+    ): void {
         $statement = $this->database->getPdo()->prepare(
-            'INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, NULL)'
+            'INSERT INTO stores (id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
         );
-        $statement->execute([$id, $name, $apiKey, $walletPath]);
+        $statement->execute([$id, $name, $apiKey, $walletPath, $addressSource, $xpub, $xpubScriptType]);
     }
 
     public function fetchClientWallet(int $userId): ?string
@@ -216,14 +231,18 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         return $statement->rowCount() === 1;
     }
 
-    /** @return array{id:string,name:string,api_key:string,wallet_path:string} */
+    /** @return array<string, mixed> */
     private function store(array $row): array
     {
         return [
             'id' => $this->requiredString($row['id'] ?? null, 'store id'),
             'name' => $this->requiredString($row['name'] ?? null, 'store name'),
             'api_key' => $this->requiredString($row['api_key'] ?? null, 'store API key'),
-            'wallet_path' => $this->requiredString($row['wallet_path'] ?? null, 'store wallet path'),
+            'wallet_path' => (string) ($row['wallet_path'] ?? ''),
+            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
+            'xpub' => (string) ($row['xpub'] ?? ''),
+            'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
+            'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),
         ];
     }
 

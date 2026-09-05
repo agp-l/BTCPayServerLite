@@ -54,7 +54,11 @@ CREATE TABLE `stores` (
     `name` VARCHAR(255) NOT NULL,
     `api_key` VARCHAR(255)
         CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-    `wallet_path` VARCHAR(255) NOT NULL,
+    `wallet_path` VARCHAR(255) DEFAULT NULL,
+    `address_source` ENUM('xpub', 'electrum') NOT NULL DEFAULT 'xpub',
+    `xpub` VARCHAR(255) DEFAULT NULL,
+    `xpub_script_type` VARCHAR(20) NOT NULL DEFAULT 'p2wpkh',
+    `xpub_last_index` INT UNSIGNED NOT NULL DEFAULT 0,
     `user_id` INT UNSIGNED DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_stores_api_key` (`api_key`),
@@ -103,6 +107,9 @@ CREATE TABLE `invoices` (
     `id` VARCHAR(50) NOT NULL,
     `store_id` VARCHAR(50) NOT NULL,
     `btc_address` VARCHAR(100) NOT NULL,
+    `address_source` ENUM('xpub', 'electrum') NOT NULL DEFAULT 'electrum',
+    `address_index` INT UNSIGNED DEFAULT NULL,
+    `derivation_path` VARCHAR(50) DEFAULT NULL,
     `amount` DECIMAL(16,8) NOT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'New',
     `metadata` JSON DEFAULT NULL,
@@ -242,6 +249,24 @@ CREATE TABLE store_integrations (
     KEY idx_store_integration_seen (last_seen_at),
     CONSTRAINT fk_store_integration_store
         FOREIGN KEY (store_id) REFERENCES stores (id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `api_idempotency_keys` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `store_id` VARCHAR(50) NOT NULL,
+    `idempotency_key` VARCHAR(128) NOT NULL,
+    `request_hash` BINARY(32) NOT NULL,
+    `response_code` SMALLINT UNSIGNED NOT NULL,
+    `response_body` LONGTEXT NOT NULL,
+    `created_at` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_store_idempotency_key` (`store_id`, `idempotency_key`),
+    KEY `idx_idempotency_created` (`created_at`),
+    CONSTRAINT `fk_idempotency_store`
+        FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`)
         ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4

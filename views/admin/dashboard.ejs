@@ -1,0 +1,174 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Provozní přehled</p>
+    <h1>Dashboard</h1>
+    <p>Aktuální stav obchodů, faktur a přijatého bitcoinového objemu na jednom místě.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin/wallet" class="ghost-btn">
+      <i class="fa-solid fa-wallet" aria-hidden="true"></i> Otevřít peněženku
+    </a>
+    <a href="/admin/invoices" class="primary">
+      <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> Vystavit fakturu
+    </a>
+  </div>
+</section>
+
+<section class="card filter-card" aria-label="Filtr dashboardu">
+  <form method="get" action="/admin/dashboard" class="filter-bar">
+    <div class="field">
+      <label for="dashboardClient">Zákazník</label>
+      <div class="input-wrap"><select id="dashboardClient" name="user_id">
+        <option value="">Všichni zákazníci</option>
+        <option value="0" <%= selectedUserId === 0 ? 'selected' : '' %>>Systém / bez klienta</option>
+        <% clients.forEach(client => { %>
+          <option value="<%= client.id %>" <%= selectedUserId === client.id ? 'selected' : '' %>><%= client.email %></option>
+        <% }); %>
+      </select></div>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="primary"><i class="fa-solid fa-filter" aria-hidden="true"></i> Filtrovat</button>
+      <% if (selectedUserId !== null && selectedUserId !== undefined && selectedUserId !== '') { %>
+        <a class="ghost-btn" href="/admin/dashboard">Zrušit filtr</a>
+      <% } %>
+    </div>
+  </form>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <span><%= pageError %></span>
+  </div>
+<% } %>
+
+<section class="stats-grid" aria-label="Souhrnné statistiky">
+  <article class="stat-card">
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span></div>
+    <div class="stat-label">Aktivní obchody</div>
+    <div class="stat-value"><%= summary.total_stores %></div>
+    <div class="stat-meta">Napojené projekty a e-shopy</div>
+  </article>
+
+  <article class="stat-card stat-card-blue">
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span></div>
+    <div class="stat-label">Všechny faktury</div>
+    <div class="stat-value"><%= summary.total_invoices %></div>
+    <div class="stat-meta">Celkový počet vytvořených faktur</div>
+  </article>
+
+  <article class="stat-card">
+    <div class="stat-card-head">
+      <span class="stat-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+      <span class="badge badge-Settled"><%= summary.settlement_rate %> %</span>
+    </div>
+    <div class="stat-label">Zaplacené faktury</div>
+    <div class="stat-value"><%= summary.settled_invoices %></div>
+    <div class="stat-meta">Podíl úspěšně vypořádaných plateb</div>
+  </article>
+
+  <article class="stat-card stat-card-amber">
+    <div class="stat-card-head"><span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span></div>
+    <div class="stat-label">Přijatý objem</div>
+    <div class="stat-value code"><%= summary.total_btc_volume %> BTC</div>
+    <div class="stat-meta">Pouze potvrzené faktury</div>
+  </article>
+</section>
+
+<div class="dashboard-grid">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        Poslední faktury
+      </span>
+      <a href="/admin/invoices" class="action-link">Všechny faktury <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <p class="card-subtitle">Nejnovější platební požadavky ze všech obchodů.</p>
+
+    <% if (recentInvoices.length === 0) { %>
+      <div class="empty-state">
+        <div><i class="fa-solid fa-file-circle-xmark" aria-hidden="true"></i><p>Zatím nejsou vystaveny žádné faktury.</p></div>
+      </div>
+    <% } else { %>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Čas</th>
+              <th>Zákazník</th>
+              <th>Obchod</th>
+              <th>Faktura</th>
+              <th>Částka</th>
+              <th>Stav</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% recentInvoices.forEach(inv => { %>
+              <tr>
+                <td class="muted"><%= new Date(inv.created_at * 1000).toLocaleString('cs-CZ') %></td>
+                <td><%= inv.client_email %></td>
+                <td><strong><%= inv.store_name %></strong></td>
+                <td><code><%= inv.id %></code></td>
+                <td><code><%= inv.amount %> BTC</code></td>
+                <td><span class="badge badge-<%= inv.status %>"><%= inv.status %></span></td>
+                <td>
+                  <a class="ghost-btn" target="_blank" rel="noopener" href="/pay?id=<%= inv.id %>" title="Otevřít checkout">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group">
+        <i class="fa-solid fa-store" aria-hidden="true"></i>
+        Aktivní obchody
+      </span>
+      <a href="/admin/stores" class="action-link">Správa obchodů <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <p class="card-subtitle">Přehled projektů s napojeným Electrum rozhraním.</p>
+
+    <% if (recentStores.length === 0) { %>
+      <div class="empty-state">
+        <div><i class="fa-solid fa-store-slash" aria-hidden="true"></i><p>Není vytvořený žádný obchod.</p></div>
+      </div>
+    <% } else { %>
+      <div class="store-grid">
+        <% recentStores.forEach(store => { %>
+          <article class="store-card">
+            <div class="store-card-head">
+              <h3><%= store.name %></h3>
+              <span class="badge s-paid">Aktivní</span>
+            </div>
+            <div class="credential">
+              <span class="credential-label">Klient</span>
+              <div class="credential-value"><strong><%= store.client_email %></strong></div>
+            </div>
+            <div class="credential">
+              <span class="credential-label">Store ID</span>
+              <div class="credential-value">
+                <code><%= store.id %></code>
+                <button type="button" class="ghost-btn" data-copy="<%= store.id %>" aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="store-metrics muted">
+              Faktury: <%= store.invoice_count %> · Webhooky: <%= store.webhook_count %>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<%- include('layout/footer') %>

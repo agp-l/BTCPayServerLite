@@ -32,12 +32,18 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     private BtcStatelessInvoiceManager $statelessManager;
     private ?Database $db;
     private Closure $clock;
+    private ?AddressGeneratorFactory $addressGeneratorFactory;
+    private ?AddressGeneratorInterface $addressGenerator;
+    private ?BlockchainProviderInterface $blockchainProvider;
 
     public function __construct(
         ElectrumWallet $wallet,
         string $secretKey,
         ?Database $db = null,
-        ?callable $clock = null
+        ?callable $clock = null,
+        ?AddressGeneratorFactory $addressGeneratorFactory = null,
+        ?AddressGeneratorInterface $addressGenerator = null,
+        ?BlockchainProviderInterface $blockchainProvider = null
     ) {
         $this->wallet = $wallet;
         $this->statelessManager = new BtcStatelessInvoiceManager($wallet, $secretKey, $clock);
@@ -45,6 +51,9 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         $this->clock = $clock === null
             ? static fn (): int => time()
             : Closure::fromCallable($clock);
+        $this->addressGeneratorFactory = $addressGeneratorFactory;
+        $this->addressGenerator = $addressGenerator;
+        $this->blockchainProvider = $blockchainProvider;
     }
 
     /**
@@ -55,7 +64,8 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         string $storeId,
         int|float|string $amountBtc,
         array $metadata = [],
-        int $expirationMinutes = 15
+        int $expirationMinutes = 15,
+        ?AddressGeneratorInterface $addressGenerator = null
     ): array {
         $database = $this->requireDatabase();
         $storeId = $this->validateIdentifier($storeId, 'Store ID', 50);
@@ -67,14 +77,39 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
 
         $this->encodeJson($metadata, 'invoice metadata', self::MAX_METADATA_BYTES);
 
-        $request = $this->reservePaymentRequest(
-            $amount,
-            'Faktura ' . $invoiceId,
-            $expirationSeconds
+        // Fetch store configuration to determine address source and settings
+        $storeStmt = $database->getPdo()->prepare('SELECT * FROM stores WHERE id = ?');
+        $storeStmt->execute([$storeId]);
+        $store = $storeStmt->fetch();
+        if (!is_array($store)) {
+            throw new BtcInvoiceManagerException("Store '{$storeId}' not found.", 'create_database_invoice', 404);
+        }
+
+        $generator = $addressGenerator;
+        if ($generator === null) {
+            if ($this->addressGeneratorFactory !== null) {
+                $generator = $this->addressGeneratorFactory->forStore($store);
+            } elseif ($this->addressGenerator !== null) {
+                $generator = $this->addressGenerator;
+            } else {
+                $factory = new AddressGeneratorFactory($this->wallet, $database);
+                $generator = $factory->forStore($store);
+            }
+        }
+
+        $context = new AddressGenerationContext(
+            $storeId,
+            !empty($store['wallet_path']) ? (string) $store['wallet_path'] : null,
+            'Faktura ' . $invoiceId
         );
 
+        $generated = $generator->generateAddress($context);
+        $address = $generated->getAddress();
+        $source = $generated->getSource();
+        $index = $generated->getIndex();
+        $derivationPath = $generated->getDerivationPath();
+
         $storedMetadata = $metadata;
-        $storedMetadata[self::INTERNAL_REQUEST_ID_KEY] = $request['request_id'];
         $jsonMetadata = $this->encodeJson(
             $storedMetadata,
             'invoice metadata',
@@ -84,21 +119,22 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         try {
             $statement = $database->getPdo()->prepare(
                 "INSERT INTO invoices
-                    (id, store_id, btc_address, amount, status, metadata, created_at, expires_at)
-                 VALUES (?, ?, ?, ?, 'New', ?, ?, ?)"
+                    (id, store_id, btc_address, address_source, address_index, derivation_path, amount, status, metadata, created_at, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?)"
             );
             $statement->execute([
                 $invoiceId,
                 $storeId,
-                $request['address'],
+                $address,
+                $source,
+                $index,
+                $derivationPath,
                 $amount->toBtcString(),
                 $jsonMetadata,
                 $now,
                 $expiresAt,
             ]);
         } catch (Throwable $exception) {
-            $this->removePaymentRequestQuietly($request['request_id']);
-
             throw new BtcInvoiceManagerException(
                 'Database invoice could not be stored.',
                 'create_database_invoice',
@@ -108,16 +144,19 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
 
         return [
             'id' => $invoiceId,
-            'address' => $request['address'],
+            'address' => $address,
             'amount' => $amount->toBtcString(),
             'status' => 'New',
             'created_at' => $now,
             'expires_at' => $expiresAt,
             'bip21_uri' => $this->generateBip21Uri(
-                $request['address'],
+                $address,
                 $amount->toBtcString(),
                 'Faktura ' . $invoiceId
             ),
+            'address_source' => $source,
+            'address_index' => $index,
+            'derivation_path' => $derivationPath,
         ];
     }
 
@@ -192,6 +231,10 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
                 'get_database_invoice'
             );
         }
+        $invoice['address_source'] = (string) ($invoice['address_source'] ?? GeneratedAddress::SOURCE_ELECTRUM);
+        $invoice['address_index'] = isset($invoice['address_index']) && $invoice['address_index'] !== null ? (int) $invoice['address_index'] : null;
+        $invoice['derivation_path'] = isset($invoice['derivation_path']) && $invoice['derivation_path'] !== null ? (string) $invoice['derivation_path'] : null;
+
         $invoice['bip21_uri'] = $this->generateBip21Uri(
             $address,
             $amount->toBtcString(),
@@ -199,6 +242,44 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         );
 
         return $invoice;
+    }
+
+    /**
+     * Fast, database-only payment status check without contacting Electrum.
+     * Updates to 'Expired' if expires_at is in the past.
+     *
+     * @return array<string, mixed>
+     */
+    public function getCachedDatabasePaymentStatus(string $invoiceId): array
+    {
+        $database = $this->requireDatabase();
+        $invoice = $this->loadDatabaseInvoice($invoiceId);
+        $expected = $this->requirePositiveAmount((string) $invoice['amount']);
+        $currentStatus = (string) ($invoice['status'] ?? 'New');
+        $now = $this->now();
+        $isExpired = $now >= (int) $invoice['expires_at'];
+
+        if ($currentStatus === 'New' && $isExpired) {
+            $statement = $database->getPdo()->prepare(
+                "UPDATE invoices SET status = 'Expired' WHERE id = ? AND status = 'New'"
+            );
+            $statement->execute([$invoiceId]);
+            if ($statement->rowCount() === 1) {
+                $currentStatus = 'Expired';
+                $invoice['status'] = 'Expired';
+            }
+        }
+
+        $confirmed = $currentStatus === 'Settled' ? $expected : BitcoinAmount::fromSatoshis(0);
+        $received = $currentStatus === 'Settled' ? $expected : BitcoinAmount::fromSatoshis(0);
+
+        return $this->databaseStatusResult(
+            $invoice,
+            $currentStatus,
+            $expected,
+            $received,
+            'None'
+        );
     }
 
     /**
@@ -373,21 +454,28 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
             }
         }
 
-        $balance = $this->wallet->getAddressBalanceExact($address);
+        if ($this->blockchainProvider !== null) {
+            $observation = $this->blockchainProvider->observeAddress($address, $expected->toSatoshis());
+            $amounts = $observation->toAmountArray();
+            $confirmed = $amounts['confirmed'];
+            $received = $amounts['received'];
+        } else {
+            $balance = $this->wallet->getAddressBalanceExact($address);
 
-        try {
-            $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
-            $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed'] ?? '0');
-        } catch (InvalidArgumentException $exception) {
-            throw new BtcInvoiceManagerException(
-                'Electrum returned an invalid address balance.',
-                'observe_payment',
-                previous: $exception
-            );
+            try {
+                $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
+                $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed'] ?? '0');
+            } catch (InvalidArgumentException $exception) {
+                throw new BtcInvoiceManagerException(
+                    'Electrum returned an invalid address balance.',
+                    'observe_payment',
+                    previous: $exception
+                );
+            }
+            $zero = BitcoinAmount::fromSatoshis(0);
+            $confirmed = BitcoinAmount::max($zero, $confirmed);
+            $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
         }
-        $zero = BitcoinAmount::fromSatoshis(0);
-        $confirmed = BitcoinAmount::max($zero, $confirmed);
-        $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
 
         if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
             $confirmed = BitcoinAmount::max($confirmed, $expected);

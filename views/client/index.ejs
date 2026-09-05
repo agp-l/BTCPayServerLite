@@ -1,0 +1,248 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, clientEmail, clientSection }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Merchant portal</p>
+    <h1><%= sectionTitle %></h1>
+    <p>Spravujte své obchody, integrační klíče, webhooky a poslední přijaté faktury.</p>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= pageError %></span></div>
+<% } %>
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= toastMsg %></span></div>
+<% } %>
+
+<% if (clientSection === 'overview') { %>
+<section class="stats-grid" aria-label="Statistiky účtu">
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-store" aria-hidden="true"></i></span>
+    <div class="stat-label">Moje obchody</div>
+    <div class="stat-value"><%= clientStats.total_stores %></div>
+    <div class="stat-meta">Aktivní API integrace</div>
+  </article>
+  <article class="stat-card stat-card-blue">
+    <span class="stat-icon"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></span>
+    <div class="stat-label">Vytvořené faktury</div>
+    <div class="stat-value"><%= clientStats.total_invoices %></div>
+    <div class="stat-meta">Napříč všemi obchody</div>
+  </article>
+  <article class="stat-card">
+    <span class="stat-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+    <div class="stat-label">Zaplacené faktury</div>
+    <div class="stat-value"><%= clientStats.paid_invoices %></div>
+    <div class="stat-meta">Potvrzené platby</div>
+  </article>
+  <article class="stat-card stat-card-amber">
+    <span class="stat-icon"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span>
+    <div class="stat-label">Zůstatek peněženky</div>
+    <div class="stat-value code"><%= walletBalance.confirmed %> BTC</div>
+    <div class="stat-meta">Živý potvrzený zůstatek</div>
+  </article>
+</section>
+<% } %>
+
+<% if (['invoices', 'webhooks', 'payouts', 'activity'].includes(clientSection)) { %>
+<section class="card filter-card">
+  <form method="get" action="/client" class="filter-bar">
+    <input type="hidden" name="section" value="<%= clientSection %>">
+    <div class="field"><label for="clientStoreFilter">Obchod</label><div class="input-wrap"><select id="clientStoreFilter" name="store_id"><option value="">Všechny moje obchody</option><% stores.forEach(store => { %><option value="<%= store.id %>" <%= selectedStoreId === store.id ? 'selected' : '' %>><%= store.name %></option><% }); %></select></div></div>
+    <% if (clientSection === 'invoices') { %>
+      <div class="field"><label for="clientStatusFilter">Stav</label><div class="input-wrap"><select id="clientStatusFilter" name="status"><option value="">Všechny stavy</option><% ['New', 'Processing', 'Settled', 'Expired'].forEach(status => { %><option value="<%= status %>" <%= selectedInvoiceStatus === status ? 'selected' : '' %>><%= status %></option><% }); %></select></div></div>
+    <% } %>
+    <div class="filter-actions"><button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button><a class="ghost-btn" href="/client?section=<%= clientSection %>">Zrušit</a></div>
+  </form>
+</section>
+<% } %>
+
+<% if (['overview', 'stores'].includes(clientSection)) { %>
+<section class="card">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-store" aria-hidden="true"></i> Obchody a API přístup</span>
+  </div>
+  <p class="card-subtitle">Všechny vaše obchody používají vaši peněženku; každý má oddělený API klíč.</p>
+
+  <details class="disclosure">
+    <summary><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit nový obchod</summary>
+    <div class="disclosure-body">
+      <form method="post" action="/client?section=stores" class="form-stack">
+        <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="create_store">
+        <div class="field"><label for="storeName">Název obchodu</label><div class="input-wrap"><input id="storeName" name="store_name" type="text" maxlength="100" required></div></div>
+        <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit obchod</button></div>
+      </form>
+    </div>
+  </details>
+
+  <% if (stores.length === 0) { %>
+    <div class="empty-state"><div><i class="fa-solid fa-store-slash" aria-hidden="true"></i><p>Zatím nemáte vytvořený žádný obchod.</p></div></div>
+  <% } else { %>
+    <div class="store-grid">
+    <% stores.forEach(store => { %>
+      <article class="store-card">
+        <div class="store-card-head">
+          <h3><%= store.name %></h3>
+          <span class="badge s-paid">Aktivní</span>
+        </div>
+        <div class="credential">
+          <span class="credential-label">Store ID</span>
+          <div class="credential-value">
+            <code><%= store.id %></code>
+            <button type="button" class="ghost-btn" data-copy="<%= store.id %>"><i class="fa-regular fa-copy"></i></button>
+          </div>
+        </div>
+        <div class="credential">
+          <span class="credential-label">API klíč</span>
+          <div class="credential-value">
+            <input type="password" readonly value="<%= store.api_key %>" aria-label="API klíč">
+            <button type="button" class="ghost-btn" data-reveal><i class="fa-regular fa-eye"></i></button>
+            <button type="button" class="ghost-btn" data-copy="<%= store.api_key %>"><i class="fa-regular fa-copy"></i></button>
+          </div>
+        </div>
+        <div class="store-metrics muted">
+          Faktury: <%= store.invoice_count %> · Webhooky: <%= store.webhook_count %>
+        </div>
+      </article>
+    <% }); %>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
+<% if (['overview', 'invoices'].includes(clientSection)) { %>
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Faktury</span>
+    <span class="badge s-unknown"><%= invoices.length %></span>
+  </div>
+  <p class="card-subtitle">Platební požadavky generované přes API nebo checkout.</p>
+
+  <% if (invoices.length === 0) { %>
+    <div class="empty-state"><p>Žádné faktury k zobrazení.</p></div>
+  <% } else { %>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Čas</th>
+            <th>Obchod</th>
+            <th>Faktura</th>
+            <th>Částka</th>
+            <th>Stav</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% invoices.forEach(inv => { %>
+            <tr>
+              <td class="muted"><%= new Date(inv.created_at * 1000).toLocaleString('cs-CZ') %></td>
+              <td><strong><%= inv.store_name %></strong></td>
+              <td><code><%= inv.id %></code></td>
+              <td><code><%= inv.amount %> BTC</code></td>
+              <td><span class="badge badge-<%= inv.status %>"><%= inv.status %></span></td>
+              <td>
+                <a class="ghost-btn" target="_blank" rel="noopener" href="/pay?id=<%= inv.id %>" title="Otevřít checkout">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
+<% if (clientSection === 'webhooks') { %>
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Moje webhooky</span></div>
+  <p class="card-subtitle">Endpointy pro automatické přijímání informací o platbách.</p>
+  <% if (webhooks.length === 0) { %>
+    <div class="empty-state"><p>Nemáte nastavené žádné webhooky.</p></div>
+  <% } else { %>
+    <div class="webhook-list">
+      <% webhooks.forEach(wh => { %>
+        <article class="webhook-item">
+          <div class="webhook-main">
+            <strong><%= wh.store_name %></strong>
+            <code><%= wh.url %></code>
+            <div class="credential">
+              <span class="credential-label">Secret</span>
+              <div class="credential-value"><input type="password" readonly value="<%= wh.secret %>"><button type="button" class="ghost-btn" data-reveal><i class="fa-regular fa-eye"></i></button></div>
+            </div>
+          </div>
+        </article>
+      <% }); %>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
+<% if (clientSection === 'payouts') { %>
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> Výběry na externí peněženku</span></div>
+  <p class="card-subtitle">Seznam automatických nebo ručních převodů na vaši on-chain adresu.</p>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Čas</th>
+          <th>Cílová adresa</th>
+          <th>Částka</th>
+          <th>Stav</th>
+          <th>TXID</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% payouts.forEach(p => { %>
+          <tr>
+            <td class="muted"><%= new Date(p.created_at * 1000).toLocaleString('cs-CZ') %></td>
+            <td><code><%= p.destination %></code></td>
+            <td><code><%= p.amount %> BTC</code></td>
+            <td><span class="badge s-paid"><%= p.status %></span></td>
+            <td><code><%= p.txid.substring(0, 16) %>...</code></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>
+
+<% if (clientSection === 'activity') { %>
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Poslední API aktivita</span></div>
+  <p class="card-subtitle">Záznamy o požadavcích z vašeho e-shopu na náš server.</p>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Čas</th>
+          <th>Endpoint</th>
+          <th>Metoda</th>
+          <th>Plugin</th>
+          <th>IP</th>
+          <th>Kód</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% activities.forEach(a => { %>
+          <tr>
+            <td class="muted"><%= new Date(a.time * 1000).toLocaleString('cs-CZ') %></td>
+            <td><code><%= a.endpoint %></code></td>
+            <td><span class="badge"><%= a.method %></span></td>
+            <td><%= a.plugin %></td>
+            <td><%= a.ip %></td>
+            <td><span class="badge s-paid"><%= a.status %> OK</span></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>
+
+<%- include('layout/footer') %>

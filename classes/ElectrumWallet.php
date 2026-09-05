@@ -34,6 +34,18 @@ class ElectrumWallet
      */
     public function loadWallet(string $walletPath, ?string $password = null): void
     {
+        $this->ensureWalletLoaded($walletPath, $password);
+        $this->activeWalletPath = $this->validateWalletPath($walletPath);
+    }
+
+    /**
+     * Ensures a wallet is loaded into the Electrum daemon without altering
+     * the currently selected active wallet.
+     *
+     * @throws ElectrumWalletException
+     */
+    public function ensureWalletLoaded(string $walletPath, ?string $password = null): void
+    {
         $walletPath = $this->validateWalletPath($walletPath);
         $loadedWallets = $this->rpc->call('list_wallets');
         $loadedPaths = $this->extractLoadedWalletPaths($loadedWallets);
@@ -52,8 +64,17 @@ class ElectrumWallet
                 );
             }
         }
+    }
 
-        $this->activeWalletPath = $walletPath;
+    /**
+     * Returns a list of all wallet paths currently loaded in the Electrum daemon.
+     *
+     * @return list<string>
+     */
+    public function getLoadedWallets(): array
+    {
+        $loadedWallets = $this->rpc->call('list_wallets');
+        return $this->extractLoadedWalletPaths($loadedWallets);
     }
 
     public function getActiveWalletPath(): ?string
@@ -64,10 +85,10 @@ class ElectrumWallet
     /**
      * @return array{confirmed: float, unconfirmed: float}
      */
-    public function getWalletBalance(): array
+    public function getWalletBalance(?string $walletPath = null): array
     {
         return $this->normalizeBalance(
-            $this->callForActiveWallet('getbalance'),
+            $this->callForActiveWallet('getbalance', [], $walletPath),
             'getbalance'
         );
     }
@@ -101,10 +122,10 @@ class ElectrumWallet
         );
     }
 
-    public function getNewAddress(): string
+    public function getNewAddress(?string $walletPath = null): string
     {
         return $this->requireNonEmptyStringResult(
-            $this->callForActiveWallet('createnewaddress'),
+            $this->callForActiveWallet('createnewaddress', [], $walletPath),
             'createnewaddress'
         );
     }
@@ -347,9 +368,13 @@ class ElectrumWallet
         );
     }
 
-    private function callForActiveWallet(string $method, array $params = []): mixed
+    public function callForActiveWallet(string $method, array $params = [], ?string $walletPath = null): mixed
     {
-        return $this->rpc->callForWallet($method, $this->requireWalletLoaded(), $params);
+        $targetWallet = $walletPath !== null
+            ? $this->validateWalletPath($walletPath)
+            : $this->requireWalletLoaded();
+
+        return $this->rpc->callWallet($method, $targetWallet, $params);
     }
 
     private function requireWalletLoaded(): string

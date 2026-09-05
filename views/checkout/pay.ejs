@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title><%= checkout.title %> · Bitcoin platba</title>
+    <link rel="stylesheet" href="/assets/checkout.css">
+    <script src="/assets/checkout.js" defer></script>
+</head>
+<body>
+<main id="checkout-app"
+      class="checkout-shell"
+      data-status-url="<%= statusUrl %>"
+      data-initial-status="<%= checkout.status %>"
+      data-seconds-remaining="<%= checkout.seconds_remaining %>"
+      data-redirect-url="<%= checkout.redirect_url || '' %>"
+      data-redirect-automatically="<%= checkout.redirect_automatically ? 'true' : 'false' %>">
+    <section class="checkout-card" aria-labelledby="checkout-title">
+        <header class="checkout-header">
+            <div class="checkout-brand">
+                <span class="brand-mark" aria-hidden="true">₿</span>
+                <span>
+                    <strong>BTCPay Lite</strong>
+                    <small>Bezpečný Bitcoin checkout</small>
+                </span>
+            </div>
+            <div class="secure-pill">
+                <span class="secure-dot" aria-hidden="true"></span>
+                Lokální QR · bez trackerů
+            </div>
+        </header>
+
+        <div class="checkout-summary">
+            <p class="eyebrow">Platební požadavek</p>
+            <h1 id="checkout-title"><%= checkout.title %></h1>
+            <p class="invoice-id">ID <%= checkout.id %></p>
+
+            <div id="status-badge"
+                 class="status-badge status-<%= checkout.status.toLowerCase() %>"
+                 role="status"
+                 aria-live="polite">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="status-label"><%= statusLabel %></span>
+            </div>
+        </div>
+
+        <section id="success-panel" class="success-panel<%= isSettled ? ' is-visible' : '' %>" aria-live="polite">
+            <span class="success-symbol" aria-hidden="true">✓</span>
+            <div>
+                <p class="eyebrow">Hotovo</p>
+                <h2>Děkujeme, platba je potvrzena</h2>
+                <p>Faktura byla bezpečně uhrazena v bitcoinové síti.</p>
+                <% if (checkout.redirect_url) { %>
+                    <a class="secondary-button" href="<%= checkout.redirect_url %>">
+                        Zpět do obchodu
+                    </a>
+                    <% if (checkout.redirect_automatically) { %>
+                        <small id="redirect-notice" class="redirect-notice">Za okamžik vás vrátíme do obchodu.</small>
+                    <% } %>
+                <% } %>
+            </div>
+        </section>
+
+        <section id="payment-panel" class="payment-panel<%= isSettled ? ' is-hidden' : '' %>">
+            <div class="payment-grid">
+                <div class="qr-column">
+                    <p class="section-label">Naskenujte v peněžence</p>
+                    <% if (qrCodeDataUri) { %>
+                        <a id="qr-payment-link"
+                           class="qr-payment-link<%= isExpired ? ' is-disabled' : '' %>"
+                           href="<%= isExpired ? '#' : checkout.bip21_uri %>"
+                           <%= isExpired ? 'aria-disabled="true" tabindex="-1"' : '' %>
+                           aria-label="Otevřít bitcoinovou platbu v peněžence">
+                            <span class="qr-frame">
+                                <img src="<%= qrCodeDataUri %>"
+                                     width="248"
+                                     height="248"
+                                     alt="QR kód bitcoinové platby">
+                            </span>
+                        </a>
+                    <% } else { %>
+                        <div class="qr-placeholder">
+                            <span aria-hidden="true">₿</span>
+                            <strong>QR kód není dostupný</strong>
+                            <small>Použijte tlačítko pro otevření peněženky.</small>
+                        </div>
+                    <% } %>
+                    <p class="qr-help">QR obsahuje adresu i přesnou částku.</p>
+                </div>
+
+                <div class="payment-details">
+                    <div class="amount-section">
+                        <span>Částka k úhradě</span>
+                        <strong id="payment-amount"><%= checkout.amount %></strong>
+                        <small>BTC</small>
+                        <button class="text-button" type="button" data-copy-value="<%= checkout.amount %>">
+                            Kopírovat částku
+                        </button>
+                    </div>
+
+                    <p id="checkout-timer" class="checkout-timer" aria-live="polite">
+                        <%= isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' %>
+                    </p>
+
+                    <div id="partial-notice" class="notice notice-warning<%= isPartial ? ' is-visible' : '' %>" role="alert">
+                        Dorazila pouze část platby. Zbývá doplatit
+                        <strong id="missing-amount"><%= checkout.missing_amount %> BTC</strong>.
+                    </div>
+
+                    <div class="address-section">
+                        <div class="section-heading">
+                            <span>Bitcoinová adresa</span>
+                            <button class="text-button" type="button" data-copy-target="payment-address">Kopírovat</button>
+                        </div>
+                        <code id="payment-address"><%= checkout.address %></code>
+                    </div>
+
+                    <a id="wallet-link"
+                       class="wallet-button<%= isExpired ? ' is-disabled' : '' %>"
+                       href="<%= isExpired ? '#' : checkout.bip21_uri %>"
+                       <%= isExpired ? 'aria-disabled="true" tabindex="-1"' : '' %>>
+                        <span aria-hidden="true">₿</span>
+                        Otevřít Bitcoin peněženku
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <footer class="checkout-footer">
+            <div class="checkout-steps" aria-label="Postup platby">
+                <span><strong>1</strong> Naskenujte QR</span>
+                <span><strong>2</strong> Odešlete přesnou částku</span>
+                <span><strong>3</strong> Vyčkejte na potvrzení</span>
+            </div>
+            <p>Odesílejte pouze BTC v bitcoinové síti. Stav se obnovuje automaticky.</p>
+            <div class="privacy-note">
+                <span aria-hidden="true">◆</span>
+                QR kód vzniká přímo na serveru. Platební údaje neopouštějí aplikaci.
+            </div>
+        </footer>
+
+        <noscript>
+            <p class="notice notice-static">
+                Pro automatickou kontrolu platby povolte JavaScript nebo stránku ručně obnovte.
+            </p>
+        </noscript>
+    </section>
+</main>
+<div id="copy-toast" class="copy-toast" role="status" aria-live="polite">Zkopírováno</div>
+</body>
+</html>

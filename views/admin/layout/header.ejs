@@ -1,0 +1,124 @@
+<%
+const pageTitleStr = typeof pageTitle !== 'undefined' ? pageTitle : 'BTCPay Lite';
+const activeMenuStr = typeof activeMenu !== 'undefined' ? activeMenu : 'dashboard';
+const csrfTokenStr = typeof csrfToken !== 'undefined' ? csrfToken : 'csrf-token';
+const adminEmailStr = typeof adminEmail !== 'undefined' ? adminEmail : 'admin@btcpay.local';
+const adminInitialStr = adminEmailStr.charAt(0).toUpperCase();
+
+const menuContext = {
+    'dashboard': { label: 'Dashboard', icon: 'fa-chart-line' },
+    'wallet': { label: 'Peněženka', icon: 'fa-wallet' },
+    'stores': { label: 'Obchody', icon: 'fa-store' },
+    'invoices': { label: 'Faktury', icon: 'fa-file-invoice' },
+    'webhooks': { label: 'Webhooky', icon: 'fa-wave-square' },
+    'url_invoices': { label: 'URL faktury', icon: 'fa-link' },
+    'settings': { label: 'Nastavení', icon: 'fa-gear' },
+    'account': { label: 'Účet', icon: 'fa-user-shield' },
+    'users': { label: 'Klienti', icon: 'fa-users' },
+};
+const currentContext = menuContext[activeMenuStr] || { label: 'Administrace', icon: 'fa-shield-halved' };
+%>
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitleStr %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar" id="adminSidebar" aria-label="Hlavní navigace">
+    <a href="/admin/dashboard" class="admin-brand">
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Bitcoin payments</span></span>
+    </a>
+
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Přehled</div>
+        <a href="/admin/dashboard" class="admin-nav-link<%= activeMenuStr === 'dashboard' ? ' is-active' : '' %>" <%= activeMenuStr === 'dashboard' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Dashboard</span>
+        </a>
+        <a href="/admin/users" class="admin-nav-link<%= activeMenuStr === 'users' ? ' is-active' : '' %>" <%= activeMenuStr === 'users' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-users" aria-hidden="true"></i><span>Klienti</span>
+        </a>
+        <a href="/admin/wallet" class="admin-nav-link<%= activeMenuStr === 'wallet' ? ' is-active' : '' %>" <%= activeMenuStr === 'wallet' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-wallet" aria-hidden="true"></i><span>Peněženka</span>
+        </a>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Platby</div>
+        <a href="/admin/stores" class="admin-nav-link<%= activeMenuStr === 'stores' ? ' is-active' : '' %>" <%= activeMenuStr === 'stores' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-store" aria-hidden="true"></i><span>Obchody</span>
+        </a>
+        <a href="/admin/invoices" class="admin-nav-link<%= activeMenuStr === 'invoices' ? ' is-active' : '' %>" <%= activeMenuStr === 'invoices' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-file-invoice" aria-hidden="true"></i><span>Faktury</span>
+        </a>
+        <a href="/admin/webhooks" class="admin-nav-link<%= activeMenuStr === 'webhooks' ? ' is-active' : '' %>" <%= activeMenuStr === 'webhooks' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>Webhooky</span>
+        </a>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Nástroje</div>
+        <a href="/admin/url_invoices" class="admin-nav-link<%= activeMenuStr === 'url_invoices' ? ' is-active' : '' %>" <%= activeMenuStr === 'url_invoices' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-link" aria-hidden="true"></i><span>URL faktury</span>
+        </a>
+        <a href="/admin/settings" class="admin-nav-link<%= activeMenuStr === 'settings' ? ' is-active' : '' %>" <%= activeMenuStr === 'settings' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-gear" aria-hidden="true"></i><span>Nastavení</span>
+        </a>
+        <a href="/admin/account" class="admin-nav-link<%= activeMenuStr === 'account' ? ' is-active' : '' %>" <%= activeMenuStr === 'account' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Změna hesla</span>
+        </a>
+        <a href="/" class="admin-nav-link" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          <span>Otevřít web</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>Systém online</span>
+      </div>
+      <div class="admin-profile">
+        <span class="admin-profile-avatar" aria-hidden="true"><%= adminInitialStr %></span>
+        <span class="admin-profile-copy">
+          <strong>Administrátor</strong>
+          <span title="<%= adminEmailStr %>"><%= adminEmailStr %></span>
+        </span>
+      </div>
+      <form method="post" action="/login" class="admin-logout">
+        <input type="hidden" name="action" value="logout">
+        <input type="hidden" name="csrf_token" value="<%= csrfTokenStr %>">
+        <button type="submit" class="admin-nav-link">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Odhlásit se</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
+
+  <div class="admin-main">
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="adminSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
+        <i class="fa-solid <%= currentContext.icon %>" aria-hidden="true"></i>
+        <span><%= currentContext.label %></span>
+      </span>
+    </header>
+    <main class="admin-content">

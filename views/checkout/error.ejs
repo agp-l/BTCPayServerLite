@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Platbu nelze zobrazit</title>
+    <link rel="stylesheet" href="/assets/checkout.css">
+</head>
+<body>
+<main class="checkout-shell">
+    <section class="checkout-card error-card" aria-labelledby="error-title">
+        <span class="error-code"><%= checkoutErrorStatus %></span>
+        <span class="error-symbol" aria-hidden="true">!</span>
+        <p class="eyebrow">Bitcoin checkout</p>
+        <h1 id="error-title">Platbu nelze zobrazit</h1>
+        <p class="error-message"><%= checkoutErrorMessage %></p>
+        <% if (checkoutErrorStatus >= 500) { %>
+            <p class="error-help">Služba může být dočasně nedostupná. Zkuste stránku za chvíli obnovit.</p>
+        <% } %>
+        <a class="secondary-button" href="/">
+            Zpět na hlavní stránku
+        </a>
+    </section>
+</main>
+</body>
+</html>

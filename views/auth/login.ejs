@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Přihlášení - BTCPay Lite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <a href="/" class="auth-brand">
+      <span class="auth-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+      <span class="auth-brand-copy"><strong>BTCPay Lite</strong><span>Self-hosted payments</span></span>
+    </a>
+    <section class="auth-card">
+      <header class="auth-card-header"><h1>Vítejte zpět</h1><p>Přihlaste se do zabezpečeného platebního portálu.</p></header>
+      <% if (error) { %>
+        <div class="auth-alert auth-alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= error %></span></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="auth-alert auth-alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= success %></span></div>
+      <% } %>
+      <form method="post" action="/login" class="auth-form">
+        <input type="hidden" name="action" value="login">
+        <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+        <div class="auth-field"><label for="loginEmail">E-mail</label><div class="auth-input"><i class="fa-solid fa-envelope" aria-hidden="true"></i><input id="loginEmail" type="email" name="email" autocomplete="username" value="<%= defaultEmail || '' %>" required></div></div>
+        <div class="auth-field"><label for="loginPassword">Heslo</label><div class="auth-input"><i class="fa-solid fa-lock" aria-hidden="true"></i><input id="loginPassword" type="password" name="password" autocomplete="current-password" required></div></div>
+        <div class="auth-footer"><a href="/forgot-password">Zapomenuté heslo</a></div>
+        <button type="submit" class="auth-submit"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Přihlásit se</button>
+      </form>
+      <div class="auth-footer">Nemáte účet? <a href="/registrace">Vytvořit registraci</a></div>
+      <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; font-size: 0.82rem; color: #475569; border: 1px solid #e2e8f0;">
+        <strong>Demo přihlašovací údaje:</strong><br>
+        Admin: <code>admin@btcpay.local</code> / <code>admin</code><br>
+        Klient: <code>merchant@shop.cz</code> / <code>password123</code>
+      </div>
+      <div class="auth-security-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Relace chráněná bezpečnostními cookies</div>
+    </section>
+  </main>
+</body>
+</html>

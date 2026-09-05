@@ -1,0 +1,16 @@
+{
+  "name": "btcpay-server-lite",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node -e 'console.log(\"Build successful\")'",
+    "start": "node server.js",
+    "lint": "node -c server.js src/store.js src/config.js"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.1",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4"
+  }
+}

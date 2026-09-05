@@ -1,0 +1,121 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Správa uživatelů</p>
+    <h1>Klienti</h1>
+    <p>Přihlášení, peněženky, obchody, faktury, výběry a integrační provoz.</p>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert"><%= pageError %></div>
+<% } %>
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status"><%= toastMsg %></div>
+<% } %>
+
+<section class="card">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-users" aria-hidden="true"></i> Klientské účty</span>
+    <span class="badge"><%= clients.length %></span>
+  </div>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Klient</th>
+          <th>Stav</th>
+          <th>Poslední aktivita</th>
+          <th>Peněženka</th>
+          <th>Obchody</th>
+          <th>Faktury</th>
+          <th>Výběry</th>
+          <th>Požadavky</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% clients.forEach(client => { %>
+          <tr>
+            <td><strong><%= client.email %></strong><div class="muted">#<%= client.id %></div></td>
+            <td><span class="badge <%= client.status === 'active' ? 's-paid' : 's-failed' %>"><%= client.status %></span></td>
+            <td><%= client.last_login_at ? new Date(client.last_login_at * 1000).toLocaleString('cs-CZ') : '—' %></td>
+            <td><span class="badge <%= client.wallet_path ? 's-paid' : 's-failed' %>"><%= client.wallet_path ? 'Přiřazena' : 'Nepřiřazena' %></span></td>
+            <td><%= client.store_count %></td>
+            <td><%= client.invoice_count %></td>
+            <td><%= client.payout_count %></td>
+            <td><%= client.request_count %></td>
+            <td><a class="ghost-btn" href="/admin/users?user_id=<%= client.id %>">Detail</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<% if (detail) { %>
+  <% const client = detail.client; %>
+  <section class="page-header" style="margin-top: 2rem;">
+    <div class="page-header-copy">
+      <p class="page-eyebrow">Detail klienta #<%= client.id %></p>
+      <h2><%= client.email %></h2>
+      <p>Poslední přihlášení: <%= client.last_login_at ? new Date(client.last_login_at * 1000).toLocaleString('cs-CZ') : '—' %> z <%= client.last_login_ip || '127.0.0.1' %></p>
+    </div>
+    <form method="post" action="/admin/users">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <input type="hidden" name="action" value="set_status">
+      <input type="hidden" name="user_id" value="<%= client.id %>">
+      <input type="hidden" name="status" value="<%= client.status === 'active' ? 'suspended' : 'active' %>">
+      <button type="submit" class="<%= client.status === 'active' ? 'danger-btn' : 'primary' %>">
+        <%= client.status === 'active' ? 'Pozastavit účet' : 'Aktivovat účet' %>
+      </button>
+    </form>
+  </section>
+
+  <section class="stats-grid">
+    <article class="stat-card">
+      <div class="stat-label">Potvrzený zůstatek</div>
+      <div class="stat-value code"><%= detail.wallet_balance.confirmed %> BTC</div>
+      <div class="stat-meta">Načteno živě z Electrum</div>
+    </article>
+    <article class="stat-card">
+      <div class="stat-label">Nepotvrzený zůstatek</div>
+      <div class="stat-value code"><%= detail.wallet_balance.unconfirmed %> BTC</div>
+      <div class="stat-meta">Peněženka: <%= client.wallet_path %></div>
+    </article>
+    <article class="stat-card">
+      <div class="stat-label">Webhooky / integrace</div>
+      <div class="stat-value"><%= detail.webhook_count %> / <%= detail.integration_count %></div>
+      <div class="stat-meta">Aktivní napojení obchodů</div>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-store"></i> Obchody klienta</span></div>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Obchod</th>
+            <th>Store ID</th>
+            <th>Peněženka</th>
+            <th>Faktury</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% detail.stores.forEach(store => { %>
+            <tr>
+              <td><strong><%= store.name %></strong></td>
+              <td><code><%= store.id %></code></td>
+              <td><code><%= store.wallet_path %></code></td>
+              <td><%= store.invoice_count || 0 %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<%- include('layout/footer') %>

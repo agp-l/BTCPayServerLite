@@ -232,6 +232,32 @@ class GreenfieldApiService
         ]];
     }
 
+    /**
+     * @param array<string,mixed> $input
+     * @return array{status_code: int, body: array<string,mixed>}
+     */
+    public function createInvoiceWithIdempotency(
+        string $storeId,
+        array $input,
+        string $apiKey,
+        string $idempotencyKey = ''
+    ): array {
+        if ($idempotencyKey === '' || !isset($this->database)) {
+            return [
+                'status_code' => 200,
+                'body' => $this->createInvoice($storeId, $input, $apiKey),
+            ];
+        }
+
+        $idempotency = new IdempotencyService($this->database);
+        return $idempotency->execute(
+            $storeId,
+            $idempotencyKey,
+            $input,
+            fn (): array => $this->createInvoice($storeId, $input, $apiKey)
+        );
+    }
+
     /** @param array<string,mixed> $input @return array<string,mixed> */
     public function createInvoice(string $storeId, array $input, string $apiKey): array
     {
@@ -272,20 +298,49 @@ class GreenfieldApiService
             $storedMetadata[self::META_REDIRECT_AUTO] = $redirectAutomatically;
         }
 
-        $walletPath = $this->resolveWalletPath($store['wallet_path']);
+        $addressSource = strtolower(trim((string) ($store['address_source'] ?? '')));
+        if ($addressSource === '') {
+            $addressSource = !empty($store['xpub']) ? GeneratedAddress::SOURCE_XPUB : GeneratedAddress::SOURCE_ELECTRUM;
+        }
         try {
-            $invoice = $this->database->withNamedLock(
-                'electrum_rpc',
-                10,
-                function () use ($walletPath, $store, $btcAmount, $storedMetadata, $expiration): array {
-                    $this->wallet->loadWallet($walletPath);
-                    return $this->invoiceManager->createDatabaseInvoice(
-                        $store['id'],
-                        $btcAmount,
-                        $storedMetadata,
-                        $expiration
-                    );
-                }
+            if ($addressSource === GeneratedAddress::SOURCE_ELECTRUM) {
+                $walletPath = $this->resolveWalletPath((string) ($store['wallet_path'] ?? ''));
+                $walletLockManager = new WalletLockManager($this->database);
+                $invoice = $walletLockManager->withWalletLock(
+                    $walletPath,
+                    function () use ($walletPath, $store, $btcAmount, $storedMetadata, $expiration): array {
+                        $this->wallet->loadWallet($walletPath);
+                        return $this->invoiceManager->createDatabaseInvoice(
+                            $store['id'],
+                            $btcAmount,
+                            $storedMetadata,
+                            $expiration
+                        );
+                    },
+                    5
+                );
+            } else {
+                // XPUB mode: zero RPC calls, zero wallet locks, purely in-process derivation
+                $invoice = $this->invoiceManager->createDatabaseInvoice(
+                    $store['id'],
+                    $btcAmount,
+                    $storedMetadata,
+                    $expiration
+                );
+            }
+        } catch (AddressGenerationException $exception) {
+            throw new GreenfieldApiException(
+                'Address generation failed: ' . $exception->getMessage(),
+                'create_invoice',
+                $exception->getCode() >= 400 && $exception->getCode() < 500 ? $exception->getCode() : 500,
+                $exception
+            );
+        } catch (WalletBusyException $exception) {
+            throw new GreenfieldApiException(
+                'Invoice creation is busy. Please retry shortly.',
+                'create_invoice',
+                503,
+                $exception
             );
         } catch (DatabaseException $exception) {
             throw new GreenfieldApiException(

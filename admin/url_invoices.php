@@ -35,23 +35,10 @@ $requestMethod = is_string($_SERVER['REQUEST_METHOD'] ?? null)
     : '';
 
 if ($requestMethod === 'POST' && isset($_POST['api_action'])) {
-    $lockHandle = null;
     ob_start();
 
     try {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
-
-        $lockHandle = fopen(
-            sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'btcpay_electrum_stateless.lock',
-            'c'
-        );
-        if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
-            throw new BtcStatelessServiceException(
-                'Server is busy. Please retry shortly.',
-                'acquire_invoice_lock',
-                503
-            );
-        }
 
         $controller = new BtcStatelessAjaxController(
             $factory->service(),
@@ -113,11 +100,6 @@ if ($requestMethod === 'POST' && isset($_POST['api_action'])) {
             ['status' => 'error', 'message' => 'Požadavek nyní nelze dokončit.'],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
-    } finally {
-        if (is_resource($lockHandle)) {
-            flock($lockHandle, LOCK_UN);
-            fclose($lockHandle);
-        }
     }
     exit;
 }

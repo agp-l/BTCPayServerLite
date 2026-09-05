@@ -142,9 +142,15 @@ class GreenfieldApiController
 
         if (preg_match('/\A\/api\/v1\/stores\/([A-Za-z0-9_-]+)\/invoices\z/D', $path, $matches)) {
             $this->requireMethod($method, 'POST');
+            $result = $this->service->createInvoiceWithIdempotency(
+                $matches[1],
+                $this->decodeJsonObject($rawBody),
+                $apiKey,
+                $idempotencyKey
+            );
             return [
-                'status_code' => 200,
-                'body' => $this->service->createInvoice($matches[1], $this->decodeJsonObject($rawBody), $apiKey),
+                'status_code' => $result['status_code'],
+                'body' => $result['body'],
             ];
         }
 

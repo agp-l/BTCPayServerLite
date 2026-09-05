@@ -1,0 +1,132 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy"><p class="page-eyebrow">Řízení instance</p><h1>Nastavení systému</h1><p>Centrální pravidla pro provoz této instalace.</p></div>
+</section>
+
+<% if (pageError) { %><div class="alert alert-error" role="alert"><%= pageError %></div><% } %>
+<% if (toastMsg) { %><div class="alert alert-success" role="status"><%= toastMsg %></div><% } %>
+
+<section class="card">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Veřejné registrace</span><span class="badge <%= registrationEnabled ? 's-paid' : 's-failed' %>"><%= registrationEnabled ? 'Zapnuto' : 'Vypnuto' %></span></div>
+  <p class="card-subtitle">Po vypnutí zůstávají existující účty a přihlášení funkční, ale nevznikne nový klient, obchod ani peněženka.</p>
+  <form method="post" action="/admin/settings" class="form-stack">
+    <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+    <input type="hidden" name="action" value="set_registration">
+    <div class="field"><label for="registrationEnabled">Stav registrací</label><div class="input-wrap"><select id="registrationEnabled" name="registration_enabled"><option value="1" <%= registrationEnabled ? 'selected' : '' %>>Povolit nové registrace</option><option value="0" <%= !registrationEnabled ? 'selected' : '' %>>Zakázat nové registrace</option></select></div></div>
+    <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Uložit nastavení</button></div>
+  </form>
+</section>
+
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-server" aria-hidden="true"></i> Konfigurace Electrum Daemon</span></div>
+  <p class="card-subtitle">Připojení k privátnímu Electrum serveru (JSON-RPC daemon) z <code>config.php</code>.</p>
+  <div class="credential">
+    <span class="credential-label">RPC Host & Port</span>
+    <div class="credential-value"><code><%= config.rpc_host %>:<%= config.rpc_port %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">RPC Uživatel</span>
+    <div class="credential-value"><code><%= config.rpc_user %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Cesta k peněženkám</span>
+    <div class="credential-value"><code><%= config.store_wallets_dir %> (<%= config.wallet_path %>)</code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Electrum CLI</span>
+    <div class="credential-value"><code><%= config.electrum_cli_path %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Stav spojení</span>
+    <div class="credential-value"><span class="connection-pill">Electrum JSON-RPC daemon online · Port <%= config.rpc_port %></span></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-database" aria-hidden="true"></i> Databáze (MySQL / MariaDB)</span></div>
+  <p class="card-subtitle">Databázové spojení pro trvalé faktury a relace.</p>
+  <div class="credential">
+    <span class="credential-label">Hostitel a port</span>
+    <div class="credential-value"><code><%= config.db_host %>:<%= config.db_port %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Název databáze</span>
+    <div class="credential-value"><code><%= config.db_name %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Uživatel databáze</span>
+    <div class="credential-value"><code><%= config.db_user %></code></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-key" aria-hidden="true"></i> Bezpečnost a systémové klíče</span></div>
+  <p class="card-subtitle">Klíče pro administraci, cron úlohy a šifrování tokenů.</p>
+  <div class="credential">
+    <span class="credential-label">Admin API Key</span>
+    <div class="credential-value"><code><%= config.admin_api_key %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Cron Secret Key</span>
+    <div class="credential-value"><code><%= config.cron_key %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Základní URL aplikace</span>
+    <div class="credential-value"><code><%= config.app_url %></code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Šifrovací klíč (Secret Key)</span>
+    <div class="credential-value"><span class="badge s-paid">Aktivní (HMAC-SHA256)</span> <code><%= config.secret_key.substring(0, 8) %>••••••••</code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Poplatek směny</span>
+    <div class="credential-value"><code><%= (config.exchange_fee_bps / 100).toFixed(2) %> % (<%= config.exchange_fee_bps %> bps)</code></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> Odchozí platby (Payout API)</span></div>
+  <p class="card-subtitle">Pravidla a limity pro automatizované on-chain výběry.</p>
+  <div class="credential">
+    <span class="credential-label">Stav Payout API</span>
+    <div class="credential-value"><span class="badge <%= config.payout_api_enabled ? 's-paid' : 's-failed' %>"><%= config.payout_api_enabled ? 'Povoleno' : 'Zakázáno' %></span></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Maximální platba</span>
+    <div class="credential-value"><code><%= config.payout_max_btc %> BTC</code></div>
+  </div>
+  <div class="credential">
+    <span class="credential-label">Denní limit</span>
+    <div class="credential-value"><code><%= config.payout_daily_limit_btc %> BTC</code></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1.5rem;">
+  <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-users-gear" aria-hidden="true"></i> Stateless API Klienti</span></div>
+  <p class="card-subtitle">Mapování API klíčů na konkrétní peněženky z <code>config.php</code>.</p>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>API Klíč (Token)</th>
+          <th>Přiřazená peněženka</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (config.api_clients && Object.keys(config.api_clients).length > 0) { %>
+          <% Object.entries(config.api_clients).forEach(([clientKey, wallet]) => { %>
+            <tr>
+              <td><code><%= clientKey %></code></td>
+              <td><span class="badge s-paid"><i class="fa-solid fa-wallet"></i> <%= wallet %></span></td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="2" class="empty">Žádní stateless klienti nejsou nakonfigurováni.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('layout/footer') %>

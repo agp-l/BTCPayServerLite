@@ -1,0 +1,93 @@
+<%
+const pageTitleStr = typeof pageTitle !== 'undefined' ? pageTitle : 'Klientský panel';
+const clientEmailStr = typeof clientEmail !== 'undefined' ? clientEmail : 'Klient';
+const clientInitialStr = clientEmailStr.charAt(0).toUpperCase();
+const activeMenuStr = typeof activeMenu !== 'undefined' ? activeMenu : 'client';
+const clientSectionStr = typeof clientSection !== 'undefined' ? clientSection : 'overview';
+const csrfTokenStr = typeof csrfToken !== 'undefined' ? csrfToken : 'csrf-token';
+%>
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title><%= pageTitleStr %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar" id="clientSidebar" aria-label="Klientská navigace">
+    <a href="/client" class="admin-brand">
+      <span class="admin-brand-mark" aria-hidden="true">BTC</span>
+      <span class="admin-brand-copy"><strong>Pay Server Lite</strong><span>Merchant portal</span></span>
+    </a>
+
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Můj účet</div>
+        <a href="/client?section=overview" class="admin-nav-link<%= clientSectionStr === 'overview' ? ' is-active' : '' %>" <%= clientSectionStr === 'overview' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Přehled</span>
+        </a>
+        <a href="/client?section=stores" class="admin-nav-link<%= clientSectionStr === 'stores' ? ' is-active' : '' %>">
+          <i class="fa-solid fa-store"></i><span>Obchody</span>
+        </a>
+        <a href="/client?section=invoices" class="admin-nav-link<%= clientSectionStr === 'invoices' ? ' is-active' : '' %>">
+          <i class="fa-solid fa-file-invoice"></i><span>Faktury</span>
+        </a>
+        <a href="/client?section=webhooks" class="admin-nav-link<%= clientSectionStr === 'webhooks' ? ' is-active' : '' %>">
+          <i class="fa-solid fa-wave-square"></i><span>Webhooky</span>
+        </a>
+        <a href="/client?section=payouts" class="admin-nav-link<%= clientSectionStr === 'payouts' ? ' is-active' : '' %>">
+          <i class="fa-solid fa-money-bill-transfer"></i><span>Výběry</span>
+        </a>
+        <a href="/client?section=activity" class="admin-nav-link<%= clientSectionStr === 'activity' ? ' is-active' : '' %>">
+          <i class="fa-solid fa-chart-line"></i><span>Aktivita</span>
+        </a>
+        <a href="/client/account" class="admin-nav-link<%= activeMenuStr === 'account' ? ' is-active' : '' %>" <%= activeMenuStr === 'account' ? 'aria-current="page"' : '' %>>
+          <i class="fa-solid fa-key" aria-hidden="true"></i><span>Změna hesla</span>
+        </a>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-label">Nápověda</div>
+        <a href="/" class="admin-nav-link" target="_blank" rel="noopener">
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span>Otevřít web</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+      <div class="admin-system-status" role="status">
+        <span class="admin-system-dot" aria-hidden="true"></span>
+        <span>Systém online</span>
+      </div>
+      <div class="admin-profile">
+        <span class="admin-profile-avatar" aria-hidden="true"><%= clientInitialStr %></span>
+        <span class="admin-profile-copy"><strong>Klientský účet</strong><span title="<%= clientEmailStr %>"><%= clientEmailStr %></span></span>
+      </div>
+      <form method="post" action="/login" class="admin-logout">
+        <input type="hidden" name="action" value="logout">
+        <input type="hidden" name="csrf_token" value="<%= csrfTokenStr %>">
+        <button type="submit" class="admin-nav-link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i><span>Odhlásit se</span></button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="admin-overlay" data-sidebar-close aria-hidden="true"></div>
+  <div class="admin-main">
+    <header class="admin-mobile-bar">
+      <button type="button" class="ghost-btn admin-mobile-toggle" data-sidebar-open aria-label="Otevřít navigaci" aria-controls="clientSidebar" aria-expanded="false">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="admin-mobile-context">
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span>Klientský portál</span>
+      </span>
+    </header>
+    <main class="admin-content">

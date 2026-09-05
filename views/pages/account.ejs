@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Změna hesla - BTCPay Lite</title><link rel="stylesheet" href="/assets/auth.css"></head>
+<body class="auth-page"><main class="auth-shell">
+  <a href="<%= backPath %>" class="auth-brand"><span class="auth-brand-mark">₿</span><span class="auth-brand-copy"><strong>BTCPay Lite</strong><span>Zabezpečení účtu</span></span></a>
+  <section class="auth-card">
+    <header class="auth-card-header"><h1>Změna hesla</h1><p>Změna hesla pro účet <%= userEmail %>.</p></header>
+    <% if (error) { %><div class="auth-alert auth-alert-error" role="alert"><%= error %></div><% } %>
+    <% if (success) { %><div class="auth-alert auth-alert-success" role="status"><%= success %></div><% } %>
+    <form method="post" action="<%= role === 'admin' ? '/admin/account' : '/client/account' %>" class="auth-form">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <div class="auth-field"><label for="currentPassword">Současné heslo</label><div class="auth-input"><input id="currentPassword" type="password" name="current_password" autocomplete="current-password" required></div></div>
+      <div class="auth-field"><label for="accountNewPassword">Nové heslo</label><div class="auth-input"><input id="accountNewPassword" type="password" name="new_password" minlength="8" maxlength="72" autocomplete="new-password" required></div></div>
+      <div class="auth-field"><label for="accountNewPasswordConfirm">Potvrzení hesla</label><div class="auth-input"><input id="accountNewPasswordConfirm" type="password" name="new_password_confirm" minlength="8" maxlength="72" autocomplete="new-password" required></div></div>
+      <button type="submit" class="auth-submit">Změnit heslo</button>
+    </form>
+    <div class="auth-footer"><a href="<%= backPath %>">Zpět do přehledu</a></div>
+  </section>
+</main></body></html>

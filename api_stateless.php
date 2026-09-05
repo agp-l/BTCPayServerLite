@@ -52,16 +52,6 @@ try {
         }
     }
 
-    $lockPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'btcpay_electrum_stateless.lock';
-    $lockHandle = fopen($lockPath, 'c');
-    if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
-        throw new BtcStatelessServiceException(
-            'Server is busy. Please retry shortly.',
-            'acquire_invoice_lock',
-            503
-        );
-    }
-
     $factory = new BtcStatelessFactory($config);
 
     $urlManager = new UrlManager(
@@ -121,10 +111,6 @@ try {
         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
     );
 } finally {
-    if (is_resource($lockHandle)) {
-        flock($lockHandle, LOCK_UN);
-        fclose($lockHandle);
-    }
     try {
         $database = new Database(
             $config['db_host'],

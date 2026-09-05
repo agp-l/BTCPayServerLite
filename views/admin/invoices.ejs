@@ -1,0 +1,181 @@
+<%- include('layout/header', { pageTitle, activeMenu, csrfToken, adminEmail }) %>
+
+<section class="page-header">
+  <div class="page-header-copy">
+    <p class="page-eyebrow">Databázový checkout</p>
+    <h1>Faktury</h1>
+    <p>Vystavujte přesné bitcoinové faktury a spravujte checkout odkazy pro zákazníky.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin/url_invoices" class="ghost-btn">
+      <i class="fa-solid fa-link" aria-hidden="true"></i> Stateless URL faktury
+    </a>
+  </div>
+</section>
+
+<% if (pageError) { %>
+  <div class="alert alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= pageError %></span></div>
+<% } %>
+<% if (toastMsg) { %>
+  <div class="alert alert-success" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= toastMsg %></span></div>
+<% } %>
+
+<section class="card filter-card">
+  <form method="get" action="/admin/invoices" class="filter-bar filter-bar-wide">
+    <div class="field"><label for="invoiceClientFilter">Zákazník</label><div class="input-wrap"><select id="invoiceClientFilter" name="user_id">
+      <option value="">Všichni zákazníci</option>
+      <option value="0" <%= selectedUserId === 0 ? 'selected' : '' %>>Systém / bez klienta</option>
+      <% clients.forEach(client => { %>
+        <option value="<%= client.id %>" <%= selectedUserId === client.id ? 'selected' : '' %>><%= client.email %></option>
+      <% }); %>
+    </select></div></div>
+    <div class="field"><label for="invoiceStoreFilter">Obchod</label><div class="input-wrap"><select id="invoiceStoreFilter" name="store_id">
+      <option value="">Všechny obchody</option>
+      <% filterStores.forEach(store => { %>
+        <option value="<%= store.id %>" <%= selectedStoreId === store.id ? 'selected' : '' %>><%= store.name %></option>
+      <% }); %>
+    </select></div></div>
+    <div class="field"><label for="invoiceStatusFilter">Stav</label><div class="input-wrap"><select id="invoiceStatusFilter" name="status">
+      <option value="">Všechny stavy</option>
+      <% ['New', 'Processing', 'Settled', 'Expired'].forEach(st => { %>
+        <option value="<%= st %>" <%= selectedStatus === st ? 'selected' : '' %>><%= st %></option>
+      <% }); %>
+    </select></div></div>
+    <div class="filter-actions">
+      <button type="submit" class="primary"><i class="fa-solid fa-filter"></i> Filtrovat</button>
+      <a class="ghost-btn" href="/admin/invoices">Zrušit</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-title">
+    <span class="card-title-group"><i class="fa-solid fa-database"></i> Databázové faktury</span>
+    <span class="badge s-unknown"><%= databaseInvoices.length %></span>
+  </div>
+  <p class="card-subtitle">Až 200 nejnovějších faktur podle zvoleného zákazníka, obchodu a stavu.</p>
+  <% if (databaseInvoices.length === 0) { %>
+    <div class="empty-state"><p>Filtru neodpovídají žádné faktury.</p></div>
+  <% } else { %>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Čas</th>
+            <th>Zákazník</th>
+            <th>Obchod</th>
+            <th>Faktura</th>
+            <th>Částka</th>
+            <th>Stav</th>
+            <th>Platnost</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% databaseInvoices.forEach(invoice => { %>
+            <tr>
+              <td class="muted"><%= new Date(invoice.created_at * 1000).toLocaleString('cs-CZ') %></td>
+              <td><%= invoice.client_email %></td>
+              <td><strong><%= invoice.store_name %></strong></td>
+              <td><code><%= invoice.id %></code></td>
+              <td><code><%= invoice.amount %> BTC</code></td>
+              <td><span class="badge badge-<%= invoice.status %>"><%= invoice.status %></span></td>
+              <td class="muted"><%= new Date(invoice.expires_at * 1000).toLocaleString('cs-CZ') %></td>
+              <td>
+                <div class="table-actions">
+                  <a class="ghost-btn" target="_blank" rel="noopener" href="/pay?id=<%= invoice.id %>" title="Otevřít platbu">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+                  <% if (invoice.status !== 'Settled') { %>
+                    <form method="post" action="/admin/invoices" class="inline-edit-form" data-confirm="Opravdu ručně změnit stav této faktury?">
+                      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+                      <input type="hidden" name="action" value="change_status">
+                      <input type="hidden" name="invoice_id" value="<%= invoice.id %>">
+                      <select name="status" aria-label="Nový stav faktury">
+                        <% ['New', 'Processing', 'Settled', 'Expired'].forEach(st => { %>
+                          <option value="<%= st %>" <%= invoice.status === st ? 'selected' : '' %>><%= st %></option>
+                        <% }); %>
+                      </select>
+                      <button class="ghost-btn" type="submit" aria-label="Uložit stav"><i class="fa-solid fa-floppy-disk"></i></button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<div class="management-grid">
+  <section class="card">
+    <div class="card-title">
+      <span class="card-title-group"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Nedávno vytvořené</span>
+    </div>
+    <p class="card-subtitle">Přehled posledních vystavených faktur.</p>
+    <% if (invoicesHistory.length === 0) { %>
+      <div class="empty-state"><div><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Zatím nebyla vytvořena žádná faktura.</p></div></div>
+    <% } else { %>
+      <div class="invoice-history">
+        <% invoicesHistory.forEach(invoice => { %>
+          <article class="invoice-history-item">
+            <div class="invoice-history-main">
+              <strong><%= invoice.description %></strong>
+              <span class="muted"><%= new Date(invoice.created_at * 1000).toLocaleString('cs-CZ') %></span>
+            </div>
+            <code><%= invoice.amount %> BTC</code>
+            <a href="/pay?id=<%= invoice.id %>" target="_blank" rel="noopener" class="ghost-btn"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Otevřít</a>
+          </article>
+        <% }); %>
+      </div>
+    <% } %>
+  </section>
+
+  <aside class="card management-aside">
+    <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> Vystavit fakturu</span></div>
+    <p class="card-subtitle">Částka se zpracuje jako přesný BTC řetězec, nikdy přes desetinný typ <code>float</code>.</p>
+    <form method="post" action="/admin/invoices" class="form-stack">
+      <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+      <input type="hidden" name="action" value="create">
+      <div class="field">
+        <label for="invoiceStore">Obchod</label>
+        <div class="input-wrap"><select id="invoiceStore" name="store_id" required>
+          <option value="">Vyberte obchod</option>
+          <% filterStores.forEach(store => { %>
+            <option value="<%= store.id %>"><%= store.client_email %> — <%= store.name %></option>
+          <% }); %>
+        </select></div>
+      </div>
+      <div class="field">
+        <label for="invoiceAmount">Částka</label>
+        <div class="input-wrap"><input id="invoiceAmount" type="text" inputmode="decimal" name="amount" pattern="[0-9]+([.][0-9]{1,8})?" placeholder="0.00100000" required><span class="unit">BTC</span></div>
+      </div>
+      <div class="field">
+        <label for="invoiceDescription">Popis</label>
+        <div class="input-wrap"><input id="invoiceDescription" type="text" name="description" maxlength="200" placeholder="Např. Konzultace nebo Zboží #12" required></div>
+      </div>
+      <div class="field">
+        <label for="invoiceOrder">ID objednávky <span class="muted">(volitelné)</span></label>
+        <div class="input-wrap"><input id="invoiceOrder" type="text" name="order_id" maxlength="100" placeholder="ORD-2026-001"></div>
+      </div>
+      <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Vytvořit fakturu</button></div>
+    </form>
+
+    <% if (newInvoiceUrl) { %>
+      <div class="invoice-result" role="status">
+        <span class="invoice-result-icon"><i class="fa-solid fa-check" aria-hidden="true"></i></span>
+        <div><strong>Faktura je připravená</strong><a href="<%= newInvoiceUrl %>" target="_blank" rel="noopener"><%= newInvoiceUrl %></a></div>
+        <button type="button" class="ghost-btn" data-copy="<%= newInvoiceUrl %>" aria-label="Kopírovat checkout odkaz"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+      </div>
+    <% } %>
+
+    <div class="surface-note">
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+      <span>Výsledný odkaz vede zákazníka na veřejný checkout s QR kódem a automatickou kontrolou stavu.</span>
+    </div>
+  </aside>
+</div>
+
+<%- include('layout/footer') %>

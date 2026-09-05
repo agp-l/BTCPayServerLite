@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title><%= checkout.description %> · Bitcoin platba</title>
+  <link rel="stylesheet" href="/assets/stateless-checkout.css">
+  <script src="/assets/stateless-checkout.js" defer></script>
+</head>
+<body>
+  <main class="invoice-shell">
+    <header class="invoice-brand">
+      <span class="invoice-brand__name"><span class="invoice-brand__mark">₿</span> BTCPayLite</span>
+      <span>Podepsaná stateless faktura</span>
+    </header>
+
+    <article
+      class="invoice-card"
+      data-stateless-checkout
+      data-status="<%= checkout.status %>"
+      data-terminal="<%= isTerminal ? 'true' : 'false' %>"
+      data-seconds-remaining="<%= checkout.seconds_remaining %>"
+      data-status-url="<%= statusUrl %>"
+    >
+      <header class="invoice-card__header">
+        <div>
+          <p class="invoice-kicker">Bitcoin invoice</p>
+          <h1 class="invoice-title"><%= checkout.description %></h1>
+          <p class="invoice-order">
+            <%= checkout.order_id
+              ? 'Objednávka ' + checkout.order_id
+              : 'Bez databázového záznamu faktury' %>
+          </p>
+        </div>
+        <span class="status-pill" data-status-pill data-status="<%= checkout.status %>">
+          <%= statusLabel %>
+        </span>
+      </header>
+
+      <div class="invoice-card__body">
+        <section class="invoice-qr-panel" aria-label="Bitcoin QR platba">
+          <% if (checkout.qr_code_data_uri) { %>
+            <div class="qr-frame">
+              <img src="<%= checkout.qr_code_data_uri %>" alt="QR kód s Bitcoin BIP21 platebním požadavkem" width="226" height="226">
+            </div>
+          <% } else { %>
+            <div class="qr-fallback">QR kód není na tomto serveru dostupný. Platbu otevřete tlačítkem níže.</div>
+          <% } %>
+          <% if (isTerminal) { %>
+            <span class="wallet-link" aria-disabled="true"><%= checkout.status === 'paid' ? 'Platba dokončena' : 'Faktura vypršela' %></span>
+          <% } else { %>
+            <a class="wallet-link" href="<%= checkout.bip21_uri %>">Otevřít Bitcoin peněženku</a>
+          <% } %>
+        </section>
+
+        <section class="invoice-detail-panel">
+          <span class="amount-label">Částka k úhradě</span>
+          <div class="invoice-amount"><%= checkout.amount %> <span class="invoice-unit">BTC</span></div>
+          <div class="invoice-timer" data-invoice-timer aria-live="polite">
+            <%= checkout.status === 'paid'
+              ? 'Platba byla úspěšně přijata.'
+              : (checkout.status === 'expired'
+                ? 'Čas pro úhradu vypršel.'
+                : 'Zbývá ' + checkout.seconds_remaining + ' sekund') %>
+          </div>
+
+          <dl class="invoice-details">
+            <div class="detail-row">
+              <div>
+                <dt class="detail-label">Bitcoin adresa</dt>
+                <dd class="detail-value"><%= checkout.address %></dd>
+              </div>
+              <button class="copy-button" type="button" data-copy-value="<%= checkout.address %>">Kopírovat</button>
+            </div>
+            <div class="detail-row">
+              <div>
+                <dt class="detail-label">Expirace</dt>
+                <dd class="detail-value"><%= new Date(checkout.expires_at * 1000).toLocaleString('cs-CZ') %></dd>
+              </div>
+            </div>
+          </dl>
+        </section>
+      </div>
+    </article>
+  </main>
+  <div class="copy-toast" data-copy-toast aria-live="polite">Zkopírováno</div>
+</body>
+</html>

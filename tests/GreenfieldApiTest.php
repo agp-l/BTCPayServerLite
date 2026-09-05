@@ -114,7 +114,8 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
         string $storeId,
         int|float|string $amountBtc,
         array $metadata = [],
-        int $expirationMinutes = 15
+        int $expirationMinutes = 15,
+        ?BtcPayLite\AddressGeneratorInterface $addressGenerator = null
     ): array {
         $this->createdInvoices[] = [
             'store_id' => $storeId,

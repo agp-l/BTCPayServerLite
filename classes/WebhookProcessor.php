@@ -145,7 +145,9 @@ class WebhookProcessor
                 self::ELECTRUM_LOCK_NAME,
                 self::ELECTRUM_LOCK_TIMEOUT_SECONDS,
                 function ($_pdo) use ($invoice): array {
-                    $this->wallet->loadWallet($invoice['wallet_path']);
+                    if ($invoice['wallet_path'] !== '') {
+                        $this->wallet->loadWallet($invoice['wallet_path']);
+                    }
 
                     return $this->invoiceManager->checkDatabasePaymentStatus($invoice['id']);
                 }

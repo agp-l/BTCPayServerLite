@@ -47,39 +47,25 @@ final class DatabaseCheckoutFactory
                 $rpcScheme,
                 $secretKey
             ): array {
-                return $database->withNamedLock(
-                    'electrum_rpc',
-                    10,
-                    static function () use (
-                        $database,
-                        $invoiceId,
-                        $walletPath,
-                        $rpcHost,
-                        $rpcPort,
-                        $rpcUser,
-                        $rpcPass,
-                        $rpcScheme,
-                        $secretKey
-                    ): array {
-                        $rpc = new ElectrumRPC(
-                            $rpcHost,
-                            $rpcPort,
-                            $rpcUser,
-                            $rpcPass,
-                            30,
-                            5,
-                            strtolower($rpcScheme)
-                        );
-                        $wallet = new ElectrumWallet($rpc);
-                        $wallet->loadWallet($walletPath);
-
-                        return (new BtcInvoiceManager(
-                            $wallet,
-                            $secretKey,
-                            $database
-                        ))->checkDatabasePaymentStatus($invoiceId);
-                    }
+                $rpc = new ElectrumRPC(
+                    $rpcHost,
+                    $rpcPort,
+                    $rpcUser,
+                    $rpcPass,
+                    30,
+                    5,
+                    strtolower($rpcScheme)
                 );
+                $wallet = new ElectrumWallet($rpc);
+
+                $manager = new BtcInvoiceManager(
+                    $wallet,
+                    $secretKey,
+                    $database
+                );
+
+                // Zero Electrum RPC during HTTP checkout: read directly from database
+                return $manager->getCachedDatabasePaymentStatus($invoiceId);
             }
         );
     }

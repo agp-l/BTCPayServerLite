@@ -47,7 +47,7 @@ final class PdoCheckoutRepository implements CheckoutRepository
         return [
             'id' => $this->storedString($row['id'] ?? null, 'invoice ID', 50),
             'store_id' => $this->storedString($row['store_id'] ?? null, 'store ID', 50),
-            'wallet_path' => $this->storedString($row['wallet_path'] ?? null, 'wallet path', 4096),
+            'wallet_path' => is_string($row['wallet_path'] ?? null) ? trim((string) $row['wallet_path']) : '',
         ];
     }
 

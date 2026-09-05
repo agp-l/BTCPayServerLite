@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Registrace nového klienta - BTCPay Lite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <a href="/" class="auth-brand">
+      <span class="auth-brand-mark"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+      <span class="auth-brand-copy"><strong>BTCPay Lite</strong><span>Self-hosted payments</span></span>
+    </a>
+    <section class="auth-card">
+      <header class="auth-card-header"><h1>Registrace klienta</h1><p>Vytvořte si účet pro příjem bitcoinových plateb na svůj e-shop.</p></header>
+      <% if (error) { %>
+        <div class="auth-alert auth-alert-error" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span><%= error %></span></div>
+      <% } %>
+      <form method="post" action="/registrace" class="auth-form">
+        <input type="hidden" name="csrf_token" value="<%= csrfToken %>">
+        <div class="auth-field"><label for="regEmail">E-mail</label><div class="auth-input"><i class="fa-solid fa-envelope" aria-hidden="true"></i><input id="regEmail" type="email" name="email" autocomplete="username" required></div></div>
+        <div class="auth-field"><label for="regPassword">Heslo (min. 8 znaků)</label><div class="auth-input"><i class="fa-solid fa-lock" aria-hidden="true"></i><input id="regPassword" type="password" name="password" minlength="8" autocomplete="new-password" required></div></div>
+        <div class="auth-field"><label for="regStoreName">Název vašeho prvního obchodu</label><div class="auth-input"><i class="fa-solid fa-store" aria-hidden="true"></i><input id="regStoreName" type="text" name="store_name" placeholder="Např. Můj E-shop" required></div></div>
+        <button type="submit" class="auth-submit"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Zaregistrovat se</button>
+      </form>
+      <div class="auth-footer">Již máte účet? <a href="/login">Přihlásit se</a></div>
+    </section>
+  </main>
+</body>
+</html>

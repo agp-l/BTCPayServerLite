@@ -365,7 +365,6 @@ class WebhookDeliveryRepository
                 || !is_string($row['id'] ?? null)
                 || !is_string($row['store_id'] ?? null)
                 || !is_string($row['status'] ?? null)
-                || !is_string($row['wallet_path'] ?? null)
             ) {
                 throw new WebhookDeliveryException('Stored invoice data is invalid.', 'normalize_invoices');
             }
@@ -373,7 +372,7 @@ class WebhookDeliveryRepository
                 'id' => $row['id'],
                 'store_id' => $row['store_id'],
                 'status' => $row['status'],
-                'wallet_path' => $row['wallet_path'],
+                'wallet_path' => (string) ($row['wallet_path'] ?? ''),
             ];
         }
 
