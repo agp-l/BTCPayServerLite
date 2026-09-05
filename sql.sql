@@ -113,12 +113,20 @@ CREATE TABLE `invoices` (
     `amount` DECIMAL(16,8) NOT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'New',
     `metadata` JSON DEFAULT NULL,
+    `payment_processing_token` VARCHAR(64) DEFAULT NULL,
+    `payment_processing_until` INT UNSIGNED DEFAULT NULL,
+    `last_checked_at` INT UNSIGNED DEFAULT NULL,
+    `next_check_at` INT UNSIGNED DEFAULT NULL,
+    `confirmed_received_sats` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `unconfirmed_received_sats` BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `created_at` BIGINT UNSIGNED NOT NULL,
     `expires_at` BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (`id`),
     KEY `store_id` (`store_id`),
     KEY `status` (`status`),
     KEY `idx_invoices_monitoring` (`status`, `expires_at`, `store_id`),
+    KEY `idx_invoices_lease` (`payment_processing_until`, `next_check_at`, `status`),
+    KEY `idx_invoices_token` (`payment_processing_token`),
     CONSTRAINT `fk_invoices_store`
         FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`)
         ON UPDATE CASCADE ON DELETE RESTRICT

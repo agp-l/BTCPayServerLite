@@ -45,18 +45,6 @@ class WebhookCronApplication
             $this->stringConfig('db_pass', true),
             $databasePort
         );
-        $rpc = new ElectrumRPC(
-            $this->stringConfig('rpc_host'),
-            $this->integerConfig('rpc_port', null, 1, 65_535),
-            $this->nullableStringConfig('rpc_user'),
-            $this->nullableStringConfig('rpc_pass')
-        );
-        $wallet = new ElectrumWallet($rpc);
-        $invoiceManager = new BtcInvoiceManager(
-            $wallet,
-            $this->stringConfig('secret_key'),
-            $database
-        );
         $repository = new WebhookDeliveryRepository($database);
         $endpointPolicy = new WebhookEndpointPolicy(
             null,
@@ -64,9 +52,6 @@ class WebhookCronApplication
         );
         $transport = new CurlWebhookTransport($endpointPolicy);
         $processor = new WebhookProcessor(
-            $database,
-            $wallet,
-            $invoiceManager,
             $repository,
             $transport
         );

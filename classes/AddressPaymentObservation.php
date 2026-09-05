@@ -72,15 +72,23 @@ class AddressPaymentObservation
     }
 
     /**
-     * Total satoshis confirmed + unconfirmed currently visible.
+     * Currently observed satoshis (confirmed + unconfirmed).
      */
-    public function getCurrentReceivedSatoshis(): int
+    public function getCurrentObservedSatoshis(): int
     {
         return $this->confirmedSatoshis + $this->unconfirmedSatoshis;
     }
 
     /**
-     * Cumulative satoshis received by this address across its entire history.
+     * Total satoshis confirmed + unconfirmed currently visible.
+     */
+    public function getCurrentReceivedSatoshis(): int
+    {
+        return $this->getCurrentObservedSatoshis();
+    }
+
+    /**
+     * Cumulative satoshis received by this address across observed state.
      */
     public function getTotalReceivedSatoshis(): int
     {
@@ -93,7 +101,7 @@ class AddressPaymentObservation
      */
     public function getEffectiveReceivedSatoshis(): int
     {
-        return max($this->totalReceivedSatoshis, $this->getCurrentReceivedSatoshis());
+        return max($this->totalReceivedSatoshis, $this->getCurrentObservedSatoshis());
     }
 
     public function getHistoryCount(): int
@@ -103,7 +111,7 @@ class AddressPaymentObservation
 
     public function hasTransactions(): bool
     {
-        return $this->historyCount > 0 || $this->getCurrentReceivedSatoshis() > 0;
+        return $this->historyCount > 0 || $this->getCurrentObservedSatoshis() > 0;
     }
 
     public function getObservedAt(): int
@@ -116,8 +124,7 @@ class AddressPaymentObservation
         if ($expectedSatoshis <= 0) {
             return false;
         }
-        return $this->confirmedSatoshis >= $expectedSatoshis
-            || $this->totalReceivedSatoshis >= $expectedSatoshis;
+        return $this->confirmedSatoshis >= $expectedSatoshis;
     }
 
     public function isUnconfirmedPaid(int $expectedSatoshis): bool
