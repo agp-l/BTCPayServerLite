@@ -97,7 +97,7 @@ class GreenfieldApiRepository
         }
         try {
             $statement = $this->database->getPdo()->prepare(
-                "SELECT id, name, api_key, wallet_path FROM stores WHERE {$column} = ? LIMIT 1"
+                "SELECT id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores WHERE {$column} = ? LIMIT 1"
             );
             $statement->execute([$value]);
             $store = $statement->fetch(PDO::FETCH_ASSOC);
@@ -112,7 +112,6 @@ class GreenfieldApiRepository
             || !is_string($store['id'] ?? null)
             || !is_string($store['name'] ?? null)
             || !is_string($store['api_key'] ?? null)
-            || !is_string($store['wallet_path'] ?? null)
         ) {
             throw new GreenfieldApiException('Stored store data is invalid.', 'find_store');
         }
@@ -120,7 +119,11 @@ class GreenfieldApiRepository
             'id' => $store['id'],
             'name' => $store['name'],
             'api_key' => $store['api_key'],
-            'wallet_path' => $store['wallet_path'],
+            'wallet_path' => (string) ($store['wallet_path'] ?? ''),
+            'address_source' => (string) ($store['address_source'] ?? 'electrum'),
+            'xpub' => (string) ($store['xpub'] ?? ''),
+            'xpub_script_type' => (string) ($store['xpub_script_type'] ?? 'p2wpkh'),
+            'xpub_last_index' => (int) ($store['xpub_last_index'] ?? 0),
         ];
     }
 

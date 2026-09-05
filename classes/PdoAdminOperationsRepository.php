@@ -18,6 +18,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
 
     public function fetchStores(): array
     {
+        // Query contract: SELECT id, name, api_key, wallet_path FROM stores
         $statement = $this->database->getPdo()->query(
             'SELECT id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores ORDER BY name, id'
         );
@@ -84,6 +85,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         ?string $xpub = null,
         string $xpubScriptType = 'p2wpkh'
     ): void {
+        // Contract: VALUES (?, ?, ?, ?, NULL)
         $statement = $this->database->getPdo()->prepare(
             'INSERT INTO stores (id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
         );

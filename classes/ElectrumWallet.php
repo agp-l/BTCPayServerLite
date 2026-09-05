@@ -85,10 +85,10 @@ class ElectrumWallet
     /**
      * @return array{confirmed: float, unconfirmed: float}
      */
-    public function getWalletBalance(?string $walletPath = null): array
+    public function getWalletBalance(): array
     {
         return $this->normalizeBalance(
-            $this->callForActiveWallet('getbalance', [], $walletPath),
+            $this->callForActiveWallet('getbalance'),
             'getbalance'
         );
     }

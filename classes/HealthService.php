@@ -133,11 +133,12 @@ class HealthService
         $hasBcmath = extension_loaded('bcmath');
         $hasOpenssl = extension_loaded('openssl');
 
-        // Test secp256k1 generator point derivation
+        // Test secp256k1 BitWasp EC adapter readiness
         $generatorHealthy = false;
         try {
-            $point = Secp256k1::generator();
-            $generatorHealthy = $point->getX() !== '0';
+            $adapter = \BitWasp\Bitcoin\Bitcoin::getEcAdapter();
+            $generator = $adapter->getGenerator();
+            $generatorHealthy = $generator !== null;
         } catch (Throwable) {
             $generatorHealthy = false;
         }

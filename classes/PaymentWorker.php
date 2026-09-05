@@ -67,7 +67,7 @@ class PaymentWorker
 
         foreach ($claimedInvoices as $invoice) {
             try {
-                $transition = $this->processInvoice($invoice, $now);
+                $transition = $this->processInvoiceWithLock($invoice, $now);
                 if ($transition['changed']) {
                     ++$stats['transitioned'];
                     if ($transition['status'] === 'Expired') {
@@ -110,6 +110,36 @@ class PaymentWorker
 
             return is_array($rows) ? $rows : [];
         });
+    }
+
+    /**
+     * Attempts to acquire an exclusive lock on the invoice before processing,
+     * ensuring two concurrent worker processes never process the same invoice.
+     *
+     * @param array<string, mixed> $invoice
+     * @return array{changed: bool, status: string, deliveries_queued: int}
+     */
+    private function processInvoiceWithLock(array $invoice, int $now): array
+    {
+        $invoiceId = (string) ($invoice['id'] ?? '');
+        $lockName = 'inv_w_' . substr(hash('sha256', $invoiceId), 0, 48);
+
+        try {
+            return $this->database->withNamedLock($lockName, 0, function () use ($invoice, $now): array {
+                return $this->processInvoice($invoice, $now);
+            });
+        } catch (DatabaseException $e) {
+            if ($e->getCode() === 503) {
+                // Another PaymentWorker is actively processing this invoice; safely skip it
+                return [
+                    'changed' => false,
+                    'status' => (string) ($invoice['status'] ?? 'New'),
+                    'deliveries_queued' => 0,
+                ];
+            }
+            // If named locking is not supported by driver (e.g. SQLite memory DB in tests), fallback to CAS
+            return $this->processInvoice($invoice, $now);
+        }
     }
 
     /**

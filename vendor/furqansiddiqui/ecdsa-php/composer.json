@@ -1,0 +1,31 @@
+{
+  "name": "furqansiddiqui/ecdsa-php",
+  "description": "ECDSA (Elliptic Curves) lib for PHP",
+  "type": "library",
+  "homepage": "https://github.com/furqansiddiqui/ecdsa-php",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Furqan A. Siddiqui",
+      "email": "hello@furqansiddiqui.com",
+      "homepage": "https://www.furqansiddiqui.com",
+      "role": "Author"
+    }
+  ],
+  "require": {
+    "php-64bit": "^8.1",
+    "ext-openssl": "*",
+    "ext-bcmath": "*",
+    "ext-gmp": "*",
+    "ext-curl": "*",
+    "comely-io/buffer-php": "^0.1.11"
+  },
+  "autoload": {
+    "psr-4": {
+      "FurqanSiddiqui\\ECDSA\\": [
+        "src"
+      ]
+    }
+  },
+  "minimum-stability": "dev"
+}

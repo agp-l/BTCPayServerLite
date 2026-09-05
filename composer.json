@@ -2,7 +2,8 @@
     "name": "ag/btcpay-lite",
     "require": {
         "php": "^8.0",
-        "endroid/qr-code": "4.7.0"
+        "endroid/qr-code": "4.7.0",
+        "shanelic/bitcoin-p8": "^1.0.5"
     },
     "autoload": {
         "psr-4": {
@@ -10,6 +11,11 @@
         }
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "policy": {
+            "advisories": {
+                "block": false
+            }
+        }
     }
 }

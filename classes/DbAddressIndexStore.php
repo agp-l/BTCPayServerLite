@@ -60,10 +60,12 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
             if ($e instanceof AddressGenerationException) {
                 throw $e;
             }
+            $msg = strtolower($e->getMessage());
+            $code = (str_contains($msg, 'lock wait timeout') || str_contains($msg, 'deadlock')) ? 503 : 500;
             throw new AddressGenerationException(
                 'Database index reservation failed: ' . $e->getMessage(),
                 GeneratedAddress::SOURCE_XPUB,
-                500,
+                $code,
                 $e
             );
         }

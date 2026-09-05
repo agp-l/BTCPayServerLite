@@ -55,7 +55,7 @@ CREATE TABLE `stores` (
     `api_key` VARCHAR(255)
         CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
     `wallet_path` VARCHAR(255) DEFAULT NULL,
-    `address_source` ENUM('xpub', 'electrum') NOT NULL DEFAULT 'xpub',
+    `address_source` ENUM('xpub', 'electrum') NOT NULL DEFAULT 'electrum',
     `xpub` VARCHAR(255) DEFAULT NULL,
     `xpub_script_type` VARCHAR(20) NOT NULL DEFAULT 'p2wpkh',
     `xpub_last_index` INT UNSIGNED NOT NULL DEFAULT 0,

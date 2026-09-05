@@ -6,38 +6,100 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit5aa43d90a37b32362e789d573ffded39
 {
+    public static $files = array (
+        'a626201e4406003b96eee958a069f504' => __DIR__ . '/..' . '/bitwasp/bech32/src/bech32.php',
+        '326eaee97106a3a1eb6093474833ccf5' => __DIR__ . '/..' . '/shanelic/bitcoin-p8/src/Script/functions.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
-        'E' => 
+        'l' =>
+        array (
+            'lastguest\\' => 10,
+        ),
+        'M' =>
+        array (
+            'Mdanter\\Ecc\\' => 12,
+        ),
+        'F' =>
+        array (
+            'FG\\' => 3,
+        ),
+        'E' =>
         array (
             'Endroid\\QrCode\\' => 15,
         ),
-        'D' => 
+        'D' =>
         array (
             'DASPRiD\\Enum\\' => 13,
         ),
-        'B' => 
+        'C' =>
+        array (
+            'Composer\\Semver\\' => 16,
+        ),
+        'B' =>
         array (
             'BtcPayLite\\' => 11,
+            'BitWasp\\Buffertools\\' => 20,
+            'BitWasp\\Bitcoin\\' => 16,
+            'BitWasp\\Bech32\\' => 15,
             'BaconQrCode\\' => 12,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'Endroid\\QrCode\\' => 
+        'lastguest\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/lastguest/murmurhash/src/lastguest',
+        ),
+        'Mdanter\\Ecc\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/mdanter/ecc/src',
+        ),
+        'FG\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/fgrosse/phpasn1/lib',
+        ),
+        'Endroid\\QrCode\\' =>
         array (
             0 => __DIR__ . '/..' . '/endroid/qr-code/src',
         ),
-        'DASPRiD\\Enum\\' => 
+        'DASPRiD\\Enum\\' =>
         array (
             0 => __DIR__ . '/..' . '/dasprid/enum/src',
         ),
-        'BtcPayLite\\' => 
+        'Composer\\Semver\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/composer/semver/src',
+        ),
+        'BtcPayLite\\' =>
         array (
             0 => __DIR__ . '/../..' . '/classes',
         ),
-        'BaconQrCode\\' => 
+        'BitWasp\\Buffertools\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/bitwasp/buffertools/src/Buffertools',
+        ),
+        'BitWasp\\Bitcoin\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/shanelic/bitcoin-p8/src',
+        ),
+        'BitWasp\\Bech32\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/bitwasp/bech32/src',
+        ),
+        'BaconQrCode\\' =>
         array (
             0 => __DIR__ . '/..' . '/bacon/bacon-qr-code/src',
+        ),
+    );
+
+    public static $prefixesPsr0 = array (
+        'P' =>
+        array (
+            'Pleo' =>
+            array (
+                0 => __DIR__ . '/..' . '/pleonasm/merkle-tree/src',
+            ),
         ),
     );
 
@@ -50,6 +112,7 @@ class ComposerStaticInit5aa43d90a37b32362e789d573ffded39
         return \Closure::bind(function () use ($loader) {
             $loader->prefixLengthsPsr4 = ComposerStaticInit5aa43d90a37b32362e789d573ffded39::$prefixLengthsPsr4;
             $loader->prefixDirsPsr4 = ComposerStaticInit5aa43d90a37b32362e789d573ffded39::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit5aa43d90a37b32362e789d573ffded39::$prefixesPsr0;
             $loader->classMap = ComposerStaticInit5aa43d90a37b32362e789d573ffded39::$classMap;
 
         }, null, ClassLoader::class);
