@@ -24,18 +24,19 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     private const ELECTRUM_STATUS_EXPIRED = 1;
     private const ELECTRUM_STATUS_PAID = 3;
     private const ELECTRUM_STATUS_UNCONFIRMED = 7;
-    private const EXPIRED_HARD_CUTOFF_SECONDS = 86_400;
 
     private ElectrumWallet $wallet;
     private BtcStatelessTokenCodec $tokenCodec;
     private Closure $clock;
     private ?BlockchainProviderInterface $blockchainProvider;
+    private WalletLockManager $lockManager;
 
     public function __construct(
         ElectrumWallet $wallet,
         string $secretKey,
         ?callable $clock = null,
-        ?BlockchainProviderInterface $blockchainProvider = null
+        ?BlockchainProviderInterface $blockchainProvider = null,
+        ?WalletLockManager $lockManager = null
     ) {
         $this->wallet = $wallet;
         $this->tokenCodec = new BtcStatelessTokenCodec($secretKey);
@@ -43,6 +44,12 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             ? static fn (): int => time()
             : Closure::fromCallable($clock);
         $this->blockchainProvider = $blockchainProvider;
+        $this->lockManager = $lockManager ?? new WalletLockManager();
+    }
+
+    public function canObserveWithoutWallet(): bool
+    {
+        return $this->blockchainProvider !== null;
     }
 
     public function createStatelessInvoice(
@@ -104,26 +111,6 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         $now = ($this->clock)();
         $isExpired = $now >= (int) $invoice['e'];
 
-        // Fast cutoff: If invoice expired long ago, return expired without contacting Electrum
-        if ($now >= (int) $invoice['e'] + self::EXPIRED_HARD_CUTOFF_SECONDS) {
-            return [
-                'status' => 'expired',
-                'is_expired' => true,
-                'seconds_remaining' => 0,
-                'invoice' => $invoice,
-                'payment' => [
-                    'received_total' => '0.00000000',
-                    'total_received' => '0.00000000',
-                    'missing_amount' => $expected->toBtcString(),
-                ],
-                'bip21_uri' => $this->bip21(
-                    (string) $invoice['a'],
-                    $expected->toBtcString(),
-                    (string) $invoice['d']
-                ),
-            ];
-        }
-
         $observation = $this->observePayment(
             (string) $invoice['a'],
             isset($invoice['r']) ? (string) $invoice['r'] : null,
@@ -164,10 +151,15 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         string $memo,
         int $expirationSeconds
     ): array {
-        $request = $this->wallet->createPaymentRequest(
-            $amount->toBtcString(),
-            $memo,
-            $expirationSeconds
+        $walletPath = $this->wallet->getActiveWalletPath() ?? 'default_wallet';
+        $request = $this->lockManager->withWalletLock(
+            $walletPath,
+            fn (): array => $this->wallet->createPaymentRequest(
+                $amount->toBtcString(),
+                $memo,
+                $expirationSeconds
+            ),
+            5
         );
 
         return [

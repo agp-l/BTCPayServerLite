@@ -40,26 +40,10 @@ final class DatabaseCheckoutFactory
             new PdoCheckoutRepository($database),
             static function (string $invoiceId, string $walletPath) use (
                 $database,
-                $rpcHost,
-                $rpcPort,
-                $rpcUser,
-                $rpcPass,
-                $rpcScheme,
                 $secretKey
             ): array {
-                $rpc = new ElectrumRPC(
-                    $rpcHost,
-                    $rpcPort,
-                    $rpcUser,
-                    $rpcPass,
-                    30,
-                    5,
-                    strtolower($rpcScheme)
-                );
-                $wallet = new ElectrumWallet($rpc);
-
                 $manager = new BtcInvoiceManager(
-                    $wallet,
+                    null,
                     $secretKey,
                     $database
                 );

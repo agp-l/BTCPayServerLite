@@ -72,6 +72,14 @@ class AddressPaymentObservation
     }
 
     /**
+     * Currently observed balance in satoshis (confirmed + unconfirmed).
+     */
+    public function getObservedBalanceSatoshis(): int
+    {
+        return $this->confirmedSatoshis + $this->unconfirmedSatoshis;
+    }
+
+    /**
      * Currently observed satoshis (confirmed + unconfirmed).
      */
     public function getCurrentObservedSatoshis(): int

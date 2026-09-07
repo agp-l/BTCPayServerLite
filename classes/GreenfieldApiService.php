@@ -298,41 +298,19 @@ class GreenfieldApiService
             $storedMetadata[self::META_REDIRECT_AUTO] = $redirectAutomatically;
         }
 
-        $addressSource = strtolower(trim((string) ($store['address_source'] ?? '')));
-        if ($addressSource === '') {
-            $addressSource = !empty($store['xpub']) ? GeneratedAddress::SOURCE_XPUB : GeneratedAddress::SOURCE_ELECTRUM;
-        }
         try {
-            if ($addressSource === GeneratedAddress::SOURCE_ELECTRUM) {
-                $walletPath = $this->resolveWalletPath((string) ($store['wallet_path'] ?? ''));
-                $walletLockManager = new WalletLockManager($this->database);
-                $invoice = $walletLockManager->withWalletLock(
-                    $walletPath,
-                    function () use ($walletPath, $store, $btcAmount, $storedMetadata, $expiration): array {
-                        $this->wallet->loadWallet($walletPath);
-                        return $this->invoiceManager->createDatabaseInvoice(
-                            $store['id'],
-                            $btcAmount,
-                            $storedMetadata,
-                            $expiration
-                        );
-                    },
-                    5
-                );
-            } else {
-                // XPUB mode: zero RPC calls, zero wallet locks, purely in-process derivation
-                $invoice = $this->invoiceManager->createDatabaseInvoice(
-                    $store['id'],
-                    $btcAmount,
-                    $storedMetadata,
-                    $expiration
-                );
-            }
+            $invoice = $this->invoiceManager->createDatabaseInvoice(
+                $store['id'],
+                $btcAmount,
+                $storedMetadata,
+                $expiration
+            );
         } catch (AddressGenerationException $exception) {
+            $code = $exception->getCode();
             throw new GreenfieldApiException(
-                'Address generation failed: ' . $exception->getMessage(),
+                $exception->getMessage(),
                 'create_invoice',
-                $exception->getCode() >= 400 && $exception->getCode() < 500 ? $exception->getCode() : 500,
+                $code >= 400 && $code < 600 ? $code : 500,
                 $exception
             );
         } catch (WalletBusyException $exception) {

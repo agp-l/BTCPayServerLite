@@ -107,34 +107,52 @@ class IdempotencyService
         }
 
         // 3. This worker owns execution: run operation and update idempotency record
+        $operationCompleted = false;
+        $responseBody = null;
         try {
             $responseBody = $operation();
-            $responseCode = 200;
-            $encodedBody = json_encode($responseBody, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-            $update = $pdo->prepare(
-                'UPDATE api_idempotency_keys
-                    SET response_code = ?, response_body = ?
-                  WHERE store_id = ? AND idempotency_key = ?'
-            );
-            $update->execute([$responseCode, $encodedBody, $storeId, $idempotencyKey]);
-
-            return [
-                'status_code' => $responseCode,
-                'body' => $responseBody,
-            ];
-        } catch (Throwable $e) {
-            // Clean up reservation so future retry attempts can proceed
+            $operationCompleted = true;
+        } catch (Throwable $opException) {
+            // Operation itself threw an exception.
+            // Mark as Failed (500) so a retry does not blindly recreate without knowing state.
             try {
-                $delete = $pdo->prepare(
-                    'DELETE FROM api_idempotency_keys
+                $update = $pdo->prepare(
+                    'UPDATE api_idempotency_keys
+                        SET response_code = 500, response_body = ?
                       WHERE store_id = ? AND idempotency_key = ? AND response_code = 0'
                 );
-                $delete->execute([$storeId, $idempotencyKey]);
+                $update->execute([
+                    json_encode(['error' => $opException->getMessage()], JSON_UNESCAPED_SLASHES),
+                    $storeId,
+                    $idempotencyKey,
+                ]);
             } catch (Throwable) {
             }
-            throw $e;
+            throw $opException;
         }
+
+        // The operation completed successfully. Under NO circumstance delete the reservation.
+        $responseCode = 200;
+        $encodedBody = json_encode($responseBody, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            try {
+                $update = $pdo->prepare(
+                    'UPDATE api_idempotency_keys
+                        SET response_code = ?, response_body = ?
+                      WHERE store_id = ? AND idempotency_key = ?'
+                );
+                $update->execute([$responseCode, $encodedBody, $storeId, $idempotencyKey]);
+                break;
+            } catch (Throwable) {
+                usleep(20000);
+            }
+        }
+
+        return [
+            'status_code' => $responseCode,
+            'body' => $responseBody,
+        ];
     }
 
     /**

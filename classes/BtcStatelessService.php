@@ -88,8 +88,10 @@ class BtcStatelessService
             throw new BtcStatelessServiceException('Invoice wallet is invalid.', 'check_status', 400);
         }
 
-        [, $walletPath] = $this->resolveWallet($walletName);
-        $this->wallet->loadWallet($walletPath);
+        if (!$this->invoiceManager->canObserveWithoutWallet()) {
+            [, $walletPath] = $this->resolveWallet($walletName);
+            $this->wallet->loadWallet($walletPath);
+        }
 
         return $this->invoiceManager->checkStatelessPaymentStatus($token);
     }

@@ -17,7 +17,9 @@ final class BtcStatelessFactory
 {
     /** @var array<string, mixed> */
     private array $config;
+    private ?ElectrumRPC $rpc = null;
     private ?ElectrumWallet $wallet = null;
+    private ?BlockchainProviderInterface $blockchainProvider = null;
     private ?BtcStatelessInvoiceManager $invoiceManager = null;
     private ?BtcStatelessService $service = null;
 
@@ -27,16 +29,33 @@ final class BtcStatelessFactory
         $this->config = $config;
     }
 
-    public function wallet(): ElectrumWallet
+    public function rpc(): ElectrumRPC
     {
-        if ($this->wallet === null) {
-            $rpc = new ElectrumRPC(
+        if ($this->rpc === null) {
+            $this->rpc = new ElectrumRPC(
                 $this->requiredString('rpc_host'),
                 $this->requiredPort('rpc_port'),
                 $this->requiredString('rpc_user'),
                 $this->requiredString('rpc_pass', true, false)
             );
-            $this->wallet = new ElectrumWallet($rpc);
+        }
+
+        return $this->rpc;
+    }
+
+    public function blockchainProvider(): BlockchainProviderInterface
+    {
+        if ($this->blockchainProvider === null) {
+            $this->blockchainProvider = new ElectrumBlockchainProvider($this->rpc());
+        }
+
+        return $this->blockchainProvider;
+    }
+
+    public function wallet(): ElectrumWallet
+    {
+        if ($this->wallet === null) {
+            $this->wallet = new ElectrumWallet($this->rpc());
         }
 
         return $this->wallet;
@@ -47,7 +66,9 @@ final class BtcStatelessFactory
         if ($this->invoiceManager === null) {
             $this->invoiceManager = new BtcStatelessInvoiceManager(
                 $this->wallet(),
-                $this->requiredString('secret_key')
+                $this->requiredString('secret_key'),
+                null,
+                $this->blockchainProvider()
             );
         }
 

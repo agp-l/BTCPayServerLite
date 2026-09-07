@@ -28,8 +28,8 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     private const ELECTRUM_STATUS_PAID = 3;
     private const ELECTRUM_STATUS_UNCONFIRMED = 7;
 
-    private ElectrumWallet $wallet;
-    private BtcStatelessInvoiceManager $statelessManager;
+    private ?ElectrumWallet $wallet;
+    private ?BtcStatelessInvoiceManager $statelessManager;
     private ?Database $db;
     private Closure $clock;
     private ?AddressGeneratorFactory $addressGeneratorFactory;
@@ -37,8 +37,8 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     private ?BlockchainProviderInterface $blockchainProvider;
 
     public function __construct(
-        ElectrumWallet $wallet,
-        string $secretKey,
+        ?ElectrumWallet $wallet = null,
+        string $secretKey = '',
         ?Database $db = null,
         ?callable $clock = null,
         ?AddressGeneratorFactory $addressGeneratorFactory = null,
@@ -46,7 +46,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         ?BlockchainProviderInterface $blockchainProvider = null
     ) {
         $this->wallet = $wallet;
-        $this->statelessManager = new BtcStatelessInvoiceManager($wallet, $secretKey, $clock);
+        $this->statelessManager = $wallet !== null ? new BtcStatelessInvoiceManager($wallet, $secretKey, $clock) : null;
         $this->db = $db;
         $this->clock = $clock === null
             ? static fn (): int => time()
@@ -92,7 +92,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
             } elseif ($this->addressGenerator !== null) {
                 $generator = $this->addressGenerator;
             } else {
-                $factory = new AddressGeneratorFactory($this->wallet, $database);
+                $factory = new AddressGeneratorFactory($this->requireWallet(), $database);
                 $generator = $factory->forStore($store);
             }
         }
@@ -252,33 +252,48 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
      */
     public function getCachedDatabasePaymentStatus(string $invoiceId): array
     {
-        $database = $this->requireDatabase();
         $invoice = $this->loadDatabaseInvoice($invoiceId);
         $expected = $this->requirePositiveAmount((string) $invoice['amount']);
         $currentStatus = (string) ($invoice['status'] ?? 'New');
         $now = $this->now();
         $isExpired = $now >= (int) $invoice['expires_at'];
 
-        if ($currentStatus === 'New' && $isExpired) {
-            $statement = $database->getPdo()->prepare(
-                "UPDATE invoices SET status = 'Expired' WHERE id = ? AND status = 'New'"
-            );
-            $statement->execute([$invoiceId]);
-            if ($statement->rowCount() === 1) {
-                $currentStatus = 'Expired';
-                $invoice['status'] = 'Expired';
+        $confirmedSats = (int) ($invoice['confirmed_received_sats'] ?? 0);
+        $unconfirmedSats = (int) ($invoice['unconfirmed_received_sats'] ?? 0);
+        $totalReceivedSats = $confirmedSats + $unconfirmedSats;
+
+        if ($currentStatus === 'Settled') {
+            $received = BitcoinAmount::max($expected, BitcoinAmount::fromSatoshis($totalReceivedSats));
+            $displayStatus = 'Settled';
+            $additionalStatus = 'None';
+        } else {
+            $received = BitcoinAmount::fromSatoshis($totalReceivedSats);
+            $confirmed = BitcoinAmount::fromSatoshis($confirmedSats);
+
+            if ($confirmed->compare($expected) >= 0) {
+                $displayStatus = 'Settled';
+                $additionalStatus = 'None';
+            } elseif ($received->compare($expected) >= 0) {
+                $displayStatus = 'Processing';
+                $additionalStatus = 'None';
+            } elseif ($received->isPositive()) {
+                $displayStatus = 'Processing';
+                $additionalStatus = 'PaidPartial';
+            } elseif ($currentStatus === 'Expired' || $isExpired) {
+                $displayStatus = 'Expired';
+                $additionalStatus = 'None';
+            } else {
+                $displayStatus = $currentStatus;
+                $additionalStatus = 'None';
             }
         }
 
-        $confirmed = $currentStatus === 'Settled' ? $expected : BitcoinAmount::fromSatoshis(0);
-        $received = $currentStatus === 'Settled' ? $expected : BitcoinAmount::fromSatoshis(0);
-
         return $this->databaseStatusResult(
             $invoice,
-            $currentStatus,
+            $displayStatus,
             $expected,
             $received,
-            'None'
+            $additionalStatus
         );
     }
 
@@ -373,7 +388,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         array $customData = [],
         int $expirationMinutes = 15
     ): array {
-        return $this->statelessManager->createStatelessInvoice(
+        return $this->requireStatelessManager()->createStatelessInvoice(
             $amountBtc,
             $description,
             $customData,
@@ -388,7 +403,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
      */
     public function decodeStatelessToken(string $token): array
     {
-        return $this->statelessManager->decodeStatelessToken($token);
+        return $this->requireStatelessManager()->decodeStatelessToken($token);
     }
 
     /**
@@ -396,7 +411,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
      */
     public function checkStatelessPaymentStatus(string $token): array
     {
-        return $this->statelessManager->checkStatelessPaymentStatus($token);
+        return $this->requireStatelessManager()->checkStatelessPaymentStatus($token);
     }
 
     /**
@@ -407,7 +422,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         string $memo,
         int $expirationSeconds
     ): array {
-        $request = $this->wallet->createPaymentRequest(
+        $request = $this->requireWallet()->createPaymentRequest(
             $amount->toBtcString(),
             $memo,
             $expirationSeconds
@@ -440,7 +455,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     ): array {
         $electrumStatus = null;
         if ($requestId !== null && $requestId !== '') {
-            $request = $this->wallet->getPaymentRequest($requestId);
+            $request = $this->requireWallet()->getPaymentRequest($requestId);
             $rawStatus = $request['status'] ?? null;
             if (is_int($rawStatus)) {
                 $electrumStatus = $rawStatus;
@@ -460,7 +475,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
             $confirmed = $amounts['confirmed'];
             $received = $amounts['received'];
         } else {
-            $balance = $this->wallet->getAddressBalanceExact($address);
+            $balance = $this->requireWallet()->getAddressBalanceExact($address);
 
             try {
                 $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
@@ -549,11 +564,29 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     private function removePaymentRequestQuietly(string $requestId): void
     {
         try {
-            $this->wallet->deletePaymentRequest($requestId);
+            $this->requireWallet()->deletePaymentRequest($requestId);
         } catch (Throwable) {
             // Preserve the original failure. The orphaned request is harmless
             // and can be removed by a maintenance task later.
         }
+    }
+
+    private function requireWallet(): ElectrumWallet
+    {
+        if ($this->wallet === null) {
+            throw new LogicException('Wallet operations are not configured for this invoice manager.');
+        }
+
+        return $this->wallet;
+    }
+
+    private function requireStatelessManager(): BtcStatelessInvoiceManager
+    {
+        if ($this->statelessManager === null) {
+            throw new LogicException('Stateless invoice operations are not configured for this invoice manager.');
+        }
+
+        return $this->statelessManager;
     }
 
     private function requirePositiveAmount(int|float|string $amount): BitcoinAmount
