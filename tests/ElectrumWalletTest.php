@@ -181,7 +181,7 @@ $tests['uses the Electrum expiry parameter for payment requests'] = static funct
     $wallet = new ElectrumWallet($rpc);
     $wallet->loadWallet('/wallets/store');
 
-    $wallet->createPaymentRequest('0.001', 'Order 42', 900);
+    $wallet->createPaymentRequest('0.001', 'Order 42', 900, '/wallets/store');
 
     assertSameValue(
         ['amount' => '0.001', 'memo' => 'Order 42', 'expiry' => 900],
@@ -201,7 +201,7 @@ $tests['gets and deletes payment requests in the active wallet'] = static functi
     $wallet->loadWallet('/wallets/store');
 
     $request = $wallet->getPaymentRequest('a1b2c3d4e5');
-    $wallet->deletePaymentRequest('a1b2c3d4e5');
+    $wallet->deletePaymentRequest('a1b2c3d4e5', '/wallets/store');
 
     assertSameValue('a1b2c3d4e5', $request['request_id'], 'get_request returned the wrong request.');
     assertSameValue('wallet', $rpc->calls[1]['scope'], 'get_request must be wallet-scoped.');
@@ -246,7 +246,7 @@ $tests['keeps payto scoped and broadcast daemon-wide'] = static function (): voi
     $wallet = new ElectrumWallet($rpc);
     $wallet->loadWallet('/wallets/store');
 
-    $actualTxid = $wallet->sendPayment('bc1qdestination', '0.00100000', null, 2);
+    $actualTxid = $wallet->sendPayment('bc1qdestination', '0.00100000', null, 2, '/wallets/store');
 
     assertSameValue($txid, $actualTxid, 'sendPayment() returned the wrong transaction ID.');
     assertSameValue('wallet', $rpc->calls[1]['scope'], 'payto must be wallet-scoped.');

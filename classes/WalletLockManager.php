@@ -60,7 +60,8 @@ class WalletLockManager
                 $parts[] = $part;
             }
         }
-        return '/' . implode('/', $parts);
+        $canonical = '/' . implode('/', $parts);
+        return realpath($canonical) ?: $canonical;
     }
 
     /**

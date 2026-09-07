@@ -16,7 +16,7 @@ final class InvoiceStateMachine
         'Settled' => ['Settled'],
     ];
 
-    public static function next(string $current, int $expectedSats, AddressPaymentObservation $observation, int $expiresAt, int $now): string
+    public static function next(string $current, int $expectedSats, AddressPaymentObservation $observation, int $expiresAt, int $now, bool $previousPaymentObserved = false): string
     {
         if (!isset(self::ALLOWED[$current]) || $expectedSats <= 0) {
             throw new InvalidArgumentException('Invalid invoice state or amount.');
@@ -29,7 +29,7 @@ final class InvoiceStateMachine
         }
         // Preserve evidence of any earlier partial payment, even if it has since
         // left the mempool or been spent. Do not invent cumulative amounts.
-        if ($current === 'Processing' || $observation->getCurrentBalanceSatoshis() > 0) {
+        if ($current === 'Processing' || $previousPaymentObserved || $observation->getCurrentBalanceSatoshis() > 0) {
             return 'Processing';
         }
         return $current === 'Expired' || $now >= $expiresAt ? 'Expired' : 'New';

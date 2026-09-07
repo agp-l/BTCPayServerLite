@@ -101,7 +101,8 @@ class PaymentWorker
             $current = (string) $invoice['status'];
             $status = InvoiceStateMachine::next($current,
                 BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis(),
-                $observation, (int) $invoice['expires_at'], $now);
+                $observation, (int) $invoice['expires_at'], $now,
+                (int) $invoice['confirmed_balance_sats'] > 0 || (int) $invoice['mempool_delta_sats'] > 0);
             InvoiceStateMachine::assertTransition($current, $status);
             $next = match ($status) {
                 'Settled' => null,

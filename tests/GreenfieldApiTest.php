@@ -100,6 +100,7 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
 
     /** @var list<array{store_id: string, amount: int|float|string, metadata: array, expiration: int}> */
     public array $createdInvoices = [];
+    public bool $busy = false;
 
     public function __construct()
     {
@@ -118,6 +119,9 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
         ?BtcPayLite\AddressGeneratorInterface $addressGenerator = null,
         ?BtcPayLite\IdempotencyReservation $reservation = null
     ): array {
+        if ($this->busy) {
+            throw new BtcPayLite\WalletBusyException('Wallet busy', 2, 503);
+        }
         $this->createdInvoices[] = [
             'store_id' => $storeId,
             'amount' => $amountBtc,
@@ -383,8 +387,8 @@ $tests['rejects numeric JSON amounts at the API boundary'] = static function () 
 };
 
 $tests['maps a busy Electrum lock to retryable HTTP 503'] = static function () use ($walletPath): void {
-    [$service, , $database] = newGreenfieldTestService($walletPath);
-    $database->busy = true;
+    [$service, , , , $manager] = newGreenfieldTestService($walletPath);
+    $manager->busy = true;
 
     $exception = greenfieldAssertThrows(
         GreenfieldApiException::class,

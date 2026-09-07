@@ -39,48 +39,52 @@ class IdempotencyService
         // Connection-owned lock is released on a process crash, unlike an anonymous
         // response_code=0 claim. The resource ID/data remain durable for recovery.
         $lockName = 'idem_' . substr(hash('sha256', $storeId . "\0" . $idempotencyKey), 0, 56);
-        return $this->database->withNamedLock($lockName, 2, function () use ($storeId, $idempotencyKey, $hash, $operation, $responseFactory): array {
-            $row = $this->find($storeId, $idempotencyKey, $hash);
-            if ($row === null) {
-                $resourceId = 'inv_' . bin2hex(random_bytes(16));
-                $stmt = $this->database->getPdo()->prepare(
-                    "INSERT INTO api_idempotency_keys
-                        (store_id, idempotency_key, request_hash, state, resource_id, response_code, response_body, created_at)
-                     VALUES (?, ?, ?, 'Pending', ?, 0, '', ?)"
-                );
-                $stmt->execute([$storeId, $idempotencyKey, $hash, $resourceId, ($this->clock)()]);
+        try {
+            return $this->database->withNamedLock($lockName, 2, function () use ($storeId, $idempotencyKey, $hash, $operation, $responseFactory): array {
                 $row = $this->find($storeId, $idempotencyKey, $hash);
-            }
-            if ($row['state'] !== 'Pending') {
-                return $this->replay($row);
-            }
-            $reservation = new IdempotencyReservation($this->database, $storeId, $idempotencyKey,
-                (string) $row['resource_id'], $responseFactory ?? static fn (array $invoice): array => $invoice);
-            try {
-                $body = $operation($reservation);
-                $saved = $this->find($storeId, $idempotencyKey, $hash);
-                if ($saved['state'] === 'Pending') {
-                    // For side-effect-free callbacks; create-invoice already completed
-                    // inside its INSERT transaction and cannot reach this branch.
-                    $this->database->transactional(fn () => $reservation->complete($body));
+                if ($row === null) {
+                    $resourceId = 'inv_' . bin2hex(random_bytes(16));
+                    $stmt = $this->database->getPdo()->prepare(
+                        "INSERT INTO api_idempotency_keys
+                            (store_id, idempotency_key, request_hash, state, resource_id, response_code, response_body, created_at)
+                         VALUES (?, ?, ?, 'Pending', ?, 0, '', ?)"
+                    );
+                    $stmt->execute([$storeId, $idempotencyKey, $hash, $resourceId, ($this->clock)()]);
+                    $row = $this->find($storeId, $idempotencyKey, $hash);
+                }
+                if ($row['state'] !== 'Pending') {
+                    return $this->replay($row);
+                }
+                $reservation = new IdempotencyReservation($this->database, $storeId, $idempotencyKey,
+                    (string) $row['resource_id'], $responseFactory ?? static fn (array $invoice): array => $invoice);
+                try {
+                    $body = $operation($reservation);
                     $saved = $this->find($storeId, $idempotencyKey, $hash);
-                }
-                return $this->replay($saved);
-            } catch (Throwable $exception) {
-                $saved = $this->find($storeId, $idempotencyKey, $hash);
-                if ($saved !== null && $saved['state'] !== 'Pending') {
+                    if ($saved['state'] === 'Pending') {
+                        // For side-effect-free callbacks; create-invoice already completed
+                        // inside its INSERT transaction and cannot reach this branch.
+                        $this->database->transactional(fn () => $reservation->complete($body));
+                        $saved = $this->find($storeId, $idempotencyKey, $hash);
+                    }
                     return $this->replay($saved);
+                } catch (Throwable $exception) {
+                    $saved = $this->find($storeId, $idempotencyKey, $hash);
+                    if ($saved !== null && $saved['state'] !== 'Pending') {
+                        return $this->replay($saved);
+                    }
+                    // Safe deterministic client failures are replayed with their original
+                    // HTTP status/body. Transient/unknown failures keep recoverable data.
+                    if ($exception instanceof GreenfieldApiException && $exception->getHttpStatus() < 500) {
+                        $body = ['message' => $exception->getMessage()];
+                        $this->database->transactional(fn () => $reservation->complete($body, $exception->getHttpStatus(), 'Failed'));
+                        return ['status_code' => $exception->getHttpStatus(), 'body' => $body];
+                    }
+                    throw $exception;
                 }
-                // Safe deterministic client failures are replayed with their original
-                // HTTP status/body. Transient/unknown failures keep recoverable data.
-                if ($exception instanceof GreenfieldApiException && $exception->getHttpStatus() < 500) {
-                    $body = ['message' => $exception->getMessage()];
-                    $this->database->transactional(fn () => $reservation->complete($body, $exception->getHttpStatus(), 'Failed'));
-                    return ['status_code' => $exception->getHttpStatus(), 'body' => $body];
-                }
-                throw $exception;
-            }
-        });
+            });
+        } catch (DatabaseException $exception) {
+            throw new GreenfieldApiException('Invoice reservation is busy. Retry with the same key.', 'idempotency_reservation', 503, $exception);
+        }
     }
 
     private function find(string $storeId, string $key, string $hash): ?array

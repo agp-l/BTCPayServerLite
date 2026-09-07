@@ -150,14 +150,10 @@ final class PdoAdminManagementRepository implements AdminManagementRepository
         return $statement->rowCount() === 1;
     }
 
+    /** @deprecated PaymentWorker exclusively owns payment transitions and their outbox events. */
     public function updateInvoiceStatus(string $invoiceId, string $status): bool
     {
-        $statement = $this->pdo->prepare(
-            "UPDATE invoices SET status = ? WHERE id = ? AND status <> 'Settled'"
-        );
-        $statement->execute([$status, $invoiceId]);
-        return $statement->rowCount() === 1
-            || ($this->invoiceStatus($invoiceId) === $status && $status !== 'Settled');
+        throw new \LogicException('Manual invoice status writes are disabled; PaymentWorker owns payment state.');
     }
 
     public function updateWebhookUrl(string $webhookId, string $url): bool

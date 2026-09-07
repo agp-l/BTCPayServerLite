@@ -63,7 +63,7 @@ echo "[PASS] 100 concurrent walletless statuses, one refresh RPC, no loaded wall
 file_put_contents($dir . '/queries', '0');
 $results = coreConcurrent(100, static function () use ($dir, $checkStatus): int {
     try { $checkStatus($dir . '/slow', 2200000); return 200; }
-    catch (BtcPayLite\BtcStatelessServiceException $e) { return $e->getHttpStatus(); }
+    catch (BtcPayLite\BtcStatelessServiceException $e) { return $e->getCode(); }
 });
 coreSame(1, (int) file_get_contents($dir . '/queries'), 'Timeout caused an RPC stampede');
 coreCheck(in_array(503, $results, true), 'Slow refresh did not produce bounded backpressure');
@@ -74,6 +74,17 @@ $observation = (new ElectrumBlockchainProvider($rpc, 2, $dir . '/semantics'))->o
 coreSame(2, $observation->getConfirmedBalanceSatoshis(), 'Confirmed current balance');
 coreSame(-1, $observation->getMempoolDeltaSatoshis(), 'Signed mempool delta');
 coreSame(1, $observation->getCurrentBalanceSatoshis(), 'Current net balance');
+$cacheFile = glob($dir . '/semantics/*.json')[0];
+$data = json_decode(file_get_contents($cacheFile), true); $data['time'] = time() - 5;
+file_put_contents($cacheFile, json_encode($data));
+$lock = fopen(substr($cacheFile, 0, -5) . '.lock', 'c'); flock($lock, LOCK_EX);
+$queries = (int) file_get_contents($dir . '/queries');
+try {
+    $stale = (new ElectrumBlockchainProvider($rpc, 2, $dir . '/semantics'))->observeAddress('bc1qnegative');
+    coreSame($data['time'], $stale->getObservedAt(), 'Stale fallback replaced its original timestamp');
+    coreSame($queries, (int) file_get_contents($dir . '/queries'), 'Stale fallback queried Electrum');
+} finally { flock($lock, LOCK_UN); fclose($lock); }
+echo "[PASS] Lock timeout uses bounded valid stale cache with no RPC\n";
 $zero = new AddressPaymentObservation('bc1qcore', 0, 0, 0, time());
 $partial = new AddressPaymentObservation('bc1qcore', 0, 1, 1, time());
 $paid = new AddressPaymentObservation('bc1qcore', 2, 0, 2, time());

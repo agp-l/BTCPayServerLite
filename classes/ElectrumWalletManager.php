@@ -80,7 +80,8 @@ class ElectrumWalletManager
     public function closeWallet(string $walletPathOrName): void
     {
         $canonicalPath = $this->pathResolver->resolve($walletPathOrName);
-        $this->rpc->callDaemon('close_wallet', ['wallet_path' => $canonicalPath]);
+        (new WalletLockManager())->withWalletLock($canonicalPath,
+            fn () => $this->rpc->callDaemon('close_wallet', ['wallet_path' => $canonicalPath]));
         unset($this->wallets[$canonicalPath]);
     }
 }

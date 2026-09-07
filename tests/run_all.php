@@ -20,6 +20,7 @@ echo "========================================\n";
 foreach ($testFiles as $file) {
     $filename = basename($file);
     $cmd = escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($file) . ' 2>&1';
+    $output = [];
     exec($cmd, $output, $returnCode);
 
     if ($returnCode === 0) {

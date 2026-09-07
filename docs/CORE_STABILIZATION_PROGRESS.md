@@ -9,7 +9,7 @@ Scope: payment core only, no UI redesign or dependency changes.
   one file lock domain for stateless and Electrum address creation; DB-only
   checkout snapshots; one invoice state machine; short atomic worker transaction
   joining observation, status, webhook outbox and lease release; CLI-only worker.
-- Current checkpoint: idempotency `Pending/Completed/Failed`, stable invoice ID,
+- `aa295e8`: idempotency `Pending/Completed/Failed`, stable invoice ID,
   durable creation snapshot and XPUB index reservation. Invoice INSERT and exact
   API response completion share a transaction. Replay authenticates first.
 - Provider uses one `callNetwork(getaddressbalance)` per refresh, bounded
@@ -20,29 +20,36 @@ Scope: payment core only, no UI redesign or dependency changes.
 - XPUB factory can operate without an ElectrumWallet. Payout preparation now
   explicitly routes the wallet and uses the shared mutation lock.
 
-## Validation so far
+## Verified checkpoint (2026-09-07)
 
-- Initial source checkpoint: 208 PHP files passed syntax checks.
-- Existing tests after early contract adaptations: 46 passed, 3 failed.
-  Remaining failures then were outdated checkout/idempotency fixtures and the
-  Greenfield test still expecting an outer API wallet lock.
-- `IdempotencyServiceTest` and the rewritten checkout snapshot test subsequently passed.
-- New `CorePaymentArchitectureTest` is written but has NOT run yet. It covers
-  100-process single-flight, timeout backpressure, stateless wallet independence,
-  shared mutation locks, state-machine rules and both RPC dialects.
-- Full stabilization is NOT yet verified; do not describe all acceptance tests as passed.
+- All **53 test files passed, 0 failed**, with real MariaDB 10.11 enabled.
+  PHP runtime: 8.3. Integration tests used isolated disposable databases, never production.
+- 100 concurrent XPUB creates: 100 addresses and unique indices; zero Electrum
+  calls and zero wallet locks. Generator and bitcoin-p8 remain unchanged.
+- 100 concurrent identical idempotency requests: one invoice/address/index and
+  identical response. Response-write failure rolls back invoice insertion;
+  retry reuses the durable resource snapshot. Unauthorized replay and hash conflict covered.
+- 100 concurrent walletless stateless checks: one refresh RPC. Slow refresh:
+  bounded stale cache or 503, no second query. Same-wallet mutation serialization,
+  independent wallets, explicit wallet routing and both dialects covered.
+- Two worker processes claim one invoice once. Blockchain observation occurs
+  outside the transaction; lease exceeds the provider's declared maximum duration.
+- SQL outbox failure and actual SIGKILL immediately before enqueue roll back
+  status/observation. Recovery produces exactly one webhook event.
+- Processing never regresses; Settled remains terminal. Upgrade from the exact
+  original cbeba360 schema preserves late partial-payment evidence, settlement
+  and exact completed idempotency response bytes. Anonymous legacy claims become Failed/409.
+- Checkout works without RPC config, reads DB only; deprecated monitoring facade
+  is read-only. Actual HTTP request to payment_worker.php returns empty 404.
+- GitHub Actions now configures MariaDB and required test extensions so the
+  persistence and migration tests run there rather than silently skipping.
 
 ## Next steps (resume here)
 
-1. Finish Greenfield fixtures: expect no outer wallet lock or wallet load;
-   inject busy failures at the invoice/generator boundary instead.
-2. Run/fix `CorePaymentArchitectureTest` and existing tests.
-3. Add/run real MariaDB integration tests for 100 XPUB indices, 100 identical
-   idempotency requests, two worker processes, outbox rollback/crash injection,
-   idempotency response-write failure recovery, DB-only checkout, and HTTP 404 worker.
-4. Test migrations 004/005 against original schema and review pending consistency edges.
-5. Document runtime config, ownership, current-balance limitations and migration order.
-6. Publish small commits to main and update this checkpoint after each verified milestone.
+1. Publish this verified tests/migration checkpoint on main.
+2. Finish ownership/deployment documentation and correct stale README claims.
+3. Verify published GitHub Actions and document any environment-only limitation.
+4. Keep small commits and update this checkpoint; do not restart the implementation.
 
 ## Operational notes
 
@@ -68,6 +75,8 @@ Scope: payment core only, no UI redesign or dependency changes.
 
 The scratch Git checkout survives interruptions; `/tmp` was cleared on resume.
 Use scratch (outside Git) for reproducible local runtime dependencies.
+Current runtime is in `../core-runtime/`; `run-mysql.py tests/run_all.php`
+starts MariaDB and all tests together. `php.ini` enables the extracted extensions.
 PHP 8.3 CLI/extensions and MariaDB 10.11 were obtained as Ubuntu .deb packages
 and extracted without system installation. Enable PDO/mysql/sqlite, gmp, bcmath,
 curl, mbstring, ctype, iconv, tokenizer, phar, dom/xml/simplexml and fileinfo.

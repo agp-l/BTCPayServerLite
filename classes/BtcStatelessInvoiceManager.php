@@ -135,6 +135,8 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             'seconds_remaining' => $isExpired ? 0 : ((int) $invoice['e'] - $now),
             'invoice' => $invoice,
             'payment' => [
+                'current_balance' => $observation['received']->toBtcString(),
+                // Historical HTTP aliases; provider observations represent current balances.
                 'received_total' => $observation['received']->toBtcString(),
                 'total_received' => $observation['received']->toBtcString(),
                 'missing_amount' => $missing->toBtcString(),
@@ -218,21 +220,21 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             }
         }
 
-            $balance = $this->wallet->getAddressBalanceExact($address);
-            try {
-                $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
-                $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed'] ?? '0');
-            } catch (InvalidArgumentException $exception) {
-                throw new BtcInvoiceManagerException(
-                    'Electrum returned an invalid address balance.',
-                    'observe_stateless_payment',
-                    previous: $exception
-                );
-            }
+        $balance = $this->wallet->getAddressBalanceExact($address);
+        try {
+            $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
+            $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed'] ?? '0');
+        } catch (InvalidArgumentException $exception) {
+            throw new BtcInvoiceManagerException(
+                'Electrum returned an invalid address balance.',
+                'observe_stateless_payment',
+                previous: $exception
+            );
+        }
 
-            $zero = BitcoinAmount::fromSatoshis(0);
-            $confirmed = BitcoinAmount::max($zero, $confirmed);
-            $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
+        $zero = BitcoinAmount::fromSatoshis(0);
+        $confirmed = BitcoinAmount::max($zero, $confirmed);
+        $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
         if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
             $confirmed = BitcoinAmount::max($confirmed, $expected);
             $received = BitcoinAmount::max($received, $expected);

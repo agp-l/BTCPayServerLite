@@ -34,7 +34,7 @@ class ElectrumWallet
      */
     public function loadWallet(string $walletPath, ?string $password = null): void
     {
-        $this->ensureWalletLoaded($walletPath, $password);
+        (new WalletLockManager())->withWalletLock($walletPath, fn () => $this->ensureWalletLoaded($walletPath, $password));
         $this->activeWalletPath = $this->validateWalletPath($walletPath);
     }
 
@@ -221,7 +221,9 @@ class ElectrumWallet
             throw new InvalidArgumentException('Transaction ID must be 64 hexadecimal characters.');
         }
 
-        $result = $this->rpc->callNetwork('gettransaction', ['txid' => $txid]);
+        $result = $walletPath === null
+            ? $this->rpc->callNetwork('gettransaction', ['txid' => $txid])
+            : $this->rpc->callWallet('gettransaction', $walletPath, ['txid' => $txid]);
         if (!is_array($result) && !is_string($result)) {
             throw $this->invalidResponse('gettransaction');
         }
@@ -393,6 +395,13 @@ class ElectrumWallet
             ? $this->validateWalletPath($walletPath)
             : $this->requireWalletLoaded();
 
+        if (in_array($method, ['createnewaddress', 'add_request', 'delete_request', 'clear_requests',
+            'payto', 'paytomany', 'signtransaction', 'freeze_utxo', 'unfreeze_utxo', 'addtransaction'], true)) {
+            return (new WalletLockManager())->withWalletLock($targetWallet, function () use ($method, $targetWallet, $params): mixed {
+                $this->ensureWalletLoaded($targetWallet);
+                return $this->rpc->callWallet($method, $targetWallet, $params);
+            });
+        }
         return $this->rpc->callWallet($method, $targetWallet, $params);
     }
 

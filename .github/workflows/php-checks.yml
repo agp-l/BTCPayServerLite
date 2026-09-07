@@ -14,12 +14,26 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      BTCPAY_TEST_MYSQL_HOST: 127.0.0.1
+      BTCPAY_TEST_MYSQL_PORT: 3306
+      BTCPAY_TEST_MYSQL_USER: root
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: curl, json, pdo_mysql
+          extensions: curl, json, pdo_mysql, pdo_sqlite, gmp, bcmath, pcntl, posix, dom, simplexml
           coverage: none
       - run: composer install --no-interaction --no-progress --prefer-dist
       - name: PHP syntax
