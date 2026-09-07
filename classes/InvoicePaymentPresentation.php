@@ -10,7 +10,10 @@ final class InvoicePaymentPresentation
     public static function fromInvoice(array $invoice): array
     {
         $expected = BitcoinAmount::fromBtc((string) $invoice['amount']);
-        $current = max(0, (int) ($invoice['confirmed_balance_sats'] ?? 0) + (int) ($invoice['mempool_delta_sats'] ?? 0));
+        // Migrated maxima are retained only as evidence for the worker. Without
+        // an observation timestamp they are not a current-balance snapshot.
+        $current = ($invoice['payment_observed_at'] ?? null) === null ? 0
+            : max(0, (int) ($invoice['confirmed_balance_sats'] ?? 0) + (int) ($invoice['mempool_delta_sats'] ?? 0));
         $status = (string) $invoice['status'];
         InvoiceStateMachine::assertTransition($status, $status);
         $received = BitcoinAmount::fromSatoshis($current);
@@ -31,6 +34,7 @@ final class InvoicePaymentPresentation
             'additional_status' => $status !== 'Settled' && $current > 0 && $current < $expected->satoshis() ? 'PaidPartial' : 'None',
             'invoice' => $invoice,
             'payment' => [
+                'observed_at' => $invoice['payment_observed_at'] ?? null,
                 'current_balance' => $received->toBtcString(),
                 // Existing HTTP field retained as a presentation alias, not cumulative receipts.
                 'total_received' => $received->toBtcString(),

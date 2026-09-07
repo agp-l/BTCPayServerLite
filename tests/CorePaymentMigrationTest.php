@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/support/CoreTestSupport.php';
 
-use BtcPayLite\{AddressPaymentObservation, BlockchainProviderInterface, Database, InstallationManager, PaymentWorker, WebhookDeliveryRepository};
+use BtcPayLite\{AddressPaymentObservation, BlockchainProviderInterface, Database, InstallationManager, InvoicePaymentPresentation, PaymentWorker, WebhookDeliveryRepository};
 if (!getenv('BTCPAY_TEST_MYSQL_HOST')) {
     echo "[SKIP] Core migration test requires BTCPAY_TEST_MYSQL_HOST (enabled in CI).\n";
     return;
@@ -20,7 +20,7 @@ try {
     $pdo->exec("INSERT INTO stores (id,name,api_key) VALUES ('old','old','old-key')");
     $now = time();
     $stmt = $pdo->prepare("INSERT INTO invoices (id,store_id,btc_address,amount,status,confirmed_received_sats,unconfirmed_received_sats,created_at,expires_at) VALUES (?, 'old', ?, '0.00000002', ?, ?, 0, ?, ?)");
-    $stmt->execute(['inv_old_partial', 'bc1qoldpartial00000', 'Expired', 1, $now-120, $now-60]);
+    $stmt->execute(['inv_old_partial', 'bc1qoldpartial00000', 'Expired', 1, $now-172860, $now-172800]);
     $stmt->execute(['inv_old_settled', 'bc1qoldsettled00000', 'Settled', 2, $now-120, $now-60]);
     $body = '{"id":"inv_existing","status":"New"}';
     $stmt = $pdo->prepare('INSERT INTO api_idempotency_keys (store_id,idempotency_key,request_hash,response_code,response_body,created_at) VALUES (\'old\', ?, ?, ?, ?, ?)');
@@ -35,6 +35,10 @@ try {
     $row = $pdo->query("SELECT * FROM api_idempotency_keys WHERE idempotency_key='anonymous'")->fetch();
     coreSame('Failed', $row['state'], 'Anonymous old operation was left pending');
     coreSame(409, (int) $row['response_code'], 'Anonymous old operation must require reconciliation');
+    $oldPartial = $pdo->query("SELECT * FROM invoices WHERE id='inv_old_partial'")->fetch();
+    $presentation = InvoicePaymentPresentation::fromInvoice($oldPartial);
+    coreSame(null, $presentation['payment']['observed_at'], 'Legacy maxima must not invent an observation time');
+    coreSame('0.00000000', $presentation['payment']['current_balance'], 'Legacy maxima must not be presented as current balance');
     $provider = new class implements BlockchainProviderInterface {
         public function maxObservationDurationSeconds(): int { return 1; }
         public function observeAddress(string $address, int $expectedSatoshis = 0): AddressPaymentObservation

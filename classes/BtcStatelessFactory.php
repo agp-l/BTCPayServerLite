@@ -146,22 +146,4 @@ final class BtcStatelessFactory
 
         return $value;
     }
-
-    private function requiredPort(string $key): int
-    {
-        $value = $this->config[$key] ?? null;
-        if (is_int($value)) {
-            $port = $value;
-        } elseif (is_string($value) && preg_match('/\A[0-9]+\z/D', trim($value))) {
-            $port = (int) trim($value);
-        } else {
-            throw new InvalidArgumentException("Configuration value {$key} is invalid.");
-        }
-
-        if ($port < 1 || $port > 65_535) {
-            throw new InvalidArgumentException("Configuration value {$key} is outside the valid range.");
-        }
-
-        return $port;
-    }
 }

@@ -66,7 +66,8 @@ class PaymentWorker
         $update = $pdo->prepare(
             "UPDATE invoices
                 SET payment_processing_token = ?, payment_processing_until = UNIX_TIMESTAMP() + ?
-              WHERE (status IN ('New', 'Processing') OR (status = 'Expired' AND expires_at >= ?))
+              WHERE (status IN ('New', 'Processing') OR (status = 'Expired'
+                     AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0)))
                 AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())
                 AND (next_check_at IS NULL OR next_check_at <= ?)
            ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"

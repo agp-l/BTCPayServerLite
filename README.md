@@ -86,18 +86,18 @@ Projekt používá Composer PSR-4 autoloading:
 }
 ```
 
-Zjednodušený tok databázové faktury:
+Platební jádro má jednoho vlastníka pro každou odpovědnost. Podrobný kontrakt,
+provozní podmínky a omezení popisuje [Core payment architecture](docs/CORE_PAYMENT_ARCHITECTURE.md).
+Průběžný stav práce je v [checkpointu stabilizace](docs/CORE_STABILIZATION_PROGRESS.md).
 
-```text
-e-shop
-  -> api.php
-  -> GreenfieldApiController
-  -> GreenfieldApiService
-  -> GreenfieldApiRepository / BtcInvoiceManager
-  -> Database + ElectrumWallet
-  -> ElectrumRPC
-  -> Electrum daemon
-```
+| Operace | Vlastník |
+| --- | --- |
+| Vydání adresy | `AddressGenerator`: XPUB lokálně s DB rezervací indexu, nebo explicitní Electrum wallet |
+| Vytvoření faktury | `BtcInvoiceManager` + trvalá idempotency rezervace |
+| Pozorování blockchainu | `BlockchainProvider`, walletless cache a single-flight |
+| Změna payment statusu | `PaymentWorker` + `InvoiceStateMachine`, atomicky s webhook outboxem |
+| Databázový checkout | DB snapshot a prezentace, bez Electrumu |
+| Stateless status | Podepsaný token a `BlockchainProvider`, bez načítání wallet |
 
 Tok webhooku:
 
@@ -132,12 +132,12 @@ Událost se nejprve uloží do databáze a až potom odešle. Souběžné worker
 
 | Komponenta | Odpovědnost | Stav auditu |
 |---|---|---|
-| `BtcInvoiceManager` | Vytváří a načítá databázové faktury a bezpečně mění stavy `New`, `Processing`, `Settled`, `Expired`; původní stateless metody zachovává jako kompatibilní delegující fasádu. | Auditováno |
+| `BtcInvoiceManager` | Vytváří a načítá databázové faktury; starý monitoring je deprecated DB-only fasáda. Změny statusu vlastní `PaymentWorker`. | Auditováno |
 | `BtcInvoiceManagerException` | Strukturovaná chyba životního cyklu faktury. | Auditováno |
-| `CheckoutRepository` | Read-only rozhraní pro nalezení peněženky vlastnící databázovou fakturu. | Auditováno |
-| `PdoCheckoutRepository` | Parametrizovaný omezený JOIN faktury a obchodu bez načítání nepotřebných nebo citlivých sloupců. | Auditováno |
+| `CheckoutRepository` | Read-only rozhraní pro invoice checkout snapshot bez wallet konceptu. | Auditováno |
+| `PdoCheckoutRepository` | Jeden parametrizovaný SELECT checkout údajů z invoices, bez JOIN na store nebo wallet. | Auditováno |
 | `DatabaseCheckoutService` | Validuje invoice ID, normalizuje přesný platební stav a skládá prezentačně neutrální checkout view model. | Auditováno |
-| `DatabaseCheckoutFactory` | Sestavuje checkout z validované konfigurace a spouští kontrolu Electrumu pod sdíleným databázovým zámkem. | Auditováno |
+| `DatabaseCheckoutFactory` | Sestavuje checkout pouze z DB konfigurace; nevyžaduje RPC konfiguraci a nevolá Electrum. | Auditováno |
 | `DatabaseCheckoutController` | HTTP hranice veřejného checkoutu pro HTML a minimální JSON status odpověď; povoluje pouze `GET` a `HEAD`. | Auditováno |
 | `CheckoutException` | Veřejně bezpečná checkout chyba s HTTP statusem a stabilním názvem operace. | Auditováno |
 | `CheckoutQrCodeGenerator` | Lokálně generuje zelený SVG QR kód z validovaného BIP21 URI; při chybějící knihovně bezpečně zachová běžný wallet odkaz. | Auditováno |
@@ -305,13 +305,14 @@ Referenční implementace a kontrakty: [Greenfield e-commerce integrace](https:/
 
 ### `api_stateless.php`
 
-Vytváří stateless fakturu bez databázového invoice záznamu. Přístup je omezen konfigurovanými API klienty a operace s Electrumem používají lokální procesní zámek. Kanonický endpoint je `POST /api/stateless/invoices`; starší `POST /api` zůstává kompatibilní. Veřejná výsledná URL má tvar `/url-invoice?token=...`.
+Vytváří stateless fakturu bez databázového invoice záznamu. Vytváření je omezené konfigurovanými API klienty a mutace používá společný per-wallet zámek. Provider-based status potřebuje pouze token a blockchain provider; nenačítá wallet. Kanonický endpoint je `POST /api/stateless/invoices`; starší `POST /api` zůstává kompatibilní. Veřejná výsledná URL má tvar `/url-invoice?token=...`.
 
 ### Samostatné použití stateless jádra
 
 Pro lehkou instalaci není potřeba `Database`, PDO, databázové tabulky, webhook worker ani standardní checkout. Přenositelná vrstva používá tyto komponenty:
 
-- `BitcoinAmount`, `ElectrumRPC`, `ElectrumWallet` a jejich výjimky,
+- `BitcoinAmount`, `ElectrumRPCFactory`, `ElectrumRPC`, `ElectrumWallet`, `WalletLockManager` a jejich výjimky,
+- `BlockchainProviderInterface`, `ElectrumBlockchainProvider`, `AddressPaymentObservation`, `BlockchainProviderException`,
 - `BtcInvoiceManagerException`, `BtcStatelessTokenCodec`, `BtcStatelessInvoiceGateway`, `BtcStatelessInvoiceManager`,
 - volitelně `BtcStatelessService`, `BtcStatelessFactory` a příslušné HTTP controllery,
 - `CheckoutQrCodeGenerator` a `endroid/qr-code` pouze pro lokální QR na platební stránce.
@@ -319,22 +320,30 @@ Pro lehkou instalaci není potřeba `Database`, PDO, databázové tabulky, webho
 Minimální vytvoření faktury přímo z jádra:
 
 ```php
-$rpc = new BtcPayLite\ElectrumRPC($host, $port, $user, $password);
+$rpc = BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 $wallet = new BtcPayLite\ElectrumWallet($rpc);
-$wallet->loadWallet('/secure/wallets/merchant_wallet');
-
-$invoices = new BtcPayLite\BtcStatelessInvoiceManager($wallet, $secretKey);
+$provider = new BtcPayLite\ElectrumBlockchainProvider($rpc);
+$invoices = new BtcPayLite\BtcStatelessInvoiceManager($wallet, $secretKey, null, $provider);
 $result = $invoices->createStatelessInvoice(
     '0.00100000',
     'Ruční faktura e-mailem',
-    ['order_id' => 'MAIL-2026-001', 'wallet' => 'merchant_wallet'],
-    60
+    ['order_id' => 'MAIL-2026-001'],
+    60,
+    '/secure/wallets/merchant_wallet'
 );
 
 $paymentUrl = $publicBaseUrl . '/url-invoice?token=' . rawurlencode($result['token']);
 ```
 
 `secretKey` musí být stabilní tajný řetězec o délce nejméně 16 bajtů. Jeho změna zneplatní všechny dříve vytvořené odkazy. Token obsahuje platební údaje a jejich podpis, nikoli seed, xprv nebo heslo peněženky.
+
+### `payment_worker.php`
+
+Spouští se pouze přes CLI: `php payment_worker.php`. HTTP požadavek dostane 404
+ještě před načtením konfigurace. Worker provozujte nezávisle na webhook cronu;
+checkout pouze čte poslední uložený stav. Všechny procesy sdílejí
+`BTCPAY_WALLET_LOCK_DIR` a `BTCPAY_BLOCKCHAIN_CACHE_DIR` podle
+[provozních podmínek](docs/CORE_PAYMENT_ARCHITECTURE.md#electrum-routing-and-shared-directories).
 
 ### `webhook_cron.php`
 
@@ -352,6 +361,9 @@ return [
     'rpc_port' => 7777,
     'rpc_user' => '...',
     'rpc_pass' => '...',
+    'rpc_wallet_param_key' => 'wallet_path', // upstream; explicitně 'wallet' pro kompatibilní adapter
+    'rpc_timeout' => 30,
+    'rpc_connect_timeout' => 5,
     'db_host' => '127.0.0.1',
     'db_port' => 3306,
     'db_name' => '...',
@@ -392,6 +404,12 @@ return [
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
 ## Databáze a migrace
+
+Pro upgrade z `cbeba360` zastavte API/worker zápisy a postupně aplikujte
+`migrations/004_core_payment_consistency.sql` a
+`migrations/005_idempotency_resource_reservation.sql`. Čistá instalace už změny
+obsahuje v `sql.sql`. [Migrační a provozní podmínky](docs/CORE_PAYMENT_ARCHITECTURE.md#upgrade-and-validation)
+uvádějí i zacházení se starými anonymními idempotency claims.
 
 Produkční schéma navíc používá `app_settings`, `client_wallets`, `password_reset_tokens`, `api_request_log` a `store_integrations`. Request log neukládá autorizační hlavičky, API klíče ani těla požadavků.
 
@@ -484,7 +502,15 @@ Adresáře s peněženkami a zálohami databáze držte mimo `htdocs` a mimo Git
 
 ## Testy
 
-Kontraktní testy jsou samostatné PHP skripty:
+Celou sadu spustí `php tests/run_all.php`. Souběžnost a pádové scénáře ověřují
+`CorePaymentArchitectureTest`, `CorePaymentPersistenceTest`, `CorePaymentMigrationTest`
+a `PaymentWorkerHttpBoundaryTest`. Pro integrační testy nastavte
+`BTCPAY_TEST_MYSQL_HOST` a případně `BTCPAY_TEST_MYSQL_PORT`, `BTCPAY_TEST_MYSQL_USER`,
+`BTCPAY_TEST_MYSQL_PASS`; testovací účet potřebuje právo vytvořit a smazat izolované
+testovací databáze. Bez tohoto nastavení se DB integrační testy přeskočí. GitHub Actions
+poskytuje MariaDB a spouští je. Procesní testy vyžadují PHP `pcntl`/`posix`, XPUB `gmp`/`bcmath`.
+
+Kontraktní testy lze spouštět i samostatně:
 
 ```bash
 php tests/BitcoinAmountTest.php

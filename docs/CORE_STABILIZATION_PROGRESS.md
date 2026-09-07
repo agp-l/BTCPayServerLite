@@ -44,12 +44,32 @@ Scope: payment core only, no UI redesign or dependency changes.
 - GitHub Actions now configures MariaDB and required test extensions so the
   persistence and migration tests run there rather than silently skipping.
 
-## Next steps (resume here)
+## Final review checkpoint
 
-1. Publish this verified tests/migration checkpoint on main.
-2. Finish ownership/deployment documentation and correct stale README claims.
-3. Verify published GitHub Actions and document any environment-only limitation.
-4. Keep small commits and update this checkpoint; do not restart the implementation.
+- `53cac44` published the complete concurrency/crash/migration suite on main.
+- Follow-up: migrated maxima are hidden from checkout until an actual observation;
+  Expired invoices with persisted partial evidence are eligible even beyond the
+  ordinary 24-hour late-payment window. Both cases are in the real migration test.
+- After those changes, the six affected test files passed, including all MariaDB
+  persistence/concurrency cases and real SIGKILL recovery again.
+- `docs/CORE_PAYMENT_ARCHITECTURE.md` and README now describe actual ownership,
+  configuration, migration order and the current-balance/stateless limitations.
+
+## Completion and resumption
+
+The source implementation, acceptance tests, migration fixes and architecture
+notes are complete in this checkpoint. Publish it on main if interrupted before
+publication; check the main log for `fix(core): preserve migrated payment evidence and document ownership`.
+Do not restart the stabilization or broaden it into admin/withdrawal redesign.
+
+GitHub Actions on `53cac44` passed, including MariaDB tests:
+https://github.com/agp-l/BTCPayServerLite/actions/runs/34122494369
+For push-triggered results use the GitHub REST `actions/runs?head_sha=...` endpoint;
+the connector's commit-workflow convenience method filters to PR-triggered runs.
+
+Deployment still needs migrations and an actual Electrum smoke test; no production
+daemon or database has been accessed. The current-balance observation and finite
+unpaid late-payment scan window are explicit boundaries documented in the architecture.
 
 ## Operational notes
 

@@ -11,7 +11,7 @@ use LogicException;
 use Throwable;
 
 /**
- * Creates and evaluates database-backed Bitcoin invoices.
+ * Creates database-backed Bitcoin invoices and reads their persisted state.
  *
  * All monetary comparisons are performed in integer satoshis. The three
  * stateless methods remain as a backwards-compatible facade and delegate to

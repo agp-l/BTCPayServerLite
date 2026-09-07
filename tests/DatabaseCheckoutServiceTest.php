@@ -35,6 +35,11 @@ $repository->row['status'] = 'Processing';
 checkoutSame('Processing', $past->load('inv_checkout123')['status'], 'Processing must remain visible with zero current balance');
 $repository->row['status'] = 'Settled';
 checkoutSame('0.00000000', $past->load('inv_checkout123')['missing_amount'], 'Settled survives outgoing spend');
+$repository->row = array_replace($row, ['amount' => '0.00000002', 'status' => 'Processing',
+    'confirmed_balance_sats' => 1, 'payment_observed_at' => 2800]);
+$partial = $past->load('inv_checkout123');
+checkoutSame('PaidPartial', $partial['additional_status'], 'Persisted partial observation remains visible after expiry');
+checkoutSame('0.00000001', $partial['missing_amount'], 'Observed current balance is projected exactly');
 $repository->row = $row;
 $before = $repository->calls;
 try { $service->load('../config.php'); throw new RuntimeException('Unsafe ID accepted'); }

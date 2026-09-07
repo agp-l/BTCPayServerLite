@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use BtcPayLite\Database;
 use BtcPayLite\ElectrumBlockchainProvider;
-use BtcPayLite\ElectrumRPC;
+use BtcPayLite\ElectrumRPCFactory;
 use BtcPayLite\PaymentWorker;
 use BtcPayLite\WebhookDeliveryRepository;
 
@@ -17,7 +17,6 @@ ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require __DIR__ . '/vendor/autoload.php';
-
 
 try {
     $config = require __DIR__ . '/config.php';
@@ -34,8 +33,7 @@ try {
         $databasePort
     );
 
-    $rpcScheme = (string) ($config['rpc_scheme'] ?? 'http');
-    $rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
+    $rpc = ElectrumRPCFactory::fromConfig($config);
 
     $blockchain = new ElectrumBlockchainProvider($rpc);
     $webhookRepository = new WebhookDeliveryRepository($database);
@@ -56,7 +54,6 @@ try {
         'timestamp' => time(),
     ];
 }
-
 
 echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($statusCode === 200 ? 0 : 1);

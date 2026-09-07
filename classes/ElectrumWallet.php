@@ -10,8 +10,8 @@ use LogicException;
 /**
  * Application-facing wrapper around Electrum wallet commands.
  *
- * Daemon-wide commands are sent with ElectrumRPC::call(). Commands that
- * operate on wallet state are always sent with an explicit wallet_path so
+ * Network and daemon commands use their explicit transport scopes. Commands that
+ * operate on wallet state are sent with an explicit wallet path so
  * multiple wallets can safely remain loaded in the same daemon.
  */
 class ElectrumWallet
@@ -31,6 +31,8 @@ class ElectrumWallet
      *
      * Other wallets are deliberately left open. Closing them here would make
      * concurrent API, checkout and cron requests interfere with each other.
+     *
+     * @deprecated Admin compatibility only; mutation services own ensureLoaded + RPC under one lock.
      */
     public function loadWallet(string $walletPath, ?string $password = null): void
     {
@@ -41,6 +43,8 @@ class ElectrumWallet
     /**
      * Ensures a wallet is loaded into the Electrum daemon without altering
      * the currently selected active wallet.
+     *
+     * The caller must own the shared wallet mutation lock.
      *
      * @throws ElectrumWalletException
      */
