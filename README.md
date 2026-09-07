@@ -475,9 +475,13 @@ composer dump-autoload --optimize
 4. Zadejte připojení k prázdné MySQL/MariaDB databázi, veřejnou URL, první admin účet a cesty k Electrumu. Volba „Vytvořit databázi“ vyžaduje oprávnění `CREATE`; jinak databázi vytvořte předem a volbu vypněte.
 5. Po úspěchu se přihlaste vytvořeným admin účtem. Instalátor je automaticky uzamčen existencí `config.php` a při dalším otevření přesměruje na přihlášení.
 
-Instalátor přijímá pouze prázdnou databázi. Nejde o upgrade nástroj a nikdy se nesmí spouštět nad existující produkční databází. Schéma vytvoří všechny tabulky, výchozí registrační politiku a přesně jeden aktivní účet s rolí `admin`; žádný ukázkový obchod ani veřejný API klíč se nevytváří. `admin_api_key`, podpisový `secret_key` a `cron_key` se generují kryptograficky na serveru.
+Instalátor přijímá prázdnou databázi nebo čistý import aktuálního `sql.sql`, který ještě neobsahuje uživatele ani platební data. Kontroluje tabulky, sloupce, typy a indexy. Používanou databázi odmítne i po smazání `config.php`; obnovte původní konfiguraci a použijte migrace. Schéma vytvoří všechny tabulky, výchozí registrační politiku a přesně jeden aktivní účet s rolí `admin`; žádný ukázkový obchod ani veřejný API klíč se nevytváří. `admin_api_key`, podpisový `secret_key` a `cron_key` se generují kryptograficky na serveru.
 
 Nenainstalovanou instanci nenechávejte volně dostupnou z internetu: první návštěvník instalačního formuláře by mohl založit vlastní administrační účet. Instalaci dokončete za firewallem, přes VPN nebo s dočasným omezením přístupu v Apache/Nginx a teprve potom aplikaci zveřejněte. Produkční formulář otevírejte výhradně přes HTTPS.
+
+Hláška „Vyžaduje zásah“ je souhrn nesplněných požadavků. Instalátor nyní jmenuje konkrétní blokující požadavky a zobrazuje aktivní `php.ini` webového PHP. Chybějící `pdo_mysql` nebo `curl` zapněte právě tam a restartujte PHP/Apache. U zápisu konfigurace povolte uživateli PHP vytvořit soubor v adresáři projektu; neudělujte všeobecné oprávnění `777`. Pro instalaci nemusí běžet Electrum a žádná peněženka se nenačítá.
+
+První administrátor vzniká při instalaci s e-mailem a heslem z formuláře; pevný defaultní účet neexistuje. Samotný import `sql.sql` administrátora nevytvoří. Pokud jste smazali konfiguraci používané instalace, obnovte její původní klíče i mapování klientů. Nové náhodné podpisové klíče by zneplatnily staré stateless odkazy.
 
 Pokud PHP nemůže zapsat do kořene projektu, vytvořte `config.php` ručně podle sekce Konfigurace nebo dočasně upravte vlastnictví adresáře. Po instalaci ponechte soubor čitelný pouze pro uživatele PHP; instalátor se pokusí nastavit režim `0600`. Soubor nikdy necommitujte – je zahrnutý v `.gitignore`.
 

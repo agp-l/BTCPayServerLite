@@ -10,14 +10,24 @@ use BtcPayLite\InstallerException;
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/vendor/autoload.php';
-
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 header('X-Frame-Options: DENY');
 header("Content-Security-Policy: default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 header('Cache-Control: no-store, max-age=0');
 header('Pragma: no-cache');
+
+try {
+    if (!is_file(__DIR__ . '/vendor/autoload.php')) {
+        throw new RuntimeException('Composer dependencies are missing.');
+    }
+    require_once __DIR__ . '/vendor/autoload.php';
+} catch (Throwable $exception) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=UTF-8');
+    echo 'Nelze načíst závislosti aplikace. Použijte 64bitové PHP 8.0+ a spusťte composer install v adresáři projektu.';
+    exit;
+}
 
 $installer = new InstallationManager(__DIR__);
 $scriptName = is_string($_SERVER['SCRIPT_NAME'] ?? null)
@@ -35,7 +45,7 @@ try {
     AuthManager::startSession();
 } catch (AuthException $exception) {
     http_response_code(500);
-    echo 'Instalační relaci se nepodařilo bezpečně spustit.';
+    echo 'Instalační relaci se nepodařilo spustit. Ověřte session.save_path a jeho oprávnění v PHP webového serveru.';
     exit;
 }
 
@@ -67,7 +77,8 @@ if ($requestMethod === 'POST') {
 }
 
 $requirements = $installer->requirements();
-$canInstall = $installer->canInstall();
+$failedRequirements = array_filter($requirements, static fn (array $item): bool => $item['required'] && !$item['ok']);
+$canInstall = $failedRequirements === [] && !$installer->isInstalled();
 $csrfToken = $success === null ? AuthManager::csrfToken() : '';
 
 $posted = static function (string $key, string $default = ''): string {
@@ -119,6 +130,10 @@ $createDatabaseChecked = ($requestMethod !== 'POST' && !isset($_POST['create_dat
     <?php else: ?>
       <section class="installer-card requirements-card" aria-labelledby="requirements-title">
         <div class="section-heading"><div><span class="step">Kontrola</span><h2 id="requirements-title">Serverové požadavky</h2></div><span class="status-pill <?php echo $canInstall ? 'status-ok' : 'status-error'; ?>"><?php echo $canInstall ? 'Připraveno' : 'Vyžaduje zásah'; ?></span></div>
+        <?php if ($failedRequirements !== []): ?>
+          <p class="alert" role="alert">Instalaci blokuje: <?php echo $html(implode(', ', array_column($failedRequirements, 'name'))); ?>. Postup opravy je uvedený u jednotlivých požadavků.</p>
+        <?php endif; ?>
+        <p>Kontroluje se PHP webového serveru: <strong><?php echo $html(PHP_SAPI); ?></strong>, konfigurace <code><?php echo $html(php_ini_loaded_file() ?: 'php.ini není načtený'); ?></code>. Nastavení příkazového řádku může být jiné.</p>
         <div class="requirements-grid">
           <?php foreach ($requirements as $requirement): ?>
             <div class="requirement <?php echo $requirement['ok'] ? 'requirement-ok' : 'requirement-error'; ?>">
@@ -137,7 +152,7 @@ $createDatabaseChecked = ($requestMethod !== 'POST' && !isset($_POST['create_dat
         <input type="hidden" name="csrf_token" value="<?php echo $html($csrfToken); ?>">
 
         <section class="installer-card">
-          <div class="section-heading"><div><span class="step">Krok 1</span><h2>Databáze</h2><p>Použijte samostatnou prázdnou databázi MySQL nebo MariaDB.</p></div></div>
+          <div class="section-heading"><div><span class="step">Krok 1</span><h2>Databáze</h2><p>Použijte prázdnou databázi nebo čistý import aktuálního sql.sql bez uživatelů a platebních dat.</p></div></div>
           <div class="field-grid four-columns">
             <label class="field field-wide"><span>Host databáze</span><input name="db_host" value="<?php echo $html($posted('db_host', '127.0.0.1')); ?>" maxlength="253" required></label>
             <label class="field"><span>Port</span><input name="db_port" type="number" min="1" max="65535" value="<?php echo $html($posted('db_port', '3306')); ?>" required></label>
@@ -145,11 +160,11 @@ $createDatabaseChecked = ($requestMethod !== 'POST' && !isset($_POST['create_dat
             <label class="field"><span>Uživatel</span><input name="db_user" value="<?php echo $html($posted('db_user')); ?>" maxlength="128" autocomplete="username" required></label>
             <label class="field field-wide"><span>Heslo databáze</span><input name="db_pass" type="password" autocomplete="new-password"></label>
           </div>
-          <label class="check-field"><input type="checkbox" name="create_database" value="1" <?php echo $createDatabaseChecked ? 'checked' : ''; ?>><span><strong>Vytvořit databázi, pokud neexistuje</strong><small>Databázový uživatel k tomu potřebuje oprávnění CREATE. Existující databáze musí být prázdná.</small></span></label>
+          <label class="check-field"><input type="checkbox" name="create_database" value="1" <?php echo $createDatabaseChecked ? 'checked' : ''; ?>><span><strong>Vytvořit databázi, pokud neexistuje</strong><small>Databázový uživatel k tomu potřebuje oprávnění CREATE. Čistý import sql.sql instalátor rozpozná; používanou databázi nepřepíše.</small></span></label>
         </section>
 
         <section class="installer-card">
-          <div class="section-heading"><div><span class="step">Krok 2</span><h2>Administrátor a veřejná URL</h2><p>Tyto údaje použijete pro první přihlášení do správy.</p></div></div>
+          <div class="section-heading"><div><span class="step">Krok 2</span><h2>Administrátor a veřejná URL</h2><p>Instalátor založí prvního administrátora s tímto e-mailem a heslem. Pevný výchozí účet ani heslo neexistují.</p></div></div>
           <div class="field-grid two-columns">
             <label class="field"><span>E-mail administrátora</span><input name="admin_email" type="email" value="<?php echo $html($posted('admin_email')); ?>" maxlength="254" autocomplete="username" required></label>
             <label class="field"><span>Veřejná URL aplikace</span><input name="app_url" type="url" value="<?php echo $html($posted('app_url', $defaultAppUrl)); ?>" placeholder="https://pay.example.com" required></label>
@@ -161,7 +176,7 @@ $createDatabaseChecked = ($requestMethod !== 'POST' && !isset($_POST['create_dat
 
         <section class="installer-card">
           <details <?php echo $error !== '' ? 'open' : ''; ?>>
-            <summary><span><span class="step">Krok 3</span><strong>Electrum a cesty peněženek</strong><small>Výchozí hodnoty upravte podle serveru.</small></span><span class="summary-arrow" aria-hidden="true">⌄</span></summary>
+            <summary><span><span class="step">Krok 3</span><strong>Electrum a cesty peněženek</strong><small>Výchozí hodnoty upravte podle serveru. Instalace nevolá Electrum ani nenačítá peněženky.</small></span><span class="summary-arrow" aria-hidden="true">⌄</span></summary>
             <div class="details-content">
               <div class="field-grid four-columns">
                 <label class="field field-wide"><span>Electrum RPC host</span><input name="rpc_host" value="<?php echo $html($posted('rpc_host', '127.0.0.1')); ?>" required></label>

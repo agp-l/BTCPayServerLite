@@ -174,7 +174,7 @@ CREATE TABLE `webhooks` (
     `secret` VARCHAR(255) NOT NULL,
     `created_at` BIGINT UNSIGNED NOT NULL,
     `url_hash` BINARY(32)
-        GENERATED ALWAYS AS (UNHEX(SHA2(`url`, 256))) PERSISTENT,
+        GENERATED ALWAYS AS (UNHEX(SHA2(`url`, 256))) STORED,
     PRIMARY KEY (`id`),
     KEY `store_id` (`store_id`),
     KEY `idx_webhook_store_created` (`store_id`, `created_at`),

@@ -47,15 +47,15 @@ final class InstallationManager
 
         return [
             [
-                'name' => 'PHP 8.0+',
-                'ok' => PHP_VERSION_ID >= 80000,
+                'name' => 'PHP 8.0+ (64 bit)',
+                'ok' => PHP_VERSION_ID >= 80000 && PHP_INT_SIZE === 8,
                 'detail' => PHP_VERSION,
                 'required' => true,
             ],
             [
                 'name' => 'PDO MySQL',
                 'ok' => $pdoMysql,
-                'detail' => $pdoMysql ? 'Dostupné' : 'Chybí rozšíření pdo_mysql',
+                'detail' => $pdoMysql ? 'Dostupné' : 'Zapněte rozšíření pdo_mysql v PHP webového serveru a restartujte jej.',
                 'required' => true,
             ],
             [
@@ -67,21 +67,21 @@ final class InstallationManager
             [
                 'name' => 'cURL',
                 'ok' => extension_loaded('curl'),
-                'detail' => extension_loaded('curl') ? 'Dostupné' : 'Chybí rozšíření curl',
+                'detail' => extension_loaded('curl') ? 'Dostupné' : 'Zapněte rozšíření curl v PHP webového serveru a restartujte jej.',
                 'required' => true,
             ],
             [
                 'name' => 'Databázové schéma',
                 'ok' => is_file($this->schemaPath) && is_readable($this->schemaPath),
-                'detail' => 'sql.sql',
+                'detail' => is_readable($this->schemaPath) ? 'sql.sql je čitelný' : 'Nahrajte aktuální sql.sql do adresáře aplikace a povolte PHP jeho čtení.',
                 'required' => true,
             ],
             [
                 'name' => 'Zápis konfigurace',
-                'ok' => is_writable($this->rootDirectory),
-                'detail' => is_writable($this->rootDirectory)
+                'ok' => $writable = $this->canWriteConfiguration(),
+                'detail' => $writable
                     ? 'Adresář aplikace je zapisovatelný'
-                    : 'Webový server nemůže vytvořit config.php',
+                    : 'Povolte uživateli PHP vytvořit config.php a instalační zámek v adresáři aplikace.',
                 'required' => true,
             ],
         ];
@@ -108,7 +108,10 @@ final class InstallationManager
             throw new InstallerException('Aplikace už je nainstalovaná.');
         }
         if (!$this->canInstall()) {
-            throw new InstallerException('Server nesplňuje všechny požadavky instalace.');
+            throw new InstallerException('Instalaci blokuje: ' . implode('; ', array_map(
+                static fn (array $item): string => $item['name'] . ': ' . $item['detail'],
+                array_filter($this->requirements(), static fn (array $item): bool => $item['required'] && !$item['ok'])
+            )));
         }
 
         $lockHandle = @fopen($this->lockPath, 'c');
@@ -123,17 +126,29 @@ final class InstallationManager
         $databaseCreated = false;
         $databaseWasEmpty = false;
         $database = null;
+        $server = null;
+        $databaseLock = null;
+        $schema = null;
+        $createdAdminId = null;
 
         try {
             if ($this->isInstalled()) {
                 throw new InstallerException('Aplikace už je nainstalovaná.');
             }
 
+            $schema = new InstallationSchema($this->schemaPath);
             $values = $this->validateInput($input);
             $config = $this->buildConfig($values);
             $temporaryConfig = $this->prepareConfigFile($config);
 
             $server = $this->connectDatabaseServer($values);
+            $databaseLock = 'btcpay_install_' . substr(hash('sha256', strtolower($values['db_name'])), 0, 48);
+            $claim = $server->prepare('SELECT GET_LOCK(?, 0)');
+            $claim->execute([$databaseLock]);
+            if ((int) $claim->fetchColumn() !== 1) {
+                $databaseLock = null;
+                throw new InstallerException('Tuto databázi právě instaluje jiný požadavek. Zkuste to za chvíli.');
+            }
             $databaseExisted = $this->databaseExists($server, $values['db_name']);
             if (!$databaseExisted) {
                 if (!$values['create_database']) {
@@ -150,18 +165,10 @@ final class InstallationManager
 
             $database = $this->connectTargetDatabase($values);
             $databaseWasEmpty = $this->databaseIsEmpty($database);
-            if (!$databaseWasEmpty) {
-                throw new InstallerException(
-                    'Zvolená databáze není prázdná. Pro novou instalaci použijte prázdnou databázi.'
-                );
-            }
-
-            $schema = file_get_contents($this->schemaPath);
-            if (!is_string($schema) || trim($schema) === '') {
-                throw new InstallerException('Databázové schéma je prázdné nebo nečitelné.');
-            }
-            foreach (self::splitSqlStatements($schema) as $statement) {
-                $database->exec($statement);
+            if ($databaseWasEmpty) {
+                $schema->import($database);
+            } else {
+                $schema->assertPristineImport($database);
             }
 
             $passwordHash = password_hash($values['admin_password'], PASSWORD_DEFAULT);
@@ -172,6 +179,7 @@ final class InstallationManager
                 "INSERT INTO users (email, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
             );
             $statement->execute([$values['admin_email'], $passwordHash]);
+            $createdAdminId = (int) $database->lastInsertId();
 
             if (!@rename($temporaryConfig, $this->configPath)) {
                 throw new InstallerException('Nepodařilo se dokončit zápis config.php.');
@@ -183,43 +191,45 @@ final class InstallationManager
                 'admin_email' => $values['admin_email'],
                 'app_url' => $values['app_url'],
             ];
-        } catch (InstallerException $exception) {
-            if ($database instanceof PDO && $databaseWasEmpty) {
-                $this->removeInstalledSchema($database);
-            }
-            if ($databaseCreated) {
-                $this->dropDatabaseAfterFailure($input);
-            }
-            throw $exception;
-        } catch (PDOException $exception) {
-            if ($database instanceof PDO && $databaseWasEmpty) {
-                $this->removeInstalledSchema($database);
-            }
-            if ($databaseCreated) {
-                $this->dropDatabaseAfterFailure($input);
-            }
-            throw new InstallerException(
-                'Databázovou instalaci se nepodařilo dokončit. Ověřte přístupové údaje a oprávnění.',
-                previous: $exception
-            );
         } catch (Throwable $exception) {
-            if ($database instanceof PDO && $databaseWasEmpty) {
-                $this->removeInstalledSchema($database);
+            if ($database instanceof PDO && $createdAdminId !== null && !$databaseWasEmpty) {
+                // Only undo the account created by this attempt; never drop an imported schema.
+                try {
+                    $undo = $database->prepare("DELETE FROM users WHERE id = ? AND email = ? AND password_hash = ?");
+                    $undo->execute([$createdAdminId, $values['admin_email'], $passwordHash]);
+                } catch (Throwable) { error_log('Installer could not undo its new admin account.'); }
             }
-            if ($databaseCreated) {
-                $this->dropDatabaseAfterFailure($input);
+            if ($database instanceof PDO && $databaseWasEmpty && $schema instanceof InstallationSchema) {
+                $this->removeInstalledSchema($database, $schema->tableNames());
             }
-            throw new InstallerException(
-                'Instalaci se nepodařilo dokončit. Zkontrolujte serverový log.',
-                previous: $exception
-            );
+            if ($databaseCreated && $server instanceof PDO) {
+                try { $server->exec('DROP DATABASE `' . $values['db_name'] . '`'); }
+                catch (Throwable) { error_log('Installer could not clean up its new database.'); }
+            }
+            if ($exception instanceof InstallerException) { throw $exception; }
+            if ($exception instanceof PDOException) {
+                $code = (int) ($exception->errorInfo[1] ?? 0);
+                $detail = match ($code) {
+                    1044, 1045 => 'Databáze odmítla přihlášení nebo přístup. Ověřte uživatele, heslo a oprávnění pro zvolenou databázi.',
+                    2002, 2003 => 'Databázový server není dostupný. Ověřte host, port a spuštění MySQL/MariaDB.',
+                    1049 => 'Zvolená databáze neexistuje. Povolte její vytvoření.',
+                    1064 => 'Databázový server odmítl SQL schéma. Použijte aktuální sql.sql a podporovanou verzi MySQL/MariaDB.',
+                    default => 'Databázovou instalaci se nepodařilo dokončit. Ověřte přístup a oprávnění (kód ' . $code . ').',
+                };
+                throw new InstallerException($detail, previous: $exception);
+            }
+            throw new InstallerException('Instalaci se nepodařilo dokončit. Zkontrolujte serverový log.', previous: $exception);
         } finally {
             if (is_string($temporaryConfig) && is_file($temporaryConfig)) {
                 @unlink($temporaryConfig);
             }
+            if ($server instanceof PDO && $databaseLock !== null) {
+                try { $server->prepare('SELECT RELEASE_LOCK(?)')->execute([$databaseLock]); }
+                catch (Throwable) { /* Connection close also releases this lock. */ }
+            }
             flock($lockHandle, LOCK_UN);
             fclose($lockHandle);
-            @unlink($this->lockPath);
+            // Keep the lock inode: unlinking allows concurrent holders of different files.
         }
     }
 
@@ -409,6 +419,9 @@ final class InstallationManager
             'rpc_port' => $values['rpc_port'],
             'rpc_user' => $values['rpc_user'],
             'rpc_pass' => $values['rpc_pass'],
+            'rpc_wallet_param_key' => 'wallet_path',
+            'rpc_timeout' => 30,
+            'rpc_connect_timeout' => 5,
             'db_host' => $values['db_host'],
             'db_port' => $values['db_port'],
             'db_name' => $values['db_name'],
@@ -504,15 +517,11 @@ final class InstallationManager
         return $statement->fetchColumn() === false;
     }
 
-    private function removeInstalledSchema(PDO $database): void
+    private function removeInstalledSchema(PDO $database, array $tables): void
     {
         try {
             $database->exec('SET FOREIGN_KEY_CHECKS = 0');
-            foreach ([
-                'store_integrations', 'api_request_log', 'webhook_deliveries', 'webhooks',
-                'payouts', 'invoices', 'password_reset_tokens', 'client_wallets', 'stores',
-                'auth_attempts', 'app_settings', 'users',
-            ] as $table) {
+            foreach (array_reverse($tables) as $table) {
                 $database->exec('DROP TABLE IF EXISTS `' . $table . '`');
             }
             $database->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -521,33 +530,15 @@ final class InstallationManager
         }
     }
 
-    /** @param array<string, mixed> $input */
-    private function dropDatabaseAfterFailure(array $input): void
+    private function canWriteConfiguration(): bool
     {
-        try {
-            $values = $this->validateDatabaseConnectionInput($input);
-            $server = $this->connectDatabaseServer($values);
-            $server->exec('DROP DATABASE `' . str_replace('`', '``', $values['db_name']) . '`');
-        } catch (Throwable $cleanupFailure) {
-            error_log('Installer database cleanup failed: ' . $cleanupFailure->getMessage());
-        }
-    }
-
-    /** @param array<string, mixed> $input */
-    private function validateDatabaseConnectionInput(array $input): array
-    {
-        $databaseName = trim(is_string($input['db_name'] ?? null) ? $input['db_name'] : '');
-        if (!preg_match('/\A[A-Za-z0-9_$-]{1,64}\z/D', $databaseName)) {
-            throw new InstallerException('Název databáze není platný.');
-        }
-
-        return [
-            'db_host' => $this->host($input['db_host'] ?? null, 'Host databáze'),
-            'db_port' => $this->port($input['db_port'] ?? null, 'Port databáze'),
-            'db_name' => $databaseName,
-            'db_user' => is_string($input['db_user'] ?? null) ? trim($input['db_user']) : '',
-            'db_pass' => is_string($input['db_pass'] ?? null) ? $input['db_pass'] : '',
-        ];
+        if (!is_writable($this->rootDirectory)) { return false; }
+        $probe = $this->rootDirectory . '/.btcpay-config-' . bin2hex(random_bytes(8));
+        $handle = @fopen($probe, 'x');
+        if ($handle === false) { return false; }
+        fclose($handle);
+        @unlink($probe);
+        return !file_exists($this->lockPath) || is_writable($this->lockPath);
     }
 
     private function host(mixed $value, string $label): string
