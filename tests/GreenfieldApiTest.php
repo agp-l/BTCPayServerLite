@@ -115,7 +115,8 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
         int|float|string $amountBtc,
         array $metadata = [],
         int $expirationMinutes = 15,
-        ?BtcPayLite\AddressGeneratorInterface $addressGenerator = null
+        ?BtcPayLite\AddressGeneratorInterface $addressGenerator = null,
+        ?BtcPayLite\IdempotencyReservation $reservation = null
     ): array {
         $this->createdInvoices[] = [
             'store_id' => $storeId,
@@ -162,7 +163,12 @@ final class GreenfieldControllerTestService extends GreenfieldApiService
         return ['id' => $invoiceId];
     }
 
-    public function createInvoice(string $storeId, array $input, string $apiKey): array
+    public function createInvoiceWithIdempotency(string $storeId, array $input, string $apiKey, string $idempotencyKey = ''): array
+    {
+        return ['status_code' => 200, 'body' => $this->createInvoice($storeId, $input, $apiKey)];
+    }
+
+    public function createInvoice(string $storeId, array $input, string $apiKey, ?BtcPayLite\IdempotencyReservation $reservation = null): array
     {
         $this->calls[] = [
             'method' => 'createInvoice',
@@ -339,7 +345,7 @@ $tests['keeps invoices scoped to their authenticated store'] = static function (
     greenfieldAssertSame(404, $exception->getHttpStatus(), 'Cross-store invoice access returned the wrong status.');
 };
 
-$tests['creates an exact invoice while holding the Electrum lock'] = static function () use ($walletPath): void {
+$tests['delegates exact invoice creation without an outer wallet lock'] = static function () use ($walletPath): void {
     [$service, , $database, $wallet, $manager] = newGreenfieldTestService($walletPath);
 
     $invoice = $service->createInvoice('store_test', [
@@ -351,8 +357,8 @@ $tests['creates an exact invoice while holding the Electrum lock'] = static func
     greenfieldAssertSame('0.00000001', $invoice['amount'], 'The API response changed the exact amount.');
     greenfieldAssertSame('0.00000001', $manager->createdInvoices[0]['amount'], 'The manager received an imprecise amount.');
     greenfieldAssertSame(10, $manager->createdInvoices[0]['expiration'], 'The expiration changed.');
-    greenfieldAssertSame(1, $database->lockCalls, 'Invoice creation did not acquire the shared lock.');
-    greenfieldAssertSame(realpath($walletPath), $wallet->loadedWalletPaths[0], 'The wrong wallet was loaded.');
+    greenfieldAssertSame(0, $database->lockCalls, 'API must not own a wallet mutation lock.');
+    greenfieldAssertSame([], $wallet->loadedWalletPaths, 'API must delegate wallet loading to the mutation service.');
     greenfieldAssertSame(
         'http://localhost/BTCPayLite/pay?id=inv_test',
         $invoice['checkoutLink'],

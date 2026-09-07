@@ -13,7 +13,7 @@ if (!is_string($source)) {
 
 $predicates = [
     "JOIN webhooks AS webhook ON webhook.store_id = invoice.store_id\n                    AND webhook.created_at <= invoice.created_at",
-    "WHERE webhook.store_id = ?\n                            AND webhook.created_at <= invoice.created_at",
+    "WHERE webhook.store_id = ?\n                AND webhook.created_at <= invoice.created_at",
 ];
 
 foreach ($predicates as $predicate) {

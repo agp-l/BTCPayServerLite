@@ -44,7 +44,7 @@ class PaymentWorker
             try {
                 $observation = $this->blockchain->observeAddress(
                     (string) $invoice['btc_address'],
-                    BitcoinAmount::fromBtc((string) $invoice['amount'])->toSatoshis()
+                    BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis()
                 );
                 $result = $this->commitObservation((string) $invoice['id'], $token, $observation);
                 $stats['transitioned'] += (int) $result['changed'];
@@ -100,7 +100,7 @@ class PaymentWorker
             $now = ($this->clock)();
             $current = (string) $invoice['status'];
             $status = InvoiceStateMachine::next($current,
-                BitcoinAmount::fromBtc((string) $invoice['amount'])->toSatoshis(),
+                BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis(),
                 $observation, (int) $invoice['expires_at'], $now);
             InvoiceStateMachine::assertTransition($current, $status);
             $next = match ($status) {

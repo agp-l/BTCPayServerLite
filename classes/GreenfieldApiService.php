@@ -242,7 +242,10 @@ class GreenfieldApiService
         string $apiKey,
         string $idempotencyKey = ''
     ): array {
-        if ($idempotencyKey === '' || !isset($this->database)) {
+        // Authorization precedes replay: possession of a key is not authentication.
+        $authenticatedStore = $this->authenticateStore($storeId, $apiKey);
+        $storeId = $authenticatedStore['id'];
+        if ($idempotencyKey === '') {
             return [
                 'status_code' => 200,
                 'body' => $this->createInvoice($storeId, $input, $apiKey),
@@ -254,12 +257,13 @@ class GreenfieldApiService
             $storeId,
             $idempotencyKey,
             $input,
-            fn (): array => $this->createInvoice($storeId, $input, $apiKey)
+            fn (IdempotencyReservation $reservation): array => $this->createInvoice($storeId, $input, $apiKey, $reservation),
+            fn (array $invoice): array => $this->invoiceResponse($invoice, $storeId)
         );
     }
 
     /** @param array<string,mixed> $input @return array<string,mixed> */
-    public function createInvoice(string $storeId, array $input, string $apiKey): array
+    public function createInvoice(string $storeId, array $input, string $apiKey, ?IdempotencyReservation $reservation = null): array
     {
         $store = $this->authenticateStore($storeId, $apiKey);
         $originalAmount = $this->decimalAmount($input['amount'] ?? null);
@@ -303,7 +307,9 @@ class GreenfieldApiService
                 $store['id'],
                 $btcAmount,
                 $storedMetadata,
-                $expiration
+                $expiration,
+                null,
+                $reservation
             );
         } catch (AddressGenerationException $exception) {
             $code = $exception->getCode();
@@ -340,7 +346,7 @@ class GreenfieldApiService
         }
 
         $invoice['store_id'] = $store['id'];
-        $invoice['metadata'] = $storedMetadata;
+        $invoice['metadata'] ??= $storedMetadata;
         return $this->invoiceResponse($invoice, $store['id']);
     }
 

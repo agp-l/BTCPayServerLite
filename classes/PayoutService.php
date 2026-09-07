@@ -166,7 +166,6 @@ final class PayoutService
                     $requestHash,
                     $now
                 ): array {
-                    $this->wallet->loadWallet($walletPath, $this->walletPasswords[$store['id']] ?? null);
                     if (!$this->wallet->validateAddress($destination)) {
                         throw new PayoutException('Destination is not a valid Bitcoin address.', 'create_payout', 400);
                     }
@@ -243,7 +242,6 @@ final class PayoutService
                     if ($current['state'] === 'AwaitingApproval') {
                         $current = $this->payouts->approve((string) $current['id'], $revision, time());
                     }
-                    $this->wallet->loadWallet($walletPath, $this->walletPasswords[$store['id']] ?? null);
                     if (!$this->wallet->validateAddress((string) $current['destination'])) {
                         throw new PayoutException('Destination is not a valid Bitcoin address.', 'approve_payout', 400);
                     }
@@ -262,12 +260,15 @@ final class PayoutService
     {
         if ($payout['state'] === 'AwaitingPayment') {
             try {
-                $raw = $this->wallet->createTransaction(
-                    (string) $payout['destination'],
-                    (string) $payout['payout_amount'],
-                    $this->walletPasswords[$store['id']] ?? null,
-                    $payout['fee_rate_sat_vb']
-                );
+                $walletPath = $this->walletPath((string) $store['wallet_path']);
+                $raw = (new WalletLockManager())->withWalletLock($walletPath, function () use ($payout, $store, $walletPath): string {
+                    $password = $this->walletPasswords[$store['id']] ?? null;
+                    $this->wallet->ensureWalletLoaded($walletPath, $password);
+                    return $this->wallet->createTransaction(
+                        (string) $payout['destination'], (string) $payout['payout_amount'],
+                        $password, $payout['fee_rate_sat_vb'], $walletPath
+                    );
+                });
                 $payout = $this->payouts->markPrepared((string) $payout['id'], $raw, time());
             } catch (PayoutException $exception) {
                 throw $exception;

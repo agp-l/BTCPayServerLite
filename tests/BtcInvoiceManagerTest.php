@@ -31,10 +31,14 @@ final class InvoiceTestWallet extends ElectrumWallet
         $this->nextCreatedRequest = $nextCreatedRequest;
     }
 
+    public function getActiveWalletPath(): ?string { return '/wallets/test'; }
+    public function ensureWalletLoaded(string $walletPath, ?string $password = null): void {}
+
     public function createPaymentRequest(
         int|float|string $amount,
         string $memo = '',
-        ?int $expirationSeconds = null
+        ?int $expirationSeconds = null,
+        ?string $walletPath = null
     ): array {
         $this->createdRequests[] = [
             'amount' => $amount,
@@ -45,7 +49,7 @@ final class InvoiceTestWallet extends ElectrumWallet
         return $this->nextCreatedRequest;
     }
 
-    public function getPaymentRequest(string $requestId): array
+    public function getPaymentRequest(string $requestId, ?string $walletPath = null): array
     {
         if (!isset($this->paymentRequests[$requestId])) {
             throw new RuntimeException('Missing fake payment request.');
@@ -54,7 +58,7 @@ final class InvoiceTestWallet extends ElectrumWallet
         return $this->paymentRequests[$requestId];
     }
 
-    public function deletePaymentRequest(string $requestId): void
+    public function deletePaymentRequest(string $requestId, ?string $walletPath = null): void
     {
         $this->deletedRequests[] = $requestId;
     }

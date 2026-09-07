@@ -193,7 +193,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     ): array {
         // Provider status depends only on signed token data and a walletless observation.
         if ($this->blockchainProvider !== null) {
-            $amounts = $this->blockchainProvider->observeAddress($address, $expected->toSatoshis())->toAmountArray();
+            $amounts = $this->blockchainProvider->observeAddress($address, $expected->satoshis())->toAmountArray();
             return ['electrum_status' => null, 'confirmed' => $amounts['confirmed'], 'received' => $amounts['received']];
         }
 

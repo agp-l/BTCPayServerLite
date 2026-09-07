@@ -36,6 +36,8 @@ final class StatelessTestInvoiceManager extends BtcInvoiceManager
 
     /** @var array<string, mixed> */
     public array $statusResult = [];
+    public ?string $statusWalletPath = null;
+    public function canObserveWithoutWallet(): bool { return false; }
 
     public function __construct()
     {
@@ -45,13 +47,15 @@ final class StatelessTestInvoiceManager extends BtcInvoiceManager
         int|float|string $amountBtc,
         string $description,
         array $customData = [],
-        int $expirationMinutes = 15
+        int $expirationMinutes = 15,
+        ?string $walletPath = null
     ): array {
         $this->createdInvoices[] = [
             'amount' => $amountBtc,
             'description' => $description,
             'custom_data' => $customData,
             'expiration' => $expirationMinutes,
+            'wallet_path' => $walletPath,
         ];
 
         return ['token' => 'test-token', 'bip21_uri' => 'bitcoin:bc1qtest'];
@@ -62,8 +66,9 @@ final class StatelessTestInvoiceManager extends BtcInvoiceManager
         return $this->decodedInvoice;
     }
 
-    public function checkStatelessPaymentStatus(string $token): array
+    public function checkStatelessPaymentStatus(string $token, ?string $walletPath = null): array
     {
+        $this->statusWalletPath = $walletPath;
         return $this->statusResult;
     }
 }
@@ -176,7 +181,7 @@ $tests['preserves one satoshi across the API service boundary'] = static functio
     statelessAssertSame(10, $manager->createdInvoices[0]['expiration'], 'The minimum expiration was not applied.');
     statelessAssertSame(
         $walletDirectory . DIRECTORY_SEPARATOR . 'store_wallet',
-        $wallet->loadedWalletPaths[0],
+        $manager->createdInvoices[0]['wallet_path'],
         'The API client wallet was not selected.'
     );
 };
@@ -224,7 +229,7 @@ $tests['rejects an unknown API key'] = static function () use ($walletDirectory)
     statelessAssertSame(401, $exception->getCode(), 'Authentication failure returned the wrong code.');
 };
 
-$tests['loads the wallet embedded in a current token'] = static function () use ($walletDirectory): void {
+$tests['routes legacy status with the explicit token wallet'] = static function () use ($walletDirectory): void {
     [$service, $wallet, $manager] = newStatelessTestService($walletDirectory);
     $manager->decodedInvoice = ['p' => ['wallet' => 'store_wallet']];
     $manager->statusResult = ['status' => 'unpaid'];
@@ -234,7 +239,7 @@ $tests['loads the wallet embedded in a current token'] = static function () use 
     statelessAssertSame(['status' => 'unpaid'], $result, 'The payment status result changed.');
     statelessAssertSame(
         $walletDirectory . DIRECTORY_SEPARATOR . 'store_wallet',
-        $wallet->loadedWalletPaths[0],
+        $manager->statusWalletPath,
         'The wallet embedded in the token was not loaded.'
     );
 };
@@ -248,7 +253,7 @@ $tests['uses the configured wallet for a legacy token'] = static function () use
 
     statelessAssertSame(
         $walletDirectory . DIRECTORY_SEPARATOR . 'default_wallet',
-        $wallet->loadedWalletPaths[0],
+        $manager->statusWalletPath,
         'A legacy token did not select the configured default wallet.'
     );
 };

@@ -59,13 +59,14 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         int|float|string $amountBtc,
         array $metadata = [],
         int $expirationMinutes = 15,
-        ?AddressGeneratorInterface $addressGenerator = null
+        ?AddressGeneratorInterface $addressGenerator = null,
+        ?IdempotencyReservation $reservation = null
     ): array {
         $database = $this->requireDatabase();
         $storeId = $this->validateIdentifier($storeId, 'Store ID', 50);
         $amount = $this->requirePositiveAmount($amountBtc);
         $expirationSeconds = $this->expirationSeconds($expirationMinutes);
-        $invoiceId = 'inv_' . bin2hex(random_bytes(16));
+        $invoiceId = $reservation?->resourceId() ?? 'inv_' . bin2hex(random_bytes(16));
         $now = $this->now();
         $expiresAt = $now + $expirationSeconds;
 
@@ -86,7 +87,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
             } elseif ($this->addressGenerator !== null) {
                 $generator = $this->addressGenerator;
             } else {
-                $factory = new AddressGeneratorFactory($this->requireWallet(), $database);
+                $factory = new AddressGeneratorFactory($this->wallet, $database);
                 $generator = $factory->forStore($store);
             }
         }
@@ -97,61 +98,47 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
             'Faktura ' . $invoiceId
         );
 
-        $generated = $generator->generateAddress($context);
-        $address = $generated->getAddress();
-        $source = $generated->getSource();
-        $index = $generated->getIndex();
-        $derivationPath = $generated->getDerivationPath();
-
-        $storedMetadata = $metadata;
-        $jsonMetadata = $this->encodeJson(
-            $storedMetadata,
-            'invoice metadata',
-            self::MAX_METADATA_BYTES
-        );
+        $allocate = function () use ($generator, $context, $invoiceId, $storeId, $amount, $metadata, $now, $expiresAt): array {
+            $generated = $generator->generateAddress($context);
+            return [
+                'id' => $invoiceId,
+                'store_id' => $storeId,
+                'address' => $generated->getAddress(),
+                'amount' => $amount->toBtcString(),
+                'status' => 'New',
+                'metadata' => $metadata,
+                'created_at' => $now,
+                'expires_at' => $expiresAt,
+                'bip21_uri' => $this->generateBip21Uri($generated->getAddress(), $amount->toBtcString(), 'Faktura ' . $invoiceId),
+                'address_source' => $generated->getSource(),
+                'address_index' => $generated->getIndex(),
+                'derivation_path' => $generated->getDerivationPath(),
+            ];
+        };
+        // XPUB index + creation snapshot commit together. Retry reuses this data,
+        // including its rate/amount/timestamps, even if the INSERT/response failed.
+        $invoice = $reservation === null ? $allocate()
+            : $reservation->reserveResource($allocate, $generator instanceof XpubAddressGenerator);
 
         try {
-            $statement = $database->getPdo()->prepare(
-                "INSERT INTO invoices
-                    (id, store_id, btc_address, address_source, address_index, derivation_path, amount, status, metadata, created_at, expires_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?)"
-            );
-            $statement->execute([
-                $invoiceId,
-                $storeId,
-                $address,
-                $source,
-                $index,
-                $derivationPath,
-                $amount->toBtcString(),
-                $jsonMetadata,
-                $now,
-                $expiresAt,
-            ]);
+            $database->transactional(function (\PDO $pdo) use ($invoice, $reservation): void {
+                $statement = $pdo->prepare(
+                    "INSERT INTO invoices
+                        (id, store_id, btc_address, address_source, address_index, derivation_path, amount, status, metadata, created_at, expires_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?)"
+                );
+                $statement->execute([
+                    $invoice['id'], $invoice['store_id'], $invoice['address'], $invoice['address_source'],
+                    $invoice['address_index'], $invoice['derivation_path'], $invoice['amount'],
+                    $this->encodeJson($invoice['metadata'], 'invoice metadata', self::MAX_METADATA_BYTES),
+                    $invoice['created_at'], $invoice['expires_at'],
+                ]);
+                $reservation?->completeInvoice($pdo, $invoice);
+            });
         } catch (Throwable $exception) {
-            throw new BtcInvoiceManagerException(
-                'Database invoice could not be stored.',
-                'create_database_invoice',
-                previous: $exception
-            );
+            throw new BtcInvoiceManagerException('Database invoice could not be stored.', 'create_database_invoice', previous: $exception);
         }
-
-        return [
-            'id' => $invoiceId,
-            'address' => $address,
-            'amount' => $amount->toBtcString(),
-            'status' => 'New',
-            'created_at' => $now,
-            'expires_at' => $expiresAt,
-            'bip21_uri' => $this->generateBip21Uri(
-                $address,
-                $amount->toBtcString(),
-                'Faktura ' . $invoiceId
-            ),
-            'address_source' => $source,
-            'address_index' => $index,
-            'derivation_path' => $derivationPath,
-        ];
+        return $invoice;
     }
 
     /**
@@ -291,15 +278,6 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
     public function checkStatelessPaymentStatus(string $token, ?string $walletPath = null): array
     {
         return $this->requireStatelessManager()->checkStatelessPaymentStatus($token, $walletPath ?? $this->wallet?->getActiveWalletPath());
-    }
-
-    private function requireWallet(): ElectrumWallet
-    {
-        if ($this->wallet === null) {
-            throw new LogicException('Wallet operations are not configured for this invoice manager.');
-        }
-
-        return $this->wallet;
     }
 
     private function requireStatelessManager(): BtcStatelessInvoiceManager

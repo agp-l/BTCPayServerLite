@@ -9,9 +9,9 @@ if (!is_string($source)) {
 
 $checks = [
     'uses an explicit invoice and store projection'
-        => str_contains($source, 'SELECT i.id, i.store_id, s.wallet_path'),
-    'joins the store owning the invoice'
-        => str_contains($source, 'INNER JOIN stores AS s ON s.id = i.store_id'),
+        => str_contains($source, 'SELECT i.id, i.store_id, i.btc_address'),
+    'has no wallet or store dependency'
+        => !str_contains($source, 'wallet_path') && !str_contains($source, 'JOIN stores'),
     'uses a parameterized invoice lookup'
         => str_contains($source, 'WHERE i.id = ?')
             && str_contains($source, '$statement->execute([$invoiceId])'),

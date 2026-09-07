@@ -12,13 +12,13 @@ use InvalidArgumentException;
  */
 class AddressGeneratorFactory
 {
-    private ElectrumWallet $wallet;
+    private ?ElectrumWallet $wallet;
     private ?Database $database;
     private ?WalletLockManager $lockManager;
     private ?AddressIndexStoreInterface $customIndexStore;
 
     public function __construct(
-        ElectrumWallet $wallet,
+        ?ElectrumWallet $wallet,
         ?Database $database = null,
         ?WalletLockManager $lockManager = null,
         ?AddressIndexStoreInterface $customIndexStore = null
@@ -67,14 +67,22 @@ class AddressGeneratorFactory
         }
 
         if ($source === GeneratedAddress::SOURCE_ELECTRUM) {
-            return new ElectrumAddressGenerator($this->wallet, $this->lockManager);
+            return new ElectrumAddressGenerator($this->requireWallet(), $this->lockManager);
         }
 
         throw new InvalidArgumentException("Unsupported address source '{$source}'.");
     }
 
+    private function requireWallet(): ElectrumWallet
+    {
+        if ($this->wallet === null) {
+            throw new AddressGenerationException('Electrum address generation is not configured.', GeneratedAddress::SOURCE_ELECTRUM, 503);
+        }
+        return $this->wallet;
+    }
+
     public function createElectrumGenerator(): ElectrumAddressGenerator
     {
-        return new ElectrumAddressGenerator($this->wallet, $this->lockManager);
+        return new ElectrumAddressGenerator($this->requireWallet(), $this->lockManager);
     }
 }

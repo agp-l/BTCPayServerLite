@@ -266,13 +266,17 @@ CREATE TABLE store_integrations (
 CREATE TABLE `api_idempotency_keys` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `store_id` VARCHAR(50) NOT NULL,
-    `idempotency_key` VARCHAR(128) NOT NULL,
+    `idempotency_key` VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     `request_hash` BINARY(32) NOT NULL,
+    `state` ENUM('Pending','Completed','Failed') NOT NULL DEFAULT 'Pending',
+    `resource_id` VARCHAR(50) DEFAULT NULL,
+    `resource_data` LONGTEXT DEFAULT NULL,
     `response_code` SMALLINT UNSIGNED NOT NULL,
     `response_body` LONGTEXT NOT NULL,
     `created_at` BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_store_idempotency_key` (`store_id`, `idempotency_key`),
+    UNIQUE KEY `uq_idempotency_resource` (`resource_id`),
     KEY `idx_idempotency_created` (`created_at`),
     CONSTRAINT `fk_idempotency_store`
         FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`)

@@ -22,17 +22,20 @@ final class StatelessKernelTestWallet extends ElectrumWallet
     {
     }
 
+    public function ensureWalletLoaded(string $walletPath, ?string $password = null): void {}
+
     public function createPaymentRequest(
         int|float|string $amount,
         string $memo = '',
-        ?int $expirationSeconds = null
+        ?int $expirationSeconds = null,
+        ?string $walletPath = null
     ): array {
         $this->created[] = ['amount' => $amount, 'memo' => $memo, 'expiry' => $expirationSeconds];
 
         return ['address' => 'bc1qstandalone', 'request_id' => 'standalone-request'];
     }
 
-    public function getPaymentRequest(string $requestId): array
+    public function getPaymentRequest(string $requestId, ?string $walletPath = null): array
     {
         return $this->requests[$requestId] ?? ['status' => 0];
     }
@@ -45,7 +48,7 @@ final class StatelessKernelTestWallet extends ElectrumWallet
         ];
     }
 
-    public function deletePaymentRequest(string $requestId): void
+    public function deletePaymentRequest(string $requestId, ?string $walletPath = null): void
     {
     }
 }
@@ -81,7 +84,7 @@ $tests['creates a database-free signed invoice'] = static function (): void {
         '0.00000001',
         'Email invoice',
         ['order_id' => 'MAIL-42', 'wallet' => 'merchant_wallet'],
-        15
+        15, '/wallets/test'
     );
     $invoice = $manager->decodeStatelessToken($created['token']);
 
@@ -105,8 +108,8 @@ $tests['detects a partial payment exactly'] = static function (): void {
         static fn (): int => 1_700_000_000
     );
 
-    $created = $manager->createStatelessInvoice('0.00000005', 'Partial');
-    $status = $manager->checkStatelessPaymentStatus($created['token']);
+    $created = $manager->createStatelessInvoice('0.00000005', 'Partial', [], 15, '/wallets/test');
+    $status = $manager->checkStatelessPaymentStatus($created['token'], '/wallets/test');
 
     kernelAssertSame('underpaid', $status['status'], 'Partial payment status is wrong.');
     kernelAssertSame('0.00000003', $status['payment']['received_total'], 'Received amount is wrong.');
@@ -122,8 +125,8 @@ $tests['keeps a paid request paid after address funds move'] = static function (
         static fn (): int => 1_700_000_000
     );
 
-    $created = $manager->createStatelessInvoice('0.001', 'Paid');
-    $status = $manager->checkStatelessPaymentStatus($created['token']);
+    $created = $manager->createStatelessInvoice('0.001', 'Paid', [], 15, '/wallets/test');
+    $status = $manager->checkStatelessPaymentStatus($created['token'], '/wallets/test');
 
     kernelAssertSame('paid', $status['status'], 'Paid request regressed.');
     kernelAssertSame('0.00100000', $status['payment']['received_total'], 'Paid total was lost.');

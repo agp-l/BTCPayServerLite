@@ -5,250 +5,107 @@ declare(strict_types=1);
 namespace BtcPayLite;
 
 use Closure;
-use InvalidArgumentException;
-use JsonException;
 use PDO;
 use Throwable;
 
-/**
- * Ensures strict idempotency for Greenfield API mutations (such as invoice creation).
- *
- * Prevents double-creation, double index derivation, and duplicate transactions
- * when clients retry HTTP requests due to transient network issues or when concurrent
- * requests arrive with identical Idempotency-Keys.
- */
+/** Resource reservation + exact response replay for Greenfield invoice creation. */
 class IdempotencyService
 {
-    private Database $database;
     private Closure $clock;
 
-    public function __construct(Database $database, ?callable $clock = null)
+    public function __construct(private Database $database, ?callable $clock = null)
     {
-        $this->database = $database;
-        $this->clock = $clock === null
-            ? static fn (): int => time()
-            : Closure::fromCallable($clock);
+        $this->clock = $clock === null ? static fn (): int => time() : Closure::fromCallable($clock);
     }
 
     /**
-     * Executes the given operation under an idempotency key.
-     *
-     * @param string $storeId
-     * @param string $idempotencyKey
-     * @param array<string, mixed> $payload
-     * @param callable(): array<string, mixed> $operation
-     * @return array{status_code: int, body: array<string, mixed>}
+     * Caller must authenticate before lookup/replay. The callback may receive an
+     * IdempotencyReservation; invoice creation completes it atomically with INSERT.
+     * No DB transaction is held across the whole operation.
      */
-    public function execute(
-        string $storeId,
-        string $idempotencyKey,
-        array $payload,
-        callable $operation
-    ): array {
-        $idempotencyKey = trim($idempotencyKey);
+    public function execute(string $storeId, string $idempotencyKey, array $payload, callable $operation, ?callable $responseFactory = null): array
+    {
         if ($idempotencyKey === '') {
-            // No idempotency requested; execute directly
-            $result = $operation();
-            return [
-                'status_code' => 200,
-                'body' => $result,
-            ];
+            return ['status_code' => 200, 'body' => $operation()];
         }
-
-        if (strlen($idempotencyKey) > 128 || !preg_match('/\A[A-Za-z0-9_-]{1,128}\z/D', $idempotencyKey)) {
-            throw new GreenfieldApiException(
-                'Idempotency-Key must contain between 1 and 128 alphanumeric characters, dashes, or underscores.',
-                'validate_idempotency_key',
-                400
-            );
+        if (!preg_match('/\A[A-Za-z0-9_-]{1,128}\z/D', $idempotencyKey)) {
+            throw new GreenfieldApiException('Idempotency-Key must contain 1–128 alphanumeric characters, dashes or underscores.', 'validate_idempotency_key', 400);
         }
-
-        $requestJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $requestHash = hash('sha256', (string) $requestJson, true);
-        $pdo = $this->database->getPdo();
-
-        // 1. Check for existing completed or pending record
-        $stmt = $pdo->prepare(
-            'SELECT request_hash, response_code, response_body
-               FROM api_idempotency_keys
-              WHERE store_id = ? AND idempotency_key = ?
-              LIMIT 1'
-        );
-        $stmt->execute([$storeId, $idempotencyKey]);
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (is_array($existing)) {
-            return $this->handleExistingRecord($storeId, $idempotencyKey, $requestHash, $existing, $operation);
+        $hash = hash('sha256', json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), true);
+        $existing = $this->find($storeId, $idempotencyKey, $hash);
+        if ($existing !== null && $existing['state'] !== 'Pending') {
+            return $this->replay($existing);
         }
-
-        // 2. No record exists yet: attempt atomic reservation
-        $ownsExecution = false;
-        try {
-            $insert = $pdo->prepare(
-                'INSERT INTO api_idempotency_keys
-                    (store_id, idempotency_key, request_hash, response_code, response_body, created_at)
-                 VALUES (?, ?, ?, 0, \'\', ?)'
-            );
-            $insert->execute([
-                $storeId,
-                $idempotencyKey,
-                $requestHash,
-                ($this->clock)(),
-            ]);
-            $ownsExecution = true;
-        } catch (Throwable) {
-            // Another concurrent thread inserted the key first
-            $ownsExecution = false;
-        }
-
-        if (!$ownsExecution) {
-            // Another worker won the insert race; wait for its completion
-            return $this->waitForCompletion($storeId, $idempotencyKey, $requestHash, $operation);
-        }
-
-        // 3. This worker owns execution: run operation and update idempotency record
-        $operationCompleted = false;
-        $responseBody = null;
-        try {
-            $responseBody = $operation();
-            $operationCompleted = true;
-        } catch (Throwable $opException) {
-            // Operation itself threw an exception.
-            // Mark as Failed (500) so a retry does not blindly recreate without knowing state.
-            try {
-                $update = $pdo->prepare(
-                    'UPDATE api_idempotency_keys
-                        SET response_code = 500, response_body = ?
-                      WHERE store_id = ? AND idempotency_key = ? AND response_code = 0'
+        // Connection-owned lock is released on a process crash, unlike an anonymous
+        // response_code=0 claim. The resource ID/data remain durable for recovery.
+        $lockName = 'idem_' . substr(hash('sha256', $storeId . "\0" . $idempotencyKey), 0, 56);
+        return $this->database->withNamedLock($lockName, 2, function () use ($storeId, $idempotencyKey, $hash, $operation, $responseFactory): array {
+            $row = $this->find($storeId, $idempotencyKey, $hash);
+            if ($row === null) {
+                $resourceId = 'inv_' . bin2hex(random_bytes(16));
+                $stmt = $this->database->getPdo()->prepare(
+                    "INSERT INTO api_idempotency_keys
+                        (store_id, idempotency_key, request_hash, state, resource_id, response_code, response_body, created_at)
+                     VALUES (?, ?, ?, 'Pending', ?, 0, '', ?)"
                 );
-                $update->execute([
-                    json_encode(['error' => $opException->getMessage()], JSON_UNESCAPED_SLASHES),
-                    $storeId,
-                    $idempotencyKey,
-                ]);
-            } catch (Throwable) {
+                $stmt->execute([$storeId, $idempotencyKey, $hash, $resourceId, ($this->clock)()]);
+                $row = $this->find($storeId, $idempotencyKey, $hash);
             }
-            throw $opException;
-        }
-
-        // The operation completed successfully. Under NO circumstance delete the reservation.
-        $responseCode = 200;
-        $encodedBody = json_encode($responseBody, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            if ($row['state'] !== 'Pending') {
+                return $this->replay($row);
+            }
+            $reservation = new IdempotencyReservation($this->database, $storeId, $idempotencyKey,
+                (string) $row['resource_id'], $responseFactory ?? static fn (array $invoice): array => $invoice);
             try {
-                $update = $pdo->prepare(
-                    'UPDATE api_idempotency_keys
-                        SET response_code = ?, response_body = ?
-                      WHERE store_id = ? AND idempotency_key = ?'
-                );
-                $update->execute([$responseCode, $encodedBody, $storeId, $idempotencyKey]);
-                break;
-            } catch (Throwable) {
-                usleep(20000);
-            }
-        }
-
-        return [
-            'status_code' => $responseCode,
-            'body' => $responseBody,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $existing
-     * @return array{status_code: int, body: array<string, mixed>}
-     */
-    private function handleExistingRecord(
-        string $storeId,
-        string $idempotencyKey,
-        string $requestHash,
-        array $existing,
-        callable $operation
-    ): array {
-        if ($existing['request_hash'] !== $requestHash) {
-            throw new GreenfieldApiException(
-                'Idempotency key was already used for a different request payload.',
-                'idempotency_conflict',
-                409
-            );
-        }
-
-        $code = (int) ($existing['response_code'] ?? 0);
-        if ($code > 0) {
-            try {
-                $savedBody = json_decode((string) $existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
-                return [
-                    'status_code' => $code,
-                    'body' => is_array($savedBody) ? $savedBody : [],
-                ];
-            } catch (JsonException) {
-                // Fallback to re-execution if stored body was somehow unparseable
-            }
-        }
-
-        // If response_code is 0, execution is currently pending by another process
-        return $this->waitForCompletion($storeId, $idempotencyKey, $requestHash, $operation);
-    }
-
-    /**
-     * Waits for an in-flight operation to complete and returns its cached response.
-     *
-     * @return array{status_code: int, body: array<string, mixed>}
-     */
-    private function waitForCompletion(
-        string $storeId,
-        string $idempotencyKey,
-        string $requestHash,
-        callable $operation
-    ): array {
-        $pdo = $this->database->getPdo();
-        $attempts = 40; // 40 * 50ms = 2.0s timeout
-
-        for ($i = 0; $i < $attempts; $i++) {
-            usleep(50000); // 50ms
-
-            $stmt = $pdo->prepare(
-                'SELECT request_hash, response_code, response_body
-                   FROM api_idempotency_keys
-                  WHERE store_id = ? AND idempotency_key = ?
-                  LIMIT 1'
-            );
-            $stmt->execute([$storeId, $idempotencyKey]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!is_array($row)) {
-                // Reservation was deleted (e.g. prior execution failed), we can break and run
-                break;
-            }
-
-            if ($row['request_hash'] !== $requestHash) {
-                throw new GreenfieldApiException(
-                    'Idempotency key was already used for a different request payload.',
-                    'idempotency_conflict',
-                    409
-                );
-            }
-
-            $code = (int) ($row['response_code'] ?? 0);
-            if ($code > 0) {
-                try {
-                    $savedBody = json_decode((string) $row['response_body'], true, 512, JSON_THROW_ON_ERROR);
-                    return [
-                        'status_code' => $code,
-                        'body' => is_array($savedBody) ? $savedBody : [],
-                    ];
-                } catch (JsonException) {
-                    break;
+                $body = $operation($reservation);
+                $saved = $this->find($storeId, $idempotencyKey, $hash);
+                if ($saved['state'] === 'Pending') {
+                    // For side-effect-free callbacks; create-invoice already completed
+                    // inside its INSERT transaction and cannot reach this branch.
+                    $this->database->transactional(fn () => $reservation->complete($body));
+                    $saved = $this->find($storeId, $idempotencyKey, $hash);
                 }
+                return $this->replay($saved);
+            } catch (Throwable $exception) {
+                $saved = $this->find($storeId, $idempotencyKey, $hash);
+                if ($saved !== null && $saved['state'] !== 'Pending') {
+                    return $this->replay($saved);
+                }
+                // Safe deterministic client failures are replayed with their original
+                // HTTP status/body. Transient/unknown failures keep recoverable data.
+                if ($exception instanceof GreenfieldApiException && $exception->getHttpStatus() < 500) {
+                    $body = ['message' => $exception->getMessage()];
+                    $this->database->transactional(fn () => $reservation->complete($body, $exception->getHttpStatus(), 'Failed'));
+                    return ['status_code' => $exception->getHttpStatus(), 'body' => $body];
+                }
+                throw $exception;
             }
-        }
+        });
+    }
 
-        // If timed out waiting for in-flight operation, report conflict or retry
-        throw new GreenfieldApiException(
-            'Concurrent request under the same idempotency key is still being processed. Please retry shortly.',
-            'idempotency_in_flight',
-            409
+    private function find(string $storeId, string $key, string $hash): ?array
+    {
+        $stmt = $this->database->getPdo()->prepare(
+            'SELECT request_hash, state, resource_id, response_code, response_body
+               FROM api_idempotency_keys WHERE store_id = ? AND idempotency_key = ? LIMIT 1'
         );
+        $stmt->execute([$storeId, $key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        if (!hash_equals((string) $row['request_hash'], $hash)) {
+            throw new GreenfieldApiException('Idempotency key was already used for a different request payload.', 'idempotency_conflict', 409);
+        }
+        return $row;
+    }
+
+    private function replay(array $row): array
+    {
+        $body = json_decode((string) $row['response_body'], true, 32, JSON_THROW_ON_ERROR);
+        if (!is_array($body) || (int) $row['response_code'] < 100) {
+            throw new GreenfieldApiException('Saved response is unavailable. The resource will not be recreated.', 'idempotency_replay', 503);
+        }
+        return ['status_code' => (int) $row['response_code'], 'body' => $body];
     }
 }

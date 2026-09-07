@@ -14,7 +14,7 @@ final class InvoicePaymentPresentation
         $status = (string) $invoice['status'];
         InvoiceStateMachine::assertTransition($status, $status);
         $received = BitcoinAmount::fromSatoshis($current);
-        $missing = $status === 'Settled' ? 0 : max(0, $expected->toSatoshis() - $current);
+        $missing = $status === 'Settled' ? 0 : max(0, $expected->satoshis() - $current);
         $metadata = $invoice['metadata'] ?? [];
         if (is_string($metadata)) {
             $metadata = json_decode($metadata, true, 32, JSON_THROW_ON_ERROR);
@@ -28,7 +28,7 @@ final class InvoicePaymentPresentation
         return [
             'id' => $invoice['id'],
             'status' => $status,
-            'additional_status' => $status !== 'Settled' && $current > 0 && $current < $expected->toSatoshis() ? 'PaidPartial' : 'None',
+            'additional_status' => $status !== 'Settled' && $current > 0 && $current < $expected->satoshis() ? 'PaidPartial' : 'None',
             'invoice' => $invoice,
             'payment' => [
                 'current_balance' => $received->toBtcString(),

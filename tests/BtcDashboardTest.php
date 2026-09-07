@@ -14,17 +14,17 @@ final class DashboardWalletFixture extends ElectrumWallet
     {
     }
 
-    public function getWalletBalance(): array
+    public function getWalletBalance(?string $walletPath = null): array
     {
         return ['confirmed' => 1.25, 'unconfirmed' => 0.00000001];
     }
 
-    public function listAddresses(bool $receiving = true, bool $change = false): array
+    public function listAddresses(bool $receiving = true, bool $change = false, ?string $walletPath = null): array
     {
         return $change ? ['bc1change'] : ['bc1empty', 'bc1funded'];
     }
 
-    public function listUnspent(): array
+    public function listUnspent(?string $walletPath = null): array
     {
         return [
             ['address' => 'bc1funded', 'value_sats' => 1500],
@@ -33,7 +33,7 @@ final class DashboardWalletFixture extends ElectrumWallet
         ];
     }
 
-    public function listTransactions(): array
+    public function listTransactions(?string $walletPath = null): array
     {
         return [[
             'txid' => str_repeat('a', 64),
@@ -44,7 +44,7 @@ final class DashboardWalletFixture extends ElectrumWallet
         ]];
     }
 
-    public function getTransaction(string $txid): array|string
+    public function getTransaction(string $txid, ?string $walletPath = null): array|string
     {
         return ['hex' => '00'];
     }
@@ -66,7 +66,8 @@ final class DashboardWalletFixture extends ElectrumWallet
         string $destinationAddress,
         int|float|string $amount,
         ?string $password = null,
-        ?int $feeRateSatVb = null
+        ?int $feeRateSatVb = null,
+        ?string $walletPath = null
     ): string {
         return str_repeat('b', 64);
     }

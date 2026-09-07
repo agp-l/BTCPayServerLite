@@ -99,8 +99,8 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
         if (!is_array($balance) || !isset($balance['confirmed'], $balance['unconfirmed'])) {
             throw new BlockchainProviderException('Invalid address balance response.', 'observe_address', 503);
         }
-        $confirmed = max(0, BitcoinAmount::fromBtc($balance['confirmed'])->toSatoshis());
-        $delta = BitcoinAmount::fromBtc($balance['unconfirmed'])->toSatoshis();
+        $confirmed = max(0, BitcoinAmount::fromBtc($balance['confirmed'])->satoshis());
+        $delta = BitcoinAmount::fromBtc($balance['unconfirmed'])->satoshis();
         // Electrum mempool balance is a delta, possibly negative after a spend.
         // Normalize inconsistent negative totals here, never manufacture historical receipts.
         $delta = max(-$confirmed, $delta);

@@ -18,6 +18,8 @@ final class IdempotencyTestDatabase extends Database
         parent::__construct('127.0.0.1', 'test_db', 'user', 'pass');
     }
 
+    public function withNamedLock(string $lockName, int $timeoutSeconds, callable $callback): mixed { return $callback(); }
+
     protected function createPdo(string $dsn, string $user, string $password, array $options): PDO
     {
         return $this->testPdo;
@@ -33,6 +35,9 @@ $pdo->exec('
         store_id TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
         request_hash BLOB NOT NULL,
+        state TEXT NOT NULL DEFAULT \'Pending\',
+        resource_id TEXT,
+        resource_data TEXT,
         response_code INTEGER NOT NULL,
         response_body TEXT NOT NULL,
         created_at INTEGER NOT NULL,
