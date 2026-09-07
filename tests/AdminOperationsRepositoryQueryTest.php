@@ -12,10 +12,10 @@ $checks = [
         $source,
         'SELECT id, name, api_key, wallet_path FROM stores'
     ) && !str_contains($source, 'SELECT *'),
-    'limits the default store lookup' => str_contains(
+    'requires an explicit store lookup' => str_contains(
         $source,
-        'ORDER BY id LIMIT 1'
-    ),
+        'FROM stores WHERE id = ? LIMIT 1'
+    ) && !str_contains($source, 'FROM stores ORDER BY id LIMIT 1'),
     'uses parameterized store inserts' => str_contains(
         $source,
         'VALUES (?, ?, ?, ?, NULL)'

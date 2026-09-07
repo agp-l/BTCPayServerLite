@@ -16,14 +16,34 @@ final class WalletBalanceError
                 ElectrumRPCException::TYPE_AUTHENTICATION => 'Electrum RPC odmítlo přihlášení. Zkontrolujte RPC uživatele a heslo v konfiguraci.',
                 ElectrumRPCException::TYPE_REMOTE => $exception->getRpcMethod() === 'load_wallet'
                     ? 'Electrum nemůže otevřít přiřazený soubor peněženky. Ověřte jeho cestu a oprávnění procesu Electrum.'
-                    : 'Electrum odmítlo požadavek na načtení zůstatku.',
+                    : 'Electrum odmítlo požadavek pro tuto peněženku. Daemon odpověděl; ověřte zvolenou wallet a RPC konfiguraci.',
                 default => 'Electrum vrátilo neplatnou odpověď při načítání zůstatku.',
             };
         }
+        if ($exception instanceof ElectrumWalletException && in_array($exception->getOperation(), ['wallet_not_found', 'wallet_directory'], true)) {
+            return 'Vybraný soubor nebo adresář peněženky není dostupný. Ověřte název, cestu a oprávnění PHP.';
+        }
+        if ($exception instanceof WalletBusyException) { return 'Peněženku právě mění jiný požadavek. Zkuste to za chvíli.'; }
+        if ($exception instanceof AuthException) { return 'Operace s peněženkou není autorizovaná nebo vypršela platnost formuláře.'; }
         if ($exception instanceof ElectrumWalletException && $exception->getOperation() === 'load_wallet') {
             return 'Přiřazenou peněženku se nepodařilo v Electrum načíst. Ověřte cestu k souboru.';
         }
         return 'Zůstatek peněženky nyní nelze načíst. Podrobnost je zaznamenaná v serverovém logu.';
+    }
+
+    public static function statusLabel(Throwable $exception): string
+    {
+        if ($exception instanceof ElectrumRPCException) {
+            return match ($exception->getType()) {
+                ElectrumRPCException::TYPE_TRANSPORT => 'Offline',
+                ElectrumRPCException::TYPE_AUTHENTICATION => 'Chyba přihlášení',
+                default => 'Chyba wallet RPC',
+            };
+        }
+        if ($exception instanceof WalletBusyException) { return 'Zaneprázdněná'; }
+        if ($exception instanceof AuthException) { return 'Nepovoleno'; }
+        if ($exception instanceof ElectrumWalletException) { return 'Chyba peněženky'; }
+        return 'Chyba požadavku';
     }
 
     public static function log(Throwable $exception, string $walletPath): void

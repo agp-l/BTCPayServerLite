@@ -203,7 +203,7 @@ if ($service instanceof ClientDashboardService) {
             try {
                 $wallet = new ElectrumWallet(\BtcPayLite\ElectrumRPCFactory::fromConfig($config));
                 $wallet->loadWallet($walletPath);
-                $walletBalance = $wallet->getWalletBalance();
+                $walletBalance = $wallet->getWalletBalanceExact($walletPath);
             } catch (Throwable $exception) {
                 WalletBalanceError::log($exception, $walletPath);
                 $walletError = WalletBalanceError::message($exception);

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 use BtcPayLite\AuthManager;
 use BtcPayLite\BtcDashboard;
-use BtcPayLite\ElectrumRPC;
+use BtcPayLite\ElectrumWalletException;
+use BtcPayLite\WalletBalanceError;
 use BtcPayLite\ElectrumWallet;
 use BtcPayLite\HttpBitcoinMarketDataProvider;
 use BtcPayLite\UrlManager;
@@ -49,8 +50,8 @@ $exportedXprv = '';
 $pageError = null;
 $availableWallets = [];
 $currentWalletName = $defaultWalletName;
-$connStatus = 'Offline';
-$fiatText = 'Electrum není dostupný';
+$connStatus = 'Neověřeno';
+$fiatText = 'Stav peněženky nebyl ověřen';
 $fiatValueStr = '';
 $balanceConfirmed = 0.0;
 $balanceFormatted = '0.00000000';
@@ -75,13 +76,13 @@ try {
 
     if (!is_string($requestedWallet) || !in_array($requestedWallet, $availableWallets, true)) {
         http_response_code(400);
-        $pageError = 'Vybraná peněženka neexistuje nebo není dostupná.';
+        throw new ElectrumWalletException('Selected wallet is unavailable.', 'wallet_not_found');
     } else {
         $currentWalletName = $requestedWallet;
     }
 
     if (!in_array($currentWalletName, $availableWallets, true)) {
-        throw new RuntimeException('The configured default wallet is unavailable.');
+        throw new ElectrumWalletException('The configured default wallet is unavailable.', 'wallet_not_found');
     }
 
     $resolvedDirectory = realpath($walletDirectory);
@@ -94,10 +95,11 @@ try {
         || !is_file($activeWalletPath)
         || dirname($activeWalletPath) !== $resolvedDirectory
     ) {
-        throw new RuntimeException('The selected wallet path is invalid.');
+        throw new ElectrumWalletException('The selected wallet path is invalid.', 'wallet_not_found');
     }
 
     $wallet->loadWallet($activeWalletPath);
+    $dashboard = new BtcDashboard($wallet, $walletDirectory, new HttpBitcoinMarketDataProvider(), $activeWalletPath);
     $connStatus = 'Online';
     $fiatText = 'Připojeno k peněžence ' . $currentWalletName;
 
@@ -156,12 +158,12 @@ try {
     }
 
     $balance = $dashboard->balance();
+    $balanceFormatted = $balance['confirmed_btc'];
+    $balanceConfirmed = $balance['confirmed_sats'] / 100000000;
     $addresses = $dashboard->addresses($hideEmpty);
     $transactions = $dashboard->transactions();
     $market = $dashboard->marketSnapshot('CZK');
 
-    $balanceFormatted = $balance['confirmed_btc'];
-    $balanceConfirmed = $balance['confirmed_sats'] / 100000000;
     $receiveAddress = $addresses['recommended_receive'] ?? 'Vytvořte novou přijímací adresu';
     $fees = $market['fees'];
     $feeLow = $fees['economy'];
@@ -231,13 +233,10 @@ try {
     $sendResultColor = '#dc2626';
     $sendResultIcon = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ';
 } catch (Throwable $exception) {
-    error_log(sprintf(
-        'Admin wallet request failed: %s (%s)',
-        $exception->getMessage(),
-        $exception::class
-    ));
-    $pageError = 'Peněženka nyní není dostupná. Ověřte prosím stav Electrum služby.';
-    $fiatText = 'Spojení s Electrum není dostupné';
+    WalletBalanceError::log($exception, is_string($activeWalletPath ?? null) ? $activeWalletPath : $walletPath);
+    $connStatus = WalletBalanceError::statusLabel($exception);
+    $pageError = WalletBalanceError::message($exception);
+    $fiatText = $pageError;
 }
 
 require __DIR__ . '/views/wallet_view.php';

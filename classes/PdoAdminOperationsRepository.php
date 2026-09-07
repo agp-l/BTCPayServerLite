@@ -29,29 +29,6 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         );
     }
 
-    public function fetchDefaultStore(): ?array
-    {
-        $statement = $this->database->getPdo()->query(
-            'SELECT id, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index FROM stores ORDER BY id LIMIT 1'
-        );
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
-            return null;
-        }
-        if (!is_array($row)) {
-            throw new RuntimeException('Default store query returned an invalid row.');
-        }
-
-        return [
-            'id' => $this->requiredString($row['id'] ?? null, 'store id'),
-            'wallet_path' => (string) ($row['wallet_path'] ?? ''),
-            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
-            'xpub' => (string) ($row['xpub'] ?? ''),
-            'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
-            'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),
-        ];
-    }
-
     public function fetchStore(string $storeId): ?array
     {
         $statement = $this->database->getPdo()->prepare(
@@ -69,7 +46,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         return [
             'id' => $this->requiredString($row['id'] ?? null, 'store id'),
             'wallet_path' => (string) ($row['wallet_path'] ?? ''),
-            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
+            'address_source' => (string) ($row['address_source'] ?? 'electrum'),
             'xpub' => (string) ($row['xpub'] ?? ''),
             'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
             'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),
@@ -81,7 +58,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         string $name,
         string $apiKey,
         ?string $walletPath = null,
-        string $addressSource = 'xpub',
+        string $addressSource = 'electrum',
         ?string $xpub = null,
         string $xpubScriptType = 'p2wpkh'
     ): void {
@@ -241,7 +218,7 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
             'name' => $this->requiredString($row['name'] ?? null, 'store name'),
             'api_key' => $this->requiredString($row['api_key'] ?? null, 'store API key'),
             'wallet_path' => (string) ($row['wallet_path'] ?? ''),
-            'address_source' => (string) ($row['address_source'] ?? 'xpub'),
+            'address_source' => (string) ($row['address_source'] ?? 'electrum'),
             'xpub' => (string) ($row['xpub'] ?? ''),
             'xpub_script_type' => (string) ($row['xpub_script_type'] ?? 'p2wpkh'),
             'xpub_last_index' => (int) ($row['xpub_last_index'] ?? 0),

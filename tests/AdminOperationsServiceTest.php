@@ -101,7 +101,7 @@ $service = new AdminOperationsService(
     static fn (): int => 1788160000
 );
 
-if (count($service->stores()) !== 1 || $service->defaultStore()['id'] !== 'store_owned') {
+if (count($service->stores()) !== 1) {
     throw new RuntimeException('Admin store data was not composed.');
 }
 echo "[PASS] loads admin stores through the repository\n";

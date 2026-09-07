@@ -38,17 +38,6 @@ final class AdminOperationsService
         return $this->repository->fetchWebhooks();
     }
 
-    /** @return array{id:string,wallet_path:string} */
-    public function defaultStore(): array
-    {
-        $store = $this->repository->fetchDefaultStore();
-        if ($store === null) {
-            throw new AdminOperationsException('Nejprve vytvořte alespoň jeden obchod.', 404);
-        }
-
-        return $store;
-    }
-
     /** @return array{id:string,name:string,api_key:string,wallet_path:string} */
     public function createStore(string $name): array
     {

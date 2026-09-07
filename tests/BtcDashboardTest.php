@@ -14,9 +14,9 @@ final class DashboardWalletFixture extends ElectrumWallet
     {
     }
 
-    public function getWalletBalance(?string $walletPath = null): array
+    public function getWalletBalanceExact(?string $walletPath = null): array
     {
-        return ['confirmed' => 1.25, 'unconfirmed' => 0.00000001];
+        return ['confirmed' => '1.25000000', 'unconfirmed' => '0.00000001'];
     }
 
     public function listAddresses(bool $receiving = true, bool $change = false, ?string $walletPath = null): array

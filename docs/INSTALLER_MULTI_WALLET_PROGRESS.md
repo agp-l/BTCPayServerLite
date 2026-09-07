@@ -43,3 +43,30 @@ Record test results and published commits here as work progresses.
 - Publish this installer checkpoint next, then continue the multi-wallet audit.
 - The user's exact failed local requirement is not accessible remotely. The updated
   page displays it and identifies the active web PHP configuration to repair.
+
+## Multi-wallet implementation checkpoint
+
+- Installer published as 7989b14; GitHub CI passed:
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34148586338
+- Verified upstream commands.py and daemon.py: JSON wallet_path selects the wallet;
+  the HTTP handler ignores request.query. Do not replace explicit named routing
+  with the attachment's URL-only assumption or introduce automatic mutation retry.
+- Removed the production first-store query/defaultStore fallback. Admin creation
+  requires an explicit store; provisioned Electrum stores now default to electrum,
+  matching sql.sql, instead of incorrectly defaulting to xpub without an XPUB.
+- Bound admin BtcDashboard to a fixed explicit path; exact balance strings now
+  flow through admin/client balance displays. Its mutations share the existing lock.
+- Benign load race does one read-only recheck; transport/auth failures propagate.
+  No normal request closes another wallet. Explicit close remains maintenance-only.
+- Admin wallet errors distinguish transport, authentication, wallet/path and request
+  failures; invalid requested wallet never falls back to the default for a mutation.
+- MultiWalletRoutingTest passed via actual HTTP JSON-RPC transport, three loaded
+  wallets, 0.00008827 fixture balance, repeated load, load race, two processes and
+  daemon/auth error classification. Existing wallet/dashboard/admin tests passed.
+- Real MariaDB tenant test passed assigned-wallet/store/webhook/API-key isolation;
+  extended test now also checks actual store-to-Electrum-address routing.
+- Full local suite with MariaDB: 55 passed; the only failing test asserted the
+  obsolete first-store fallback. That assertion now requires explicit store lookup
+  and passed on rerun. All production behaviors and new integration tests passed.
+- Source syntax validation: 217 PHP files, zero errors. Next publish this verified
+  implementation, finish audit documentation and confirm the full GitHub CI run.

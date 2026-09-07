@@ -223,6 +223,9 @@ class ElectrumRPC
      */
     public function callForWallet(string $method, string $walletPath, array $params = []): mixed
     {
+        if ($this->getCommandScope($method) === self::SCOPE_DAEMON) {
+            throw new InvalidArgumentException('Daemon lifecycle commands must use callDaemon() without wallet scoping.');
+        }
         if (!$this->hasOnlyNamedKeys($params)) {
             throw new InvalidArgumentException(
                 'Wallet-scoped RPC calls require named parameters.'

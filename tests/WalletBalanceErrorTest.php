@@ -32,3 +32,13 @@ if (!str_contains(WalletBalanceError::message($missingWallet), 'soubor peněžen
 echo "[PASS] explains an unavailable wallet file\n";
 
 echo "2 wallet balance error tests passed.\n";
+
+foreach ([
+    [new BtcPayLite\ElectrumWalletException('missing', 'wallet_not_found'), 'Chyba peněženky'],
+    [new ElectrumRPCException('failed', ElectrumRPCException::TYPE_REMOTE, 'getbalance'), 'Chyba wallet RPC'],
+    [new BtcPayLite\WalletBusyException('busy', 2, 503), 'Zaneprázdněná'],
+    [new BtcPayLite\AuthException('denied'), 'Nepovoleno'],
+] as [$error, $label]) {
+    if (WalletBalanceError::statusLabel($error) !== $label) { throw new RuntimeException('Wallet failure became a generic Offline status'); }
+}
+echo "[PASS] Wallet/path, command, busy and authorization errors stay distinct from daemon Offline\n";

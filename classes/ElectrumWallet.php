@@ -60,13 +60,18 @@ class ElectrumWallet
                 $params['password'] = $password;
             }
 
-            $result = $this->rpc->callDaemon('load_wallet', $params);
-            if ($result === null || $result === false || $result === '') {
-                throw new ElectrumWalletException(
-                    'Electrum wallet could not be loaded.',
-                    'load_wallet'
-                );
+            try {
+                $result = $this->rpc->callDaemon('load_wallet', $params);
+                if ($result !== null && $result !== false && $result !== '') { return; }
+                $failure = new ElectrumWalletException('Electrum wallet could not be loaded.', 'load_wallet');
+            } catch (ElectrumRPCException $exception) {
+                if ($exception->getType() !== ElectrumRPCException::TYPE_REMOTE) { throw $exception; }
+                $failure = $exception;
             }
+            // A daemon-side/CLI loader may have won the race outside our PHP lock.
+            // Recheck once; never retry a mutation or conceal transport/auth failures.
+            if ($this->containsWalletPath($this->getLoadedWallets(), $walletPath)) { return; }
+            throw $failure;
         }
     }
 
@@ -84,6 +89,12 @@ class ElectrumWallet
     public function getActiveWalletPath(): ?string
     {
         return $this->activeWalletPath;
+    }
+
+    /** @return array{confirmed:string,unconfirmed:string} Exact amounts for application accounting/presentation. */
+    public function getWalletBalanceExact(?string $walletPath = null): array
+    {
+        return $this->normalizeExactBalance($this->walletCommand('getbalance', [], $walletPath), 'getbalance');
     }
 
     /**

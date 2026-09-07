@@ -75,7 +75,8 @@ class ElectrumWalletManager
     }
 
     /**
-     * Closes a specific wallet in the Electrum daemon.
+     * Explicit maintenance operation only; normal application flows never call this.
+     * Closes only the specified wallet, under the shared mutation lock.
      */
     public function closeWallet(string $walletPathOrName): void
     {

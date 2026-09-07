@@ -1,3 +1,5 @@
+> Historical planning document. Current implementation and verified follow-ups are documented in [Core architecture](docs/CORE_PAYMENT_ARCHITECTURE.md) and [Installer / multi-wallet checkpoint](docs/INSTALLER_MULTI_WALLET_PROGRESS.md). Unchecked items below are not a statement of current runtime behavior.
+
 # BTC Pay Lite – Core PHP Architecture Refactoring Plan
 
 **Branch:** `googleAIstudio`  

@@ -84,3 +84,9 @@ try {
 echo "[PASS] rejects an unknown selected store\n";
 
 echo "4 admin invoice service tests passed.\n";
+
+$captured = null;
+try { $service->create('0.1', 'Invoice', ''); throw new RuntimeException('Missing store selected an arbitrary wallet'); }
+catch (AdminOperationsException $exception) {}
+if ($captured !== null) { throw new RuntimeException('Missing store reached invoice creation'); }
+echo "[PASS] Missing store never falls back to the first store\n";

@@ -46,19 +46,13 @@ final class AdminInvoiceService
             throw new AdminOperationsException('ID objednávky může mít nejvýše 100 platných znaků.');
         }
 
-        $storeId = $storeId !== null ? trim($storeId) : null;
-        if ($storeId !== null && !preg_match('/\Astore_[a-f0-9]{32}\z/D', $storeId)) {
-            throw new AdminOperationsException('Vybraný obchod má neplatný identifikátor.');
+        $storeId = trim($storeId ?? '');
+        if ($storeId === '' || !preg_match('/\A[A-Za-z0-9_-]{1,50}\z/D', $storeId)) {
+            throw new AdminOperationsException('Vyberte konkrétní obchod pro tuto fakturu.');
         }
-
-        $store = $storeId === null
-            ? $this->repository->fetchDefaultStore()
-            : $this->repository->fetchStore($storeId);
+        $store = $this->repository->fetchStore($storeId);
         if ($store === null) {
-            throw new AdminOperationsException(
-                $storeId === null ? 'Nejprve vytvořte alespoň jeden obchod.' : 'Vybraný obchod neexistuje.',
-                404
-            );
+            throw new AdminOperationsException('Vybraný obchod neexistuje.', 404);
         }
 
         try {

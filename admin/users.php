@@ -25,7 +25,7 @@ $service = new AdminUserService(
     static function (string $walletPath) use ($config): array {
         $wallet = new ElectrumWallet(\BtcPayLite\ElectrumRPCFactory::fromConfig($config));
         $wallet->loadWallet($walletPath);
-        return $wallet->getWalletBalance();
+        return $wallet->getWalletBalanceExact($walletPath);
     }
 );
 

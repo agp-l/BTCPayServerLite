@@ -21,11 +21,13 @@ final class BtcDashboard
     private ElectrumWallet $wallet;
     private string $walletsDirectory;
     private BitcoinMarketDataProvider $marketData;
+    private ?string $walletPath;
 
     public function __construct(
         ElectrumWallet $wallet,
         string $walletsDirectory,
-        ?BitcoinMarketDataProvider $marketData = null
+        ?BitcoinMarketDataProvider $marketData = null,
+        ?string $walletPath = null
     ) {
         $walletsDirectory = rtrim(trim($walletsDirectory), DIRECTORY_SEPARATOR);
         if ($walletsDirectory === '' || str_contains($walletsDirectory, "\0")) {
@@ -33,6 +35,7 @@ final class BtcDashboard
         }
 
         $this->wallet = $wallet;
+        $this->walletPath = $walletPath === null ? null : WalletLockManager::canonicalWalletPath($walletPath);
         $this->walletsDirectory = $walletsDirectory;
         $this->marketData = $marketData ?? new HttpBitcoinMarketDataProvider();
     }
@@ -42,12 +45,12 @@ final class BtcDashboard
     {
         $directory = realpath($this->walletsDirectory);
         if ($directory === false || !is_dir($directory) || !is_readable($directory)) {
-            throw new RuntimeException('The Electrum wallet directory is unavailable.');
+            throw new ElectrumWalletException('The Electrum wallet directory is unavailable.', 'wallet_directory');
         }
 
         $entries = scandir($directory);
         if (!is_array($entries)) {
-            throw new RuntimeException('The Electrum wallet directory could not be read.');
+            throw new ElectrumWalletException('The Electrum wallet directory could not be read.', 'wallet_directory');
         }
 
         $wallets = [];
@@ -70,7 +73,7 @@ final class BtcDashboard
     /** @return array{confirmed_btc:string,unconfirmed_btc:string,confirmed_sats:int,unconfirmed_sats:int} */
     public function balance(): array
     {
-        $balance = $this->wallet->getWalletBalance();
+        $balance = $this->wallet->getWalletBalanceExact($this->walletPath);
         $confirmed = BitcoinAmount::fromBtc($balance['confirmed']);
         $unconfirmed = BitcoinAmount::fromBtc($balance['unconfirmed']);
 
@@ -90,14 +93,14 @@ final class BtcDashboard
      */
     public function addresses(bool $hideEmpty = false): array
     {
-        $receiving = $this->uniqueAddresses($this->wallet->listAddresses(true, false));
-        $change = $this->uniqueAddresses($this->wallet->listAddresses(false, true));
+        $receiving = $this->uniqueAddresses($this->wallet->listAddresses(true, false, $this->walletPath));
+        $change = $this->uniqueAddresses($this->wallet->listAddresses(false, true, $this->walletPath));
         $receivingSet = array_fill_keys($receiving, true);
         $changeSet = array_fill_keys($change, true);
 
         /** @var array<string, BitcoinAmount> $balances */
         $balances = [];
-        foreach ($this->wallet->listUnspent() as $unspent) {
+        foreach ($this->wallet->listUnspent($this->walletPath) as $unspent) {
             $address = $unspent['address'] ?? null;
             if (!is_string($address) || $address === '') {
                 continue;
@@ -150,11 +153,11 @@ final class BtcDashboard
      */
     public function transactions(): array
     {
-        $receiving = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(true, false)), true);
-        $change = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(false, true)), true);
+        $receiving = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(true, false, $this->walletPath)), true);
+        $change = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(false, true, $this->walletPath)), true);
         $transactions = [];
 
-        foreach ($this->wallet->listTransactions() as $transaction) {
+        foreach ($this->wallet->listTransactions($this->walletPath) as $transaction) {
             $txid = $transaction['txid'] ?? $transaction['tx_hash'] ?? null;
             if (!is_string($txid) || !preg_match('/\A[0-9a-fA-F]{64}\z/D', $txid)) {
                 continue;
@@ -218,22 +221,32 @@ final class BtcDashboard
             throw new InvalidArgumentException('Destination Bitcoin address is invalid.');
         }
 
-        return $this->wallet->sendPayment($destination, $amount, $password, $feeRate);
+        if ($this->walletPath === null) {
+            return $this->wallet->sendPayment($destination, $amount, $password, $feeRate);
+        }
+        $hex = (new WalletLockManager())->withWalletLock($this->walletPath, function () use ($destination, $amount, $password, $feeRate): string {
+            $this->wallet->ensureWalletLoaded($this->walletPath, $password);
+            return $this->wallet->createTransaction($destination, $amount, $password, $feeRate, $this->walletPath);
+        });
+        return $this->wallet->broadcastTransaction($hex);
     }
 
     public function newAddress(): string
     {
-        return $this->wallet->getNewAddress();
+        if ($this->walletPath === null) { return $this->wallet->getNewAddress(); }
+        return (new ElectrumAddressGenerator($this->wallet))->generateAddress(
+            new AddressGenerationContext('admin', $this->walletPath)
+        )->getAddress();
     }
 
     /** @return array{seed:string,master_private_key:?string} */
     public function privateKeys(string $password): array
     {
-        $seed = $this->wallet->getSeed($password);
+        $seed = $this->wallet->getSeed($password, $this->walletPath);
         $masterPrivateKey = null;
 
         try {
-            $masterPrivateKey = $this->wallet->getMasterPrivateKey($password);
+            $masterPrivateKey = $this->wallet->getMasterPrivateKey($password, $this->walletPath);
         } catch (Throwable $exception) {
             $this->logFailure('master private key export', $exception);
         }
@@ -243,7 +256,7 @@ final class BtcDashboard
 
     public function masterPublicKey(): string
     {
-        return $this->wallet->getMasterPublicKey();
+        return $this->wallet->getMasterPublicKey($this->walletPath);
     }
 
     /** @param list<string> $addresses @return list<string> */
@@ -278,7 +291,7 @@ final class BtcDashboard
     private function transactionOutputs(string $txid, bool $incoming, array $receiving, array $change): array
     {
         try {
-            $details = $this->wallet->getTransaction($txid);
+            $details = $this->wallet->getTransaction($txid, $this->walletPath);
             $hex = is_array($details) ? ($details['hex'] ?? null) : $details;
             if (!is_string($hex) || $hex === '') {
                 return [];
