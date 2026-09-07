@@ -3,3 +3,5 @@ config.php
 .install.lock
 english
 *.log
+
+/var/

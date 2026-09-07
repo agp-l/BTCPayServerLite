@@ -56,7 +56,8 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         int|float|string $amountBtc,
         string $description,
         array $customData = [],
-        int $expirationMinutes = 15
+        int $expirationMinutes = 15,
+        ?string $walletPath = null
     ): array {
         $amount = $this->requirePositiveAmount($amountBtc);
         $description = $this->validateString(
@@ -69,7 +70,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         // Validate caller data before creating a mutable Electrum request.
         $this->encodeJson($customData, 'custom invoice data', self::MAX_CUSTOM_DATA_BYTES);
 
-        $request = $this->reservePaymentRequest($amount, $description, $expirationSeconds);
+        $request = $this->reservePaymentRequest($amount, $description, $expirationSeconds, $walletPath);
         $now = ($this->clock)();
         $payload = [
             'ver' => 2,
@@ -85,7 +86,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         try {
             $token = $this->tokenCodec->encode($payload);
         } catch (Throwable $exception) {
-            $this->removePaymentRequestQuietly($request['request_id']);
+            $this->removePaymentRequestQuietly($request['request_id'], $walletPath);
             throw $exception;
         }
 
@@ -104,7 +105,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         return $this->tokenCodec->decode($token);
     }
 
-    public function checkStatelessPaymentStatus(string $token): array
+    public function checkStatelessPaymentStatus(string $token, ?string $walletPath = null): array
     {
         $invoice = $this->decodeStatelessToken($token);
         $expected = $this->requirePositiveAmount((string) $invoice['v']);
@@ -114,7 +115,8 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         $observation = $this->observePayment(
             (string) $invoice['a'],
             isset($invoice['r']) ? (string) $invoice['r'] : null,
-            $expected
+            $expected,
+            $walletPath
         );
         $missing = BitcoinAmount::max(
             BitcoinAmount::fromSatoshis(0),
@@ -149,16 +151,20 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     private function reservePaymentRequest(
         BitcoinAmount $amount,
         string $memo,
-        int $expirationSeconds
+        int $expirationSeconds,
+        ?string $walletPath
     ): array {
-        $walletPath = $this->wallet->getActiveWalletPath() ?? 'default_wallet';
+        if ($walletPath === null) {
+            throw new InvalidArgumentException('Wallet path is required to create an Electrum request.');
+        }
         $request = $this->lockManager->withWalletLock(
             $walletPath,
-            fn (): array => $this->wallet->createPaymentRequest(
-                $amount->toBtcString(),
-                $memo,
-                $expirationSeconds
-            ),
+            function () use ($walletPath, $amount, $memo, $expirationSeconds): array {
+                $this->wallet->ensureWalletLoaded($walletPath);
+                return $this->wallet->createPaymentRequest(
+                    $amount->toBtcString(), $memo, $expirationSeconds, $walletPath
+                );
+            },
             5
         );
 
@@ -182,11 +188,23 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     private function observePayment(
         string $address,
         ?string $requestId,
-        BitcoinAmount $expected
+        BitcoinAmount $expected,
+        ?string $walletPath
     ): array {
+        // Provider status depends only on signed token data and a walletless observation.
+        if ($this->blockchainProvider !== null) {
+            $amounts = $this->blockchainProvider->observeAddress($address, $expected->toSatoshis())->toAmountArray();
+            return ['electrum_status' => null, 'confirmed' => $amounts['confirmed'], 'received' => $amounts['received']];
+        }
+
+        // Explicit legacy fallback, available only when no provider is configured.
+        if ($walletPath === null) {
+            throw new InvalidArgumentException('Legacy status requires an explicit wallet path.');
+        }
+        $this->lockManager->withWalletLock($walletPath, fn () => $this->wallet->ensureWalletLoaded($walletPath));
         $electrumStatus = null;
         if ($requestId !== null && $requestId !== '') {
-            $request = $this->wallet->getPaymentRequest($requestId);
+            $request = $this->wallet->getPaymentRequest($requestId, $walletPath);
             $rawStatus = $request['status'] ?? null;
             if (is_int($rawStatus)) {
                 $electrumStatus = $rawStatus;
@@ -200,12 +218,6 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             }
         }
 
-        if ($this->blockchainProvider !== null) {
-            $obs = $this->blockchainProvider->observeAddress($address, $expected->toSatoshis());
-            $amounts = $obs->toAmountArray();
-            $confirmed = $amounts['confirmed'];
-            $received = $amounts['received'];
-        } else {
             $balance = $this->wallet->getAddressBalanceExact($address);
             try {
                 $confirmed = BitcoinAmount::fromBtc($balance['confirmed'] ?? '0');
@@ -221,7 +233,6 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             $zero = BitcoinAmount::fromSatoshis(0);
             $confirmed = BitcoinAmount::max($zero, $confirmed);
             $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
-        }
         if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
             $confirmed = BitcoinAmount::max($confirmed, $expected);
             $received = BitcoinAmount::max($received, $expected);
@@ -311,10 +322,13 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         );
     }
 
-    private function removePaymentRequestQuietly(string $requestId): void
+    private function removePaymentRequestQuietly(string $requestId, string $walletPath): void
     {
         try {
-            $this->wallet->deletePaymentRequest($requestId);
+            $this->lockManager->withWalletLock($walletPath, function () use ($requestId, $walletPath): void {
+                $this->wallet->ensureWalletLoaded($walletPath);
+                $this->wallet->deletePaymentRequest($requestId, $walletPath);
+            });
         } catch (Throwable) {
             // Preserve the original token-encoding failure.
         }

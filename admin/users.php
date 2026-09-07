@@ -23,12 +23,7 @@ $database = isset($database) && $database instanceof Database
 $service = new AdminUserService(
     new PdoAdminUserRepository($database),
     static function (string $walletPath) use ($config): array {
-        $wallet = new ElectrumWallet(new ElectrumRPC(
-            $config['rpc_host'] ?? '',
-            (int) ($config['rpc_port'] ?? 0),
-            is_string($config['rpc_user'] ?? null) ? $config['rpc_user'] : null,
-            is_string($config['rpc_pass'] ?? null) ? $config['rpc_pass'] : null
-        ));
+        $wallet = new ElectrumWallet(\BtcPayLite\ElectrumRPCFactory::fromConfig($config));
         $wallet->loadWallet($walletPath);
         return $wallet->getWalletBalance();
     }

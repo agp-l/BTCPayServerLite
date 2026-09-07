@@ -25,7 +25,7 @@ class AddressGeneratorFactory
     ) {
         $this->wallet = $wallet;
         $this->database = $database;
-        $this->lockManager = $lockManager ?? new WalletLockManager($database);
+        $this->lockManager = $lockManager ?? new WalletLockManager();
         $this->customIndexStore = $customIndexStore;
     }
 

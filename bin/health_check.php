@@ -16,12 +16,7 @@ $database = new Database(
     (int) ($config['db_port'] ?? 3306)
 );
 
-$rpc = new ElectrumRPC(
-    $config['rpc_host'] ?? '127.0.0.1',
-    (int) ($config['rpc_port'] ?? 7777),
-    $config['rpc_user'] ?? '',
-    $config['rpc_pass'] ?? ''
-);
+$rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 
 $healthService = new HealthService($database, $rpc);
 $report = $healthService->check();

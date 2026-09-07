@@ -112,6 +112,21 @@ class WebhookDeliveryRepository
         string $eventType,
         int $timestamp
     ): int {
+        $pdo = $this->database->getPdo();
+        if ($pdo->inTransaction()) {
+            return $this->enqueueInTransaction($pdo, $invoiceId, $storeId, $eventType, $timestamp);
+        }
+        return $this->database->transactional(
+            fn (PDO $pdo): int => $this->enqueueInTransaction($pdo, $invoiceId, $storeId, $eventType, $timestamp)
+        );
+    }
+
+    /** Caller owns commit/rollback; failures must abort its status transition. */
+    public function enqueueInTransaction(PDO $pdo, string $invoiceId, string $storeId, string $eventType, int $timestamp): int
+    {
+        if ($pdo !== $this->database->getPdo() || !$pdo->inTransaction()) {
+            throw new \LogicException('Outbox enqueue requires the invoice transaction connection.');
+        }
         $invoiceId = $this->validateIdentifier($invoiceId, 'Invoice ID');
         $storeId = $this->validateIdentifier($storeId, 'Store ID');
         if (!in_array($eventType, self::EVENT_TYPES, true)) {
@@ -121,75 +136,60 @@ class WebhookDeliveryRepository
             throw new WebhookDeliveryException('Webhook event timestamp is invalid.', 'enqueue_delivery');
         }
 
-        try {
-            return $this->database->transactional(
-                function (PDO $pdo) use ($invoiceId, $storeId, $eventType, $timestamp): int {
-                    $statement = $pdo->prepare(
-                        'SELECT webhook.id
-                           FROM webhooks AS webhook
-                           JOIN invoices AS invoice
-                             ON invoice.id = ?
-                            AND invoice.store_id = webhook.store_id
-                          WHERE webhook.store_id = ?
-                            AND webhook.created_at <= invoice.created_at
-                       ORDER BY webhook.id'
-                    );
-                    $statement->execute([$invoiceId, $storeId]);
-                    $webhookIds = $statement->fetchAll(PDO::FETCH_COLUMN);
-                    $created = 0;
 
-                    foreach ($webhookIds as $webhookId) {
-                        if (!is_string($webhookId) || $webhookId === '') {
-                            throw new WebhookDeliveryException(
-                                'Stored webhook ID is invalid.',
-                                'enqueue_delivery'
-                            );
-                        }
+        $statement = $pdo->prepare(
+            'SELECT webhook.id
+               FROM webhooks AS webhook
+               JOIN invoices AS invoice
+                 ON invoice.id = ?
+                AND invoice.store_id = webhook.store_id
+              WHERE webhook.store_id = ?
+                AND webhook.created_at <= invoice.created_at
+           ORDER BY webhook.id'
+        );
+        $statement->execute([$invoiceId, $storeId]);
+        $webhookIds = $statement->fetchAll(PDO::FETCH_COLUMN);
+        $created = 0;
 
-                        $deliveryId = 'wd_' . bin2hex(random_bytes(16));
-                        $payload = $this->encodePayload([
-                            'deliveryId' => $deliveryId,
-                            'webhookId' => $webhookId,
-                            'storeId' => $storeId,
-                            'invoiceId' => $invoiceId,
-                            'type' => $eventType,
-                            'timestamp' => $timestamp,
-                        ]);
-                        $insert = $pdo->prepare(
-                            "INSERT INTO webhook_deliveries
-                                (id, webhook_id, invoice_id, event_type, payload,
-                                 status, attempts, next_attempt_at, created_at)
-                             VALUES (?, ?, ?, ?, ?, 'Pending', 0, ?, ?)
-                             ON DUPLICATE KEY UPDATE id = id"
-                        );
-                        $insert->execute([
-                            $deliveryId,
-                            $webhookId,
-                            $invoiceId,
-                            $eventType,
-                            $payload,
-                            $timestamp,
-                            $timestamp,
-                        ]);
-                        if ($insert->rowCount() === 1) {
-                            ++$created;
-                        }
-                    }
+        foreach ($webhookIds as $webhookId) {
+            if (!is_string($webhookId) || $webhookId === '') {
+                throw new WebhookDeliveryException(
+                    'Stored webhook ID is invalid.',
+                    'enqueue_delivery'
+                );
+            }
 
-                    return $created;
-                }
+            $deliveryId = 'wd_' . bin2hex(random_bytes(16));
+            $payload = $this->encodePayload([
+                'deliveryId' => $deliveryId,
+                'webhookId' => $webhookId,
+                'storeId' => $storeId,
+                'invoiceId' => $invoiceId,
+                'type' => $eventType,
+                'timestamp' => $timestamp,
+            ]);
+            $insert = $pdo->prepare(
+                "INSERT INTO webhook_deliveries
+                    (id, webhook_id, invoice_id, event_type, payload,
+                     status, attempts, next_attempt_at, created_at)
+                 VALUES (?, ?, ?, ?, ?, 'Pending', 0, ?, ?)
+                 ON DUPLICATE KEY UPDATE id = id"
             );
-        } catch (WebhookDeliveryException $exception) {
-            throw $exception;
-        } catch (Throwable $exception) {
-            throw new WebhookDeliveryException(
-                'Webhook deliveries could not be queued.',
-                'enqueue_delivery',
-                true,
-                null,
-                $exception
-            );
+            $insert->execute([
+                $deliveryId,
+                $webhookId,
+                $invoiceId,
+                $eventType,
+                $payload,
+                $timestamp,
+                $timestamp,
+            ]);
+            if ($insert->rowCount() === 1) {
+                ++$created;
+            }
         }
+
+        return $created;
     }
 
     /**

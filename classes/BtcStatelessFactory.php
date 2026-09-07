@@ -32,12 +32,7 @@ final class BtcStatelessFactory
     public function rpc(): ElectrumRPC
     {
         if ($this->rpc === null) {
-            $this->rpc = new ElectrumRPC(
-                $this->requiredString('rpc_host'),
-                $this->requiredPort('rpc_port'),
-                $this->requiredString('rpc_user'),
-                $this->requiredString('rpc_pass', true, false)
-            );
+            $this->rpc = ElectrumRPCFactory::fromConfig($this->config);
         }
 
         return $this->rpc;

@@ -6,8 +6,11 @@ namespace BtcPayLite;
 
 interface BlockchainProviderInterface
 {
+    /** Hard upper bound for a complete observeAddress operation, including waits. */
+    public function maxObservationDurationSeconds(): int;
+
     /**
-     * Observes address balance and history on the blockchain without loading or locking any wallet.
+     * Observes current address balance on the blockchain without loading or locking any wallet.
      *
      * @param string $address Valid Bitcoin address
      * @param int $expectedSatoshis Expected amount in satoshis (must be >= 0)

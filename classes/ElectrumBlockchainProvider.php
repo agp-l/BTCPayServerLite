@@ -4,205 +4,178 @@ declare(strict_types=1);
 
 namespace BtcPayLite;
 
-use InvalidArgumentException;
 use Throwable;
 
-/**
- * Monitors Bitcoin addresses using Electrum daemon RPC calls without loading
- * or locking any wallet.
- *
- * All network queries (getaddressbalance, getaddresshistory) are daemon-level
- * and safe to execute concurrently across multiple worker threads.
- * Includes short TTL caching (2 seconds) and per-address single-flight coalescing
- * to safely handle burst reloads without overloading the Electrum daemon.
- */
+/** Walletless current balance query with bounded per-address single-flight. */
 class ElectrumBlockchainProvider implements BlockchainProviderInterface
 {
-    private const DEFAULT_CACHE_TTL_SECONDS = 2;
-
-    private ElectrumRPC $rpc;
-    private int $ttlSeconds;
+    private const LOCK_WAIT_SECONDS = 1.5;
+    private const FAILURE_COOLDOWN_SECONDS = 2;
+    private array $memoryCache = [];
     private string $cacheDir;
 
-    /** @var array<string, array{time: int, observation: AddressPaymentObservation}> */
-    private static array $memoryCache = [];
-
     public function __construct(
-        ElectrumRPC $rpc,
-        int $ttlSeconds = self::DEFAULT_CACHE_TTL_SECONDS,
-        ?string $cacheDir = null
+        private ElectrumRPC $rpc,
+        private int $ttlSeconds = 2,
+        ?string $cacheDir = null,
+        private int $staleSeconds = 30
     ) {
-        $this->rpc = $rpc;
         $this->ttlSeconds = max(1, $ttlSeconds);
-        $this->cacheDir = $cacheDir !== null && $cacheDir !== ''
-            ? rtrim($cacheDir, '/\\')
-            : sys_get_temp_dir();
+        $this->staleSeconds = max($this->ttlSeconds, $staleSeconds);
+        $this->cacheDir = $cacheDir ?? (getenv('BTCPAY_BLOCKCHAIN_CACHE_DIR') ?: dirname(__DIR__) . '/var/blockchain');
     }
 
-    public static function clearMemoryCache(): void
+    public function maxObservationDurationSeconds(): int
     {
-        self::$memoryCache = [];
+        // One bounded HTTP RPC, plus lock wait and local cache overhead.
+        return $this->rpc->getTimeoutSeconds() + 3;
     }
 
     public function observeAddress(string $address, int $expectedSatoshis = 0): AddressPaymentObservation
     {
         $address = trim($address);
-        if ($address === '') {
-            throw new BlockchainProviderException('Address cannot be empty.', 'observe_address', 400);
+        if ($address === '' || strlen($address) > 100 || $expectedSatoshis < 0) {
+            throw new BlockchainProviderException('Invalid observation request.', 'observe_address', 400);
         }
-
-        $now = time();
-        $cacheKey = $address;
-
-        // 1. Fast in-memory single-flight / burst check
-        if (isset(self::$memoryCache[$cacheKey])) {
-            $entry = self::$memoryCache[$cacheKey];
-            if (($now - $entry['time']) < $this->ttlSeconds) {
-                return $entry['observation'];
-            }
-        }
-
-        // 2. Cross-process single-flight coalescing using file lock
-        $addressHash = hash('sha256', $address);
-        $lockPath = $this->cacheDir . DIRECTORY_SEPARATOR . 'bprov_' . substr($addressHash, 0, 32) . '.lock';
-        $lockHandle = @fopen($lockPath, 'c');
-
-        if ($lockHandle !== false) {
-            $startTime = microtime(true);
-            $locked = false;
-
-            do {
-                if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
-                    $locked = true;
-                    break;
-                }
-                usleep(10000); // 10ms wait
-            } while ((microtime(true) - $startTime) < 1.5);
-
-            if ($locked) {
-                try {
-                    // Re-check cache in case another worker just refreshed it while we waited
-                    $cached = $this->readFileCache($addressHash);
-                    if ($cached !== null) {
-                        self::$memoryCache[$cacheKey] = ['time' => $cached->getObservedAt(), 'observation' => $cached];
-                        return $cached;
-                    }
-
-                    $observation = $this->queryElectrum($address);
-                    $this->writeFileCache($addressHash, $observation);
-                    self::$memoryCache[$cacheKey] = ['time' => time(), 'observation' => $observation];
-                    return $observation;
-                } finally {
-                    flock($lockHandle, LOCK_UN);
-                    fclose($lockHandle);
-                }
-            } else {
-                fclose($lockHandle);
-            }
-        }
-
-        // If lock acquisition timed out or failed, try reading cached value
-        $cached = $this->readFileCache($addressHash);
-        if ($cached !== null) {
+        // Namespace by endpoint as well as address: never mix different networks/daemons.
+        $key = hash('sha256', 'balance-v2|' . $this->rpc->getEndpoint() . '|' . $address);
+        $cached = $this->memoryCache[$key] ?? null;
+        if ($cached !== null && time() - $cached->getObservedAt() < $this->ttlSeconds) {
             return $cached;
         }
-
-        $observation = $this->queryElectrum($address);
-        self::$memoryCache[$cacheKey] = ['time' => time(), 'observation' => $observation];
-        return $observation;
+        if (!is_dir($this->cacheDir) && !@mkdir($this->cacheDir, 0770, true) && !is_dir($this->cacheDir)) {
+            throw $this->busy();
+        }
+        $cached = $this->readCache($key, $address, $this->ttlSeconds);
+        if ($cached !== null) {
+            return $this->remember($key, $cached);
+        }
+        $lock = @fopen($this->path($key, 'lock'), 'c');
+        if ($lock === false) {
+            return $this->staleOrFail($key, $address);
+        }
+        $deadline = microtime(true) + self::LOCK_WAIT_SECONDS;
+        $locked = false;
+        try {
+            do {
+                $locked = flock($lock, LOCK_EX | LOCK_NB);
+                if ($locked) {
+                    break;
+                }
+                usleep(10000);
+            } while (microtime(true) < $deadline);
+            if (!$locked) {
+                // Never issue an uncoalesced RPC on timeout/cache miss.
+                return $this->staleOrFail($key, $address);
+            }
+            $cached = $this->readCache($key, $address, $this->ttlSeconds);
+            if ($cached !== null) {
+                return $this->remember($key, $cached);
+            }
+            $retryAt = (int) @file_get_contents($this->path($key, 'retry'));
+            if ($retryAt > time()) {
+                return $this->staleOrFail($key, $address);
+            }
+            try {
+                $observation = $this->queryElectrum($address);
+                $this->writeCache($key, $observation);
+                return $this->remember($key, $observation);
+            } catch (Throwable $exception) {
+                // Back off across processes on upstream failure, too.
+                @file_put_contents($this->path($key, 'retry'), (string) (time() + self::FAILURE_COOLDOWN_SECONDS));
+                return $this->staleOrFail($key, $address, $exception);
+            }
+        } finally {
+            if ($locked) {
+                flock($lock, LOCK_UN);
+            }
+            fclose($lock);
+        }
     }
 
     private function queryElectrum(string $address): AddressPaymentObservation
     {
-        try {
-            /** @var array<string, mixed> $balance */
-            $balance = $this->rpc->callDaemon('getaddressbalance', ['address' => $address]);
-            if (!is_array($balance)) {
-                throw new BlockchainProviderException('Electrum returned an invalid balance response.', 'observe_address');
-            }
-
-            $confirmedBtc = (string) ($balance['confirmed'] ?? '0');
-            $unconfirmedBtc = (string) ($balance['unconfirmed'] ?? '0');
-
-            $confirmedSats = BitcoinAmount::fromBtc($confirmedBtc)->toSatoshis();
-            $unconfirmedSats = BitcoinAmount::fromBtc($unconfirmedBtc)->toSatoshis();
-        } catch (BlockchainProviderException $exception) {
-            throw $exception;
-        } catch (Throwable $exception) {
-            throw new BlockchainProviderException(
-                'Failed to query address balance: ' . $exception->getMessage(),
-                'observe_address',
-                500,
-                $exception
-            );
+        $balance = $this->rpc->callNetwork('getaddressbalance', ['address' => $address]);
+        if (!is_array($balance) || !isset($balance['confirmed'], $balance['unconfirmed'])) {
+            throw new BlockchainProviderException('Invalid address balance response.', 'observe_address', 503);
         }
+        $confirmed = max(0, BitcoinAmount::fromBtc($balance['confirmed'])->toSatoshis());
+        $delta = BitcoinAmount::fromBtc($balance['unconfirmed'])->toSatoshis();
+        // Electrum mempool balance is a delta, possibly negative after a spend.
+        // Normalize inconsistent negative totals here, never manufacture historical receipts.
+        $delta = max(-$confirmed, $delta);
+        return new AddressPaymentObservation($address, $confirmed, $delta, $confirmed + $delta, time());
+    }
 
-        $historyCount = 0;
-        try {
-            $history = $this->rpc->callDaemon('getaddresshistory', ['address' => $address]);
-            if (is_array($history)) {
-                $historyCount = count($history);
+    private function staleOrFail(string $key, string $address, ?Throwable $previous = null): AddressPaymentObservation
+    {
+        $cached = $this->readCache($key, $address, $this->staleSeconds);
+        if ($cached !== null) {
+            return $cached;
+        }
+        throw $this->busy($previous);
+    }
+
+    private function busy(?Throwable $previous = null): BlockchainProviderException
+    {
+        return new BlockchainProviderException('Blockchain observation is busy. Retry shortly.', 'observe_address', 503, $previous);
+    }
+
+    private function path(string $key, string $suffix): string
+    {
+        return $this->cacheDir . '/' . $key . '.' . $suffix;
+    }
+
+    private function remember(string $key, AddressPaymentObservation $observation): AddressPaymentObservation
+    {
+        // Bound memory for long-running workers.
+        if (count($this->memoryCache) >= 1024) {
+            $this->memoryCache = [];
+        }
+        return $this->memoryCache[$key] = $observation;
+    }
+
+    private function readCache(string $key, string $address, int $maxAge): ?AddressPaymentObservation
+    {
+        $data = json_decode((string) @file_get_contents($this->path($key, 'json')), true);
+        if (!is_array($data) || ($data['address'] ?? null) !== $address) {
+            return null;
+        }
+        foreach (['confirmed', 'delta', 'current', 'time'] as $field) {
+            if (!is_int($data[$field] ?? null)) {
+                return null;
             }
+        }
+        $age = time() - $data['time'];
+        if ($age < 0 || $age >= $maxAge) {
+            return null;
+        }
+        try {
+            return new AddressPaymentObservation($address, $data['confirmed'], $data['delta'], $data['current'], $data['time']);
         } catch (Throwable) {
-            // Address history query failure is non-fatal; we proceed with balance data
-            $historyCount = 0;
+            return null;
         }
-
-        return new AddressPaymentObservation(
-            $address,
-            $confirmedSats,
-            $unconfirmedSats,
-            max($confirmedSats + $unconfirmedSats, 0),
-            $historyCount,
-            time()
-        );
     }
 
-    private function readFileCache(string $addressHash): ?AddressPaymentObservation
+    private function writeCache(string $key, AddressPaymentObservation $observation): void
     {
-        $cacheFile = $this->cacheDir . DIRECTORY_SEPARATOR . 'bprov_' . substr($addressHash, 0, 32) . '.cache';
-        if (!file_exists($cacheFile)) {
-            return null;
-        }
-
-        $content = @file_get_contents($cacheFile);
-        if ($content === false || $content === '') {
-            return null;
-        }
-
-        $data = json_decode($content, true);
-        if (!is_array($data) || !isset($data['time'], $data['address'])) {
-            return null;
-        }
-
-        if ((time() - (int) $data['time']) >= $this->ttlSeconds) {
-            return null;
-        }
-
-        return new AddressPaymentObservation(
-            (string) $data['address'],
-            (int) ($data['confirmed'] ?? 0),
-            (int) ($data['unconfirmed'] ?? 0),
-            (int) ($data['total'] ?? 0),
-            (int) ($data['history_count'] ?? 0),
-            (int) $data['time']
-        );
-    }
-
-    private function writeFileCache(string $addressHash, AddressPaymentObservation $observation): void
-    {
-        $cacheFile = $this->cacheDir . DIRECTORY_SEPARATOR . 'bprov_' . substr($addressHash, 0, 32) . '.cache';
         $payload = json_encode([
             'address' => $observation->getAddress(),
-            'confirmed' => $observation->getConfirmedSatoshis(),
-            'unconfirmed' => $observation->getUnconfirmedSatoshis(),
-            'total' => $observation->getTotalReceivedSatoshis(),
-            'history_count' => $observation->getHistoryCount(),
+            'confirmed' => $observation->getConfirmedBalanceSatoshis(),
+            'delta' => $observation->getMempoolDeltaSatoshis(),
+            'current' => $observation->getCurrentBalanceSatoshis(),
             'time' => $observation->getObservedAt(),
-        ]);
-
-        if ($payload !== false) {
-            @file_put_contents($cacheFile, $payload, LOCK_EX);
+        ], JSON_THROW_ON_ERROR);
+        $path = $this->path($key, 'json');
+        $temp = $path . '.' . bin2hex(random_bytes(8));
+        try {
+            if (@file_put_contents($temp, $payload) !== strlen($payload) || !@rename($temp, $path)) {
+                throw $this->busy();
+            }
+        } finally {
+            if (is_file($temp)) {
+                @unlink($temp);
+            }
         }
     }
 }

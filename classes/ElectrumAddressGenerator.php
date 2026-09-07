@@ -22,7 +22,7 @@ class ElectrumAddressGenerator implements AddressGeneratorInterface
 
     public function generateAddress(AddressGenerationContext $context): GeneratedAddress
     {
-        $walletPath = $context->getWalletPath() ?? $this->wallet->getActiveWalletPath();
+        $walletPath = $context->getWalletPath();
         if ($walletPath === null || $walletPath === '') {
             throw new AddressGenerationException(
                 'Wallet path is required for Electrum address generation.',

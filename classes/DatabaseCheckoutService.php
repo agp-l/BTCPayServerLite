@@ -21,16 +21,13 @@ final class DatabaseCheckoutService
     private const ADDITIONAL_STATUSES = ['None', 'PaidPartial'];
 
     private CheckoutRepository $repository;
-    private Closure $paymentStatusLoader;
     private Closure $clock;
 
     public function __construct(
         CheckoutRepository $repository,
-        callable $paymentStatusLoader,
         ?callable $clock = null
     ) {
         $this->repository = $repository;
-        $this->paymentStatusLoader = Closure::fromCallable($paymentStatusLoader);
         $this->clock = $clock === null
             ? static fn (): int => time()
             : Closure::fromCallable($clock);
@@ -58,15 +55,15 @@ final class DatabaseCheckoutService
     public function load(string $invoiceId): array
     {
         $invoiceId = $this->invoiceId($invoiceId);
-        $wallet = $this->repository->findInvoiceWallet($invoiceId);
-        if ($wallet === null) {
+        $snapshot = $this->repository->findInvoice($invoiceId);
+        if ($snapshot === null) {
             throw new CheckoutException(
                 'Faktura nebyla nalezena.',
                 404,
                 'find_invoice'
             );
         }
-        if ($wallet['id'] !== $invoiceId) {
+        if ($snapshot['id'] !== $invoiceId) {
             throw new CheckoutException(
                 'Uložené platební údaje jsou neplatné.',
                 500,
@@ -75,7 +72,7 @@ final class DatabaseCheckoutService
         }
 
         try {
-            $result = ($this->paymentStatusLoader)($invoiceId, $wallet['wallet_path']);
+            $result = InvoicePaymentPresentation::fromInvoice($snapshot);
         } catch (CheckoutException $exception) {
             throw $exception;
         } catch (BtcInvoiceManagerException $exception) {
@@ -97,7 +94,7 @@ final class DatabaseCheckoutService
             );
         }
 
-        return $this->viewModel($invoiceId, $wallet['store_id'], $result);
+        return $this->viewModel($invoiceId, $snapshot['store_id'], $result);
     }
 
     private function invoiceId(string $invoiceId): string

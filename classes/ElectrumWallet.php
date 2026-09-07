@@ -47,7 +47,7 @@ class ElectrumWallet
     public function ensureWalletLoaded(string $walletPath, ?string $password = null): void
     {
         $walletPath = $this->validateWalletPath($walletPath);
-        $loadedWallets = $this->rpc->call('list_wallets');
+        $loadedWallets = $this->rpc->callDaemon('list_wallets');
         $loadedPaths = $this->extractLoadedWalletPaths($loadedWallets);
 
         if (!$this->containsWalletPath($loadedPaths, $walletPath)) {
@@ -56,7 +56,7 @@ class ElectrumWallet
                 $params['password'] = $password;
             }
 
-            $result = $this->rpc->call('load_wallet', $params);
+            $result = $this->rpc->callDaemon('load_wallet', $params);
             if ($result === null || $result === false || $result === '') {
                 throw new ElectrumWalletException(
                     'Electrum wallet could not be loaded.',
@@ -73,7 +73,7 @@ class ElectrumWallet
      */
     public function getLoadedWallets(): array
     {
-        $loadedWallets = $this->rpc->call('list_wallets');
+        $loadedWallets = $this->rpc->callDaemon('list_wallets');
         return $this->extractLoadedWalletPaths($loadedWallets);
     }
 
@@ -85,10 +85,10 @@ class ElectrumWallet
     /**
      * @return array{confirmed: float, unconfirmed: float}
      */
-    public function getWalletBalance(): array
+    public function getWalletBalance(?string $walletPath = null): array
     {
         return $this->normalizeBalance(
-            $this->callForActiveWallet('getbalance'),
+            $this->walletCommand('getbalance', [], $walletPath),
             'getbalance'
         );
     }
@@ -117,7 +117,7 @@ class ElectrumWallet
         $address = $this->validateNonEmptyString($address, 'Bitcoin address');
 
         return $this->normalizeExactBalance(
-            $this->rpc->call('getaddressbalance', ['address' => $address]),
+            $this->rpc->callNetwork('getaddressbalance', ['address' => $address]),
             'getaddressbalance'
         );
     }
@@ -125,7 +125,7 @@ class ElectrumWallet
     public function getNewAddress(?string $walletPath = null): string
     {
         return $this->requireNonEmptyStringResult(
-            $this->callForActiveWallet('createnewaddress', [], $walletPath),
+            $this->walletCommand('createnewaddress', [], $walletPath),
             'createnewaddress'
         );
     }
@@ -133,7 +133,7 @@ class ElectrumWallet
     public function validateAddress(string $address): bool
     {
         $address = $this->validateNonEmptyString($address, 'Bitcoin address');
-        $result = $this->rpc->call('validateaddress', ['address' => $address]);
+        $result = $this->rpc->callNetwork('validateaddress', ['address' => $address]);
 
         if (is_bool($result)) {
             return $result;
@@ -150,7 +150,7 @@ class ElectrumWallet
     /**
      * @return list<string>
      */
-    public function listAddresses(bool $receiving = true, bool $change = false): array
+    public function listAddresses(bool $receiving = true, bool $change = false, ?string $walletPath = null): array
     {
         $params = [];
         if ($receiving) {
@@ -160,7 +160,7 @@ class ElectrumWallet
             $params['change'] = true;
         }
 
-        $addresses = $this->callForActiveWallet('listaddresses', $params);
+        $addresses = $this->walletCommand('listaddresses', $params, $walletPath);
         if (!$this->isList($addresses)) {
             throw $this->invalidResponse('listaddresses');
         }
@@ -177,9 +177,9 @@ class ElectrumWallet
     /**
      * @return list<array<string, mixed>>
      */
-    public function listUnspent(): array
+    public function listUnspent(?string $walletPath = null): array
     {
-        $unspent = $this->callForActiveWallet('listunspent');
+        $unspent = $this->walletCommand('listunspent', [], $walletPath);
         if (!$this->isListOfArrays($unspent)) {
             throw $this->invalidResponse('listunspent');
         }
@@ -190,17 +190,17 @@ class ElectrumWallet
     /**
      * @return list<array<string, mixed>>
      */
-    public function listTransactions(): array
+    public function listTransactions(?string $walletPath = null): array
     {
         try {
-            $result = $this->callForActiveWallet('onchain_history');
+            $result = $this->walletCommand('onchain_history', [], $walletPath);
         } catch (ElectrumRPCException $exception) {
             if ($exception->getRpcCode() !== self::METHOD_NOT_FOUND) {
                 throw $exception;
             }
 
             // Electrum releases before onchain_history exposed history instead.
-            $result = $this->callForActiveWallet('history');
+            $result = $this->walletCommand('history', [], $walletPath);
         }
 
         if (is_array($result) && array_key_exists('transactions', $result)) {
@@ -214,14 +214,14 @@ class ElectrumWallet
         return $result;
     }
 
-    public function getTransaction(string $txid): array|string
+    public function getTransaction(string $txid, ?string $walletPath = null): array|string
     {
         $txid = strtolower(trim($txid));
         if (!preg_match('/\A[0-9a-f]{64}\z/D', $txid)) {
             throw new InvalidArgumentException('Transaction ID must be 64 hexadecimal characters.');
         }
 
-        $result = $this->callForActiveWallet('gettransaction', ['txid' => $txid]);
+        $result = $this->rpc->callNetwork('gettransaction', ['txid' => $txid]);
         if (!is_array($result) && !is_string($result)) {
             throw $this->invalidResponse('gettransaction');
         }
@@ -235,7 +235,7 @@ class ElectrumWallet
     public function deserializeTransaction(string $hex): array
     {
         $hex = $this->validateSerializedTransaction($hex);
-        $result = $this->rpc->call('deserialize', ['tx' => $hex]);
+        $result = $this->rpc->callNetwork('deserialize', ['tx' => $hex]);
         if (!is_array($result)) {
             throw $this->invalidResponse('deserialize');
         }
@@ -247,7 +247,8 @@ class ElectrumWallet
         string $destinationAddress,
         int|float|string $amount,
         ?string $password = null,
-        ?int $feeRateSatVb = null
+        ?int $feeRateSatVb = null,
+        ?string $walletPath = null
     ): string {
         $destinationAddress = $this->validateNonEmptyString($destinationAddress, 'Destination');
         $params = [
@@ -266,7 +267,7 @@ class ElectrumWallet
             $params['feerate'] = $feeRateSatVb;
         }
 
-        $result = $this->callForActiveWallet('payto', $params);
+        $result = $this->walletCommand('payto', $params, $walletPath);
         $serializedTransaction = is_array($result) ? ($result['hex'] ?? null) : $result;
 
         return $this->requireNonEmptyStringResult($serializedTransaction, 'payto');
@@ -274,9 +275,8 @@ class ElectrumWallet
 
     public function broadcastTransaction(string $hex): string
     {
-        $this->requireWalletLoaded();
         $hex = $this->validateSerializedTransaction($hex);
-        $txid = $this->rpc->call('broadcast', ['tx' => $hex]);
+        $txid = $this->rpc->callNetwork('broadcast', ['tx' => $hex]);
 
         return $this->requireNonEmptyStringResult($txid, 'broadcast');
     }
@@ -285,9 +285,10 @@ class ElectrumWallet
         string $destinationAddress,
         int|float|string $amount,
         ?string $password = null,
-        ?int $feeRateSatVb = null
+        ?int $feeRateSatVb = null,
+        ?string $walletPath = null
     ): string {
-        $hex = $this->createTransaction($destinationAddress, $amount, $password, $feeRateSatVb);
+        $hex = $this->createTransaction($destinationAddress, $amount, $password, $feeRateSatVb, $walletPath);
 
         return $this->broadcastTransaction($hex);
     }
@@ -298,7 +299,8 @@ class ElectrumWallet
     public function createPaymentRequest(
         int|float|string $amount,
         string $memo = '',
-        ?int $expirationSeconds = null
+        ?int $expirationSeconds = null,
+        ?string $walletPath = null
     ): array {
         $params = [
             'amount' => $this->normalizeBitcoinAmount($amount),
@@ -312,7 +314,7 @@ class ElectrumWallet
             $params['expiry'] = $expirationSeconds;
         }
 
-        $result = $this->callForActiveWallet('add_request', $params);
+        $result = $this->walletCommand('add_request', $params, $walletPath);
         if (!is_array($result)) {
             throw $this->invalidResponse('add_request');
         }
@@ -323,10 +325,10 @@ class ElectrumWallet
     /**
      * @return array<string, mixed>
      */
-    public function getPaymentRequest(string $requestId): array
+    public function getPaymentRequest(string $requestId, ?string $walletPath = null): array
     {
         $requestId = $this->validateNonEmptyString($requestId, 'Payment request ID');
-        $result = $this->callForActiveWallet('get_request', ['request_id' => $requestId]);
+        $result = $this->walletCommand('get_request', ['request_id' => $requestId], $walletPath);
         if (!is_array($result)) {
             throw $this->invalidResponse('get_request');
         }
@@ -334,40 +336,57 @@ class ElectrumWallet
         return $result;
     }
 
-    public function deletePaymentRequest(string $requestId): void
+    public function deletePaymentRequest(string $requestId, ?string $walletPath = null): void
     {
         $requestId = $this->validateNonEmptyString($requestId, 'Payment request ID');
-        $this->callForActiveWallet('delete_request', ['request_id' => $requestId]);
+        $this->walletCommand('delete_request', ['request_id' => $requestId], $walletPath);
     }
 
-    public function getMasterPublicKey(): string
+    public function getMasterPublicKey(?string $walletPath = null): string
     {
         return $this->requireNonEmptyStringResult(
-            $this->callForActiveWallet('getmpk'),
+            $this->walletCommand('getmpk', [], $walletPath),
             'getmpk'
         );
     }
 
-    public function getSeed(string $password = ''): string
+    public function getSeed(string $password = '', ?string $walletPath = null): string
     {
         $params = $password !== '' ? ['password' => $password] : [];
 
         return $this->requireNonEmptyStringResult(
-            $this->callForActiveWallet('getseed', $params),
+            $this->walletCommand('getseed', $params, $walletPath),
             'getseed'
         );
     }
 
-    public function getMasterPrivateKey(string $password = ''): string
+    public function getMasterPrivateKey(string $password = '', ?string $walletPath = null): string
     {
         $params = $password !== '' ? ['password' => $password] : [];
 
         return $this->requireNonEmptyStringResult(
-            $this->callForActiveWallet('getmasterprivate', $params),
+            $this->walletCommand('getmasterprivate', $params, $walletPath),
             'getmasterprivate'
         );
     }
 
+    /** Explicit routing for all upstream wallet commands, including future payout commands.
+     * Mutating callers must own WalletLockManager around ensureLoaded + command.
+     */
+    public function callWallet(string $method, string $walletPath, array $params = []): mixed
+    {
+        return $this->rpc->callWallet($method, $this->validateWalletPath($walletPath), $params);
+    }
+
+    private function walletCommand(string $method, array $params, ?string $walletPath): mixed
+    {
+        if ($walletPath !== null) {
+            return $this->callWallet($method, $walletPath, $params);
+        }
+        return $this->callForActiveWallet($method, $params);
+    }
+
+    /** @deprecated Admin compatibility only. New callers must pass an explicit path. */
     public function callForActiveWallet(string $method, array $params = [], ?string $walletPath = null): mixed
     {
         $targetWallet = $walletPath !== null

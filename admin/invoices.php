@@ -68,14 +68,8 @@ try {
     $service = new AdminInvoiceService(
         $repository,
         static function (array $store, string $amount, array $metadata) use ($config, $database): array {
-            $rpc = new ElectrumRPC(
-                $config['rpc_host'],
-                (int) $config['rpc_port'],
-                $config['rpc_user'],
-                $config['rpc_pass']
-            );
+            $rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
             $wallet = new ElectrumWallet($rpc);
-            $wallet->loadWallet($store['wallet_path']);
             $manager = new BtcInvoiceManager($wallet, $config['secret_key'], $database);
 
             return $manager->createDatabaseInvoice($store['id'], $amount, $metadata, 15);

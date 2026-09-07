@@ -201,12 +201,7 @@ if ($service instanceof ClientDashboardService) {
             $walletError = 'Účet nemá jednoznačně přiřazenou peněženku.';
         } else {
             try {
-                $wallet = new ElectrumWallet(new ElectrumRPC(
-                    $config['rpc_host'] ?? '',
-                    (int) ($config['rpc_port'] ?? 0),
-                    is_string($config['rpc_user'] ?? null) ? $config['rpc_user'] : null,
-                    is_string($config['rpc_pass'] ?? null) ? $config['rpc_pass'] : null
-                ));
+                $wallet = new ElectrumWallet(\BtcPayLite\ElectrumRPCFactory::fromConfig($config));
                 $wallet->loadWallet($walletPath);
                 $walletBalance = $wallet->getWalletBalance();
             } catch (Throwable $exception) {

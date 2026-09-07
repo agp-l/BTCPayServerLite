@@ -32,13 +32,14 @@ class ElectrumRPC
     ];
 
     private const NETWORK_COMMANDS = [
-        'getaddressbalance', 'getaddresshistory', 'getaddressunspent', 'broadcast',
+        'getaddressbalance', 'getaddresshistory', 'getaddressunspent', 'gettransaction', 'broadcast',
         'validateaddress', 'deserialize', 'getfeerate', 'server.version', 'blockchain.estimatefee'
     ];
 
     private const WALLET_COMMANDS = [
         'getbalance', 'createnewaddress', 'listaddresses', 'listunspent',
-        'onchain_history', 'history', 'gettransaction', 'payto', 'signtransaction',
+        'onchain_history', 'history', 'payto', 'paytomany', 'signtransaction',
+        'freeze_utxo', 'unfreeze_utxo', 'addtransaction',
         'add_request', 'get_request', 'delete_request', 'clear_requests',
         'list_requests', 'getmpk', 'getseed', 'getmasterprivate', 'is_mine',
         'importaddress', 'export_private_key'
@@ -79,6 +80,7 @@ class ElectrumRPC
      * The wallet is no longer appended to the URL. Electrum's supported
      * JSON-RPC interface expects wallet_path as a named request parameter.
      */
+    /** @deprecated Admin compatibility only; core calls must specify a path. */
     public function setWallet(string $walletPath): void
     {
         $this->activeWallet = $this->validateWalletPath($walletPath);
@@ -92,6 +94,11 @@ class ElectrumRPC
     public function getActiveWallet(): ?string
     {
         return $this->activeWallet;
+    }
+
+    public function getTimeoutSeconds(): int
+    {
+        return $this->timeout;
     }
 
     public function getEndpoint(): string
@@ -232,7 +239,8 @@ class ElectrumRPC
             throw new InvalidArgumentException('The wallet parameter conflicts with the requested wallet.');
         }
 
-        // Apply primary wallet parameter
+        // Emit exactly one dialect key, even if the caller supplied its alias.
+        unset($params['wallet'], $params['wallet_path']);
         $params[$this->walletParamKey] = $walletPath;
 
         return $this->call($method, $params);
@@ -243,6 +251,7 @@ class ElectrumRPC
      *
      * @throws ElectrumRPCException
      */
+    /** @deprecated Use callWallet() with an explicit path. */
     public function callForActiveWallet(string $method, array $params = []): mixed
     {
         if ($this->activeWallet === null) {

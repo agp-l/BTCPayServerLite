@@ -12,6 +12,8 @@ namespace BtcPayLite;
  */
 interface BtcStatelessInvoiceGateway
 {
+    public function canObserveWithoutWallet(): bool;
+
     /**
      * @param array<string, mixed> $customData
      * @return array{token: string, bip21_uri: string}
@@ -20,12 +22,13 @@ interface BtcStatelessInvoiceGateway
         int|float|string $amountBtc,
         string $description,
         array $customData = [],
-        int $expirationMinutes = 15
+        int $expirationMinutes = 15,
+        ?string $walletPath = null
     ): array;
 
     /** @return array<string, mixed> */
     public function decodeStatelessToken(string $token): array;
 
     /** @return array<string, mixed> */
-    public function checkStatelessPaymentStatus(string $token): array;
+    public function checkStatelessPaymentStatus(string $token, ?string $walletPath = null): array;
 }

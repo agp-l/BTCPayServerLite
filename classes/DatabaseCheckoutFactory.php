@@ -22,36 +22,7 @@ final class DatabaseCheckoutFactory
             self::port($config['db_port'] ?? 3306, 'db_port')
         );
 
-        $rpcHost = self::requiredString($config, 'rpc_host');
-        $rpcPort = self::port($config['rpc_port'] ?? null, 'rpc_port');
-        $rpcUser = self::optionalString($config, 'rpc_user');
-        $rpcPass = self::optionalString($config, 'rpc_pass');
-        if (($rpcUser === null) !== ($rpcPass === null)) {
-            throw new RuntimeException('Electrum RPC credentials must be configured as a pair.');
-        }
-
-        $secretKey = self::requiredString($config, 'secret_key');
-        $rpcScheme = self::optionalString($config, 'rpc_scheme') ?? 'http';
-        if (!in_array(strtolower($rpcScheme), ['http', 'https'], true)) {
-            throw new RuntimeException('Invalid configuration value: rpc_scheme');
-        }
-
-        return new DatabaseCheckoutService(
-            new PdoCheckoutRepository($database),
-            static function (string $invoiceId, string $walletPath) use (
-                $database,
-                $secretKey
-            ): array {
-                $manager = new BtcInvoiceManager(
-                    null,
-                    $secretKey,
-                    $database
-                );
-
-                // Zero Electrum RPC during HTTP checkout: read directly from database
-                return $manager->getCachedDatabasePaymentStatus($invoiceId);
-            }
-        );
+        return new DatabaseCheckoutService(new PdoCheckoutRepository($database));
     }
 
     /** @param array<string,mixed> $config */
@@ -74,17 +45,6 @@ final class DatabaseCheckoutFactory
         }
 
         return trim($value);
-    }
-
-    /** @param array<string,mixed> $config */
-    private static function optionalString(array $config, string $key): ?string
-    {
-        if (!array_key_exists($key, $config) || $config[$key] === null) {
-            return null;
-        }
-
-        $value = self::string($config, $key);
-        return $value === '' ? null : $value;
     }
 
     private static function port(mixed $value, string $key): int

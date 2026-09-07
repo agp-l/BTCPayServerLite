@@ -10,7 +10,7 @@ namespace BtcPayLite;
 interface CheckoutRepository
 {
     /**
-     * @return array{id:string,store_id:string,wallet_path:string}|null
+     * @return array<string,mixed>|null
      */
-    public function findInvoiceWallet(string $invoiceId): ?array;
+    public function findInvoice(string $invoiceId): ?array;
 }

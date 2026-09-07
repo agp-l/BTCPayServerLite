@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace BtcPayLite;
 
-use Throwable;
+use InvalidArgumentException;
 
 /**
  * Manages fine-grained, per-wallet exclusive locks for mutating operations.
@@ -14,15 +14,13 @@ use Throwable;
  */
 class WalletLockManager
 {
-    private ?Database $database;
     private string $lockDir;
 
-    public function __construct(?Database $database = null, ?string $lockDir = null)
+    public function __construct(?string $lockDir = null)
     {
-        $this->database = $database;
         $this->lockDir = $lockDir !== null && $lockDir !== ''
             ? rtrim($lockDir, '/\\')
-            : sys_get_temp_dir();
+            : (getenv('BTCPAY_WALLET_LOCK_DIR') ?: dirname(__DIR__) . '/var/locks');
     }
 
     /**
@@ -36,33 +34,33 @@ class WalletLockManager
      */
     public function withWalletLock(string $walletPath, callable $callback, int $timeoutSeconds = 3): mixed
     {
-        $walletHash = hash('sha256', trim($walletPath));
-
-        if ($this->database !== null) {
-            return $this->withDbLock($walletHash, $callback, $timeoutSeconds);
+        $walletHash = hash('sha256', self::canonicalWalletPath($walletPath));
+        if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0770, true) && !is_dir($this->lockDir)) {
+            throw new WalletBusyException('Wallet lock directory is unavailable.', 2, 503);
         }
 
         return $this->withFileLock($walletHash, $callback, $timeoutSeconds);
     }
 
-    /**
-     * @template T
-     * @param callable(): T $callback
-     * @return T
-     */
-    private function withDbLock(string $walletHash, callable $callback, int $timeoutSeconds): mixed
+    /** Canonical daemon path; configure absolute, non-aliased paths in every process. */
+    public static function canonicalWalletPath(string $path): string
     {
-        // MySQL GET_LOCK max name length is 64 characters
-        $lockName = 'el_w_' . substr($walletHash, 0, 48);
-
-        try {
-            return $this->database->withNamedLock($lockName, $timeoutSeconds, $callback);
-        } catch (DatabaseException $e) {
-            if ($e->getCode() === 503 || str_contains(strtolower($e->getMessage()), 'busy')) {
-                throw new WalletBusyException('Wallet is currently busy. Please retry shortly.', 2, 503);
-            }
-            throw $e;
+        $path = trim($path);
+        if ($path === '' || $path[0] !== '/' || str_contains($path, "\0")) {
+            throw new InvalidArgumentException('An absolute Electrum wallet path is required.');
         }
+        $parts = [];
+        foreach (explode('/', $path) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($parts);
+            } else {
+                $parts[] = $part;
+            }
+        }
+        return '/' . implode('/', $parts);
     }
 
     /**

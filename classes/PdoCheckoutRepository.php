@@ -8,7 +8,7 @@ use PDO;
 use Throwable;
 
 /**
- * Loads only the invoice ownership and wallet data required to check payment.
+ * Loads the invoice checkout snapshot in one read. No wallet or store join.
  */
 final class PdoCheckoutRepository implements CheckoutRepository
 {
@@ -19,23 +19,23 @@ final class PdoCheckoutRepository implements CheckoutRepository
         $this->pdo = $database instanceof Database ? $database->getPdo() : $database;
     }
 
-    public function findInvoiceWallet(string $invoiceId): ?array
+    public function findInvoice(string $invoiceId): ?array
     {
         try {
             $statement = $this->pdo->prepare(
-                'SELECT i.id, i.store_id, s.wallet_path
+                'SELECT i.id, i.store_id, i.btc_address, i.amount, i.status, i.metadata,
+                        i.created_at, i.expires_at, i.confirmed_balance_sats, i.mempool_delta_sats, i.payment_observed_at
                  FROM invoices AS i
-                 INNER JOIN stores AS s ON s.id = i.store_id
                  WHERE i.id = ?
                  LIMIT 1'
             );
             $statement->execute([$invoiceId]);
-            $row = $statement->fetch();
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
         } catch (Throwable $exception) {
             throw new CheckoutException(
                 'Platební údaje nyní nelze načíst.',
                 503,
-                'load_invoice_wallet',
+                'load_invoice',
                 $exception
             );
         }
@@ -44,11 +44,9 @@ final class PdoCheckoutRepository implements CheckoutRepository
             return null;
         }
 
-        return [
-            'id' => $this->storedString($row['id'] ?? null, 'invoice ID', 50),
-            'store_id' => $this->storedString($row['store_id'] ?? null, 'store ID', 50),
-            'wallet_path' => is_string($row['wallet_path'] ?? null) ? trim((string) $row['wallet_path']) : '',
-        ];
+        $row['id'] = $this->storedString($row['id'] ?? null, 'invoice ID', 50);
+        $row['store_id'] = $this->storedString($row['store_id'] ?? null, 'store ID', 50);
+        return $row;
     }
 
     private function storedString(mixed $value, string $field, int $maxBytes): string

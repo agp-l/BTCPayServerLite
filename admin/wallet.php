@@ -62,12 +62,7 @@ $feeMed = 1;
 $feeHigh = 1;
 $mpk = '';
 
-$rpc = new ElectrumRPC(
-    $config['rpc_host'],
-    (int) $config['rpc_port'],
-    $config['rpc_user'],
-    $config['rpc_pass']
-);
+$rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 $wallet = new ElectrumWallet($rpc);
 $dashboard = new BtcDashboard(
     $wallet,

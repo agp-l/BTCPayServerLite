@@ -83,17 +83,22 @@ class BtcStatelessService
             throw new BtcStatelessServiceException('Invoice custom data is invalid.', 'check_status', 400);
         }
 
-        $walletName = $customData['wallet'] ?? $this->defaultWalletName();
-        if (!is_string($walletName)) {
-            throw new BtcStatelessServiceException('Invoice wallet is invalid.', 'check_status', 400);
-        }
-
+        $walletPath = null;
         if (!$this->invoiceManager->canObserveWithoutWallet()) {
+            $walletName = $customData['wallet'] ?? $this->defaultWalletName();
+            if (!is_string($walletName)) {
+                throw new BtcStatelessServiceException('Invoice wallet is invalid.', 'check_status', 400);
+            }
             [, $walletPath] = $this->resolveWallet($walletName);
-            $this->wallet->loadWallet($walletPath);
         }
 
-        return $this->invoiceManager->checkStatelessPaymentStatus($token);
+        try {
+            return $this->invoiceManager->checkStatelessPaymentStatus($token, $walletPath);
+        } catch (BlockchainProviderException $exception) {
+            throw new BtcStatelessServiceException(
+                'Payment observation is temporarily busy. Retry shortly.', 'check_status', 503, $exception
+            );
+        }
     }
 
     /**
@@ -109,12 +114,12 @@ class BtcStatelessService
         $expirationMinutes = $this->normalizeExpiration($input['expiration_minutes'] ?? null);
 
         // All validation happens before the wallet is mutated.
-        $this->wallet->loadWallet($walletPath);
         $result = $this->invoiceManager->createStatelessInvoice(
             $amount,
             $description,
             ['order_id' => $orderId, 'wallet' => $safeWalletName],
-            $expirationMinutes
+            $expirationMinutes,
+            $walletPath
         );
 
         if (!isset($result['token']) || !is_string($result['token']) || $result['token'] === '') {

@@ -52,12 +52,7 @@ try {
         $config['db_pass'] ?? '',
         $databasePort
     );
-    $rpc = new ElectrumRPC(
-        $config['rpc_host'] ?? '',
-        $config['rpc_port'] ?? 0,
-        $config['rpc_user'] ?? null,
-        $config['rpc_pass'] ?? null
-    );
+    $rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
     $wallet = new ElectrumWallet($rpc);
     $invoiceManager = new BtcInvoiceManager(
         $wallet,

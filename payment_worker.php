@@ -8,12 +8,16 @@ use BtcPayLite\ElectrumRPC;
 use BtcPayLite\PaymentWorker;
 use BtcPayLite\WebhookDeliveryRepository;
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
 require __DIR__ . '/vendor/autoload.php';
 
-$isCli = PHP_SAPI === 'cli';
 
 try {
     $config = require __DIR__ . '/config.php';
@@ -31,15 +35,7 @@ try {
     );
 
     $rpcScheme = (string) ($config['rpc_scheme'] ?? 'http');
-    $rpc = new ElectrumRPC(
-        (string) $config['rpc_host'],
-        (int) ($config['rpc_port'] ?? 7777),
-        (string) ($config['rpc_user'] ?? ''),
-        (string) ($config['rpc_pass'] ?? ''),
-        30,
-        5,
-        strtolower($rpcScheme)
-    );
+    $rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 
     $blockchain = new ElectrumBlockchainProvider($rpc);
     $webhookRepository = new WebhookDeliveryRepository($database);
@@ -61,10 +57,6 @@ try {
     ];
 }
 
-if (!$isCli) {
-    http_response_code($statusCode);
-    header('Content-Type: application/json; charset=utf-8');
-}
 
 echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($statusCode === 200 ? 0 : 1);

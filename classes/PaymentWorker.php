@@ -8,265 +8,135 @@ use Closure;
 use PDO;
 use Throwable;
 
-/**
- * Background worker that monitors active invoices on the blockchain, performs
- * atomic status transitions, and enqueues webhook notifications.
- *
- * Implements:
- * - Atomic invoice claiming via row-level locking
- * - Decoupled daemon-level blockchain observation (zero wallet locks)
- * - Monotonic status transitions: New -> Processing -> Settled (terminal); Expired
- * - Idempotent webhook delivery queueing
- */
+/** Owns invoice monitoring. RPC is outside transactions; state + outbox commit together. */
 class PaymentWorker
 {
-    private const DEFAULT_BATCH_SIZE = 50;
-
-    private Database $database;
-    private BlockchainProviderInterface $blockchain;
-    private WebhookDeliveryRepository $webhookRepository;
     private Closure $clock;
+    private int $leaseSeconds;
 
     public function __construct(
-        Database $database,
-        BlockchainProviderInterface $blockchain,
-        WebhookDeliveryRepository $webhookRepository,
+        private Database $database,
+        private BlockchainProviderInterface $blockchain,
+        private WebhookDeliveryRepository $webhookRepository,
         ?callable $clock = null
     ) {
-        $this->database = $database;
-        $this->blockchain = $blockchain;
-        $this->webhookRepository = $webhookRepository;
-        $this->clock = $clock === null
-            ? static fn (): int => time()
-            : Closure::fromCallable($clock);
+        $this->clock = $clock === null ? static fn (): int => time() : Closure::fromCallable($clock);
+        $bound = $blockchain->maxObservationDurationSeconds();
+        if ($bound < 1 || $bound > 3600) {
+            throw new \InvalidArgumentException('Blockchain provider must declare a bounded operation duration.');
+        }
+        $this->leaseSeconds = max(60, $bound + 30);
     }
 
-    /**
-     * Executes one monitoring cycle over active invoices.
-     *
-     * @return array{
-     *   scanned: int,
-     *   transitioned: int,
-     *   expired: int,
-     *   failed: int,
-     *   deliveries_queued: int
-     * }
-     */
-    public function run(int $batchSize = self::DEFAULT_BATCH_SIZE): array
+    /** @return array{scanned:int,transitioned:int,expired:int,failed:int,deliveries_queued:int} */
+    public function run(int $batchSize = 50): array
     {
-        $now = ($this->clock)();
-        $lockToken = bin2hex(random_bytes(16));
-        $claimedInvoices = $this->claimActiveInvoices($batchSize, $lockToken, $now);
-
-        $stats = [
-            'scanned' => count($claimedInvoices),
-            'transitioned' => 0,
-            'expired' => 0,
-            'failed' => 0,
-            'deliveries_queued' => 0,
-        ];
-
-        foreach ($claimedInvoices as $invoice) {
+        $stats = ['scanned' => 0, 'transitioned' => 0, 'expired' => 0, 'failed' => 0, 'deliveries_queued' => 0];
+        for ($i = 0; $i < max(1, min($batchSize, 500)); ++$i) {
+            $token = bin2hex(random_bytes(16));
+            // Claim just before observation. A queued batch must not consume its
+            // lease while waiting for all earlier RPCs to finish.
+            $invoice = $this->claimInvoice($token);
+            if ($invoice === null) {
+                break;
+            }
+            ++$stats['scanned'];
             try {
-                $transition = $this->processClaimedInvoice($invoice, $lockToken, $now);
-                if ($transition['changed']) {
-                    ++$stats['transitioned'];
-                    if ($transition['status'] === 'Expired') {
-                        ++$stats['expired'];
-                    }
-                    $stats['deliveries_queued'] += $transition['deliveries_queued'];
-                }
+                $observation = $this->blockchain->observeAddress(
+                    (string) $invoice['btc_address'],
+                    BitcoinAmount::fromBtc((string) $invoice['amount'])->toSatoshis()
+                );
+                $result = $this->commitObservation((string) $invoice['id'], $token, $observation);
+                $stats['transitioned'] += (int) $result['changed'];
+                $stats['expired'] += (int) ($result['changed'] && $result['status'] === 'Expired');
+                $stats['deliveries_queued'] += $result['deliveries_queued'];
             } catch (Throwable $exception) {
                 ++$stats['failed'];
-                $this->releaseInvoiceLease((string) ($invoice['id'] ?? ''), $lockToken, $now);
-                error_log(sprintf(
-                    'PaymentWorker failed for invoice %s: %s',
-                    $invoice['id'] ?? '',
-                    $exception->getMessage()
-                ));
+                $this->releaseFailedLease((string) $invoice['id'], $token);
+                error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . $exception->getMessage());
             }
         }
-
         return $stats;
     }
 
-    /**
-     * Claims active and recently expired invoices atomically using a persistent lease token.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function claimActiveInvoices(int $limit, string $lockToken, int $now, int $leaseDuration = 60): array
+    private function claimInvoice(string $token): ?array
     {
-        $limit = max(1, min($limit, 500));
-        $leaseUntil = $now + $leaseDuration;
-        $recentExpiredThreshold = $now - 86400;
         $pdo = $this->database->getPdo();
-
+        // Database time keeps independent hosts on the same lease clock.
         $update = $pdo->prepare(
             "UPDATE invoices
-                SET payment_processing_token = ?,
-                    payment_processing_until = ?
-              WHERE (
-                      status IN ('New', 'Processing')
-                      OR (status = 'Expired' AND expires_at >= ?)
-                    )
-                AND (payment_processing_until IS NULL OR payment_processing_until <= ?)
+                SET payment_processing_token = ?, payment_processing_until = UNIX_TIMESTAMP() + ?
+              WHERE (status IN ('New', 'Processing') OR (status = 'Expired' AND expires_at >= ?))
+                AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())
                 AND (next_check_at IS NULL OR next_check_at <= ?)
-           ORDER BY expires_at ASC, id ASC
-              LIMIT {$limit}"
+           ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"
         );
-        $update->execute([$lockToken, $leaseUntil, $recentExpiredThreshold, $now, $now]);
-
-        $select = $pdo->prepare(
-            "SELECT id, store_id, btc_address, amount, status, created_at, expires_at,
-                    confirmed_received_sats, unconfirmed_received_sats
-               FROM invoices
-              WHERE payment_processing_token = ?
-           ORDER BY expires_at ASC, id ASC"
-        );
-        $select->execute([$lockToken]);
-        $rows = $select->fetchAll(PDO::FETCH_ASSOC);
-
-        return is_array($rows) ? $rows : [];
+        $now = ($this->clock)();
+        $update->execute([$token, $this->leaseSeconds, $now - 86400, $now]);
+        if ($update->rowCount() !== 1) {
+            return null;
+        }
+        $select = $pdo->prepare('SELECT id, btc_address, amount FROM invoices WHERE payment_processing_token = ?');
+        $select->execute([$token]);
+        $row = $select->fetch(PDO::FETCH_ASSOC);
+        return is_array($row) ? $row : null;
     }
 
-    /**
-     * Evaluates blockchain state for a claimed invoice, persists observed satoshis,
-     * performs monotonic status transitions, and releases the lease token.
-     *
-     * @param array<string, mixed> $invoice
-     * @return array{changed: bool, status: string, deliveries_queued: int}
-     */
-    private function processClaimedInvoice(array $invoice, string $lockToken, int $now): array
+    private function commitObservation(string $invoiceId, string $token, AddressPaymentObservation $observation): array
     {
-        $invoiceId = (string) ($invoice['id'] ?? '');
-        $storeId = (string) ($invoice['store_id'] ?? '');
-        $address = (string) ($invoice['btc_address'] ?? '');
-        $currentStatus = (string) ($invoice['status'] ?? 'New');
-        $expiresAt = (int) ($invoice['expires_at'] ?? 0);
-        $prevConfirmedSats = (int) ($invoice['confirmed_received_sats'] ?? 0);
-        $prevUnconfirmedSats = (int) ($invoice['unconfirmed_received_sats'] ?? 0);
-
-        // Settled status is terminal and monotonic; never degrade
-        if ($currentStatus === 'Settled') {
-            $this->releaseInvoiceLease($invoiceId, $lockToken, $now, null);
-            return ['changed' => false, 'status' => 'Settled', 'deliveries_queued' => 0];
-        }
-
-        $expectedAmount = BitcoinAmount::fromBtc((string) ($invoice['amount'] ?? '0'));
-        $expectedSats = $expectedAmount->toSatoshis();
-
-        // Query blockchain via walletless provider
-        $observation = $this->blockchain->observeAddress($address, $expectedSats);
-        $confirmedSats = max($observation->getConfirmedSatoshis(), $prevConfirmedSats);
-        $unconfirmedSats = $observation->getUnconfirmedSatoshis();
-        $receivedSats = max($confirmedSats + $unconfirmedSats, $prevConfirmedSats + $prevUnconfirmedSats);
-
-        $newStatus = $currentStatus;
-        $nextCheckAt = null;
-
-        if ($confirmedSats >= $expectedSats) {
-            $newStatus = 'Settled';
-            $nextCheckAt = null; // terminal
-        } elseif ($receivedSats > 0) {
-            // Any observed payment (unconfirmed, partial, or late arrival) transitions to Processing
-            $newStatus = 'Processing';
-            $nextCheckAt = $now + 15;
-        } elseif ($now >= $expiresAt) {
-            // Expire only if zero payment was observed
-            $newStatus = 'Expired';
-            if ($now < $expiresAt + 86400) {
-                $nextCheckAt = $now + 300; // Check intermittently for late arrivals
-            } else {
-                $nextCheckAt = null;
+        return $this->database->transactional(function (PDO $pdo) use ($invoiceId, $token, $observation): array {
+            $select = $pdo->prepare(
+                'SELECT *, payment_processing_until > UNIX_TIMESTAMP() AS lease_valid
+                   FROM invoices WHERE id = ? FOR UPDATE'
+            );
+            $select->execute([$invoiceId]);
+            $invoice = $select->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($invoice) || $invoice['payment_processing_token'] !== $token || !(bool) $invoice['lease_valid']) {
+                throw new \RuntimeException('Payment worker no longer owns the invoice lease.');
             }
-        } else {
-            $newStatus = 'New';
-            $nextCheckAt = $now + 15;
-        }
-
-        // Monotonic transition check: Settled cannot revert
-        if ($currentStatus === 'Settled') {
-            $newStatus = 'Settled';
-            $nextCheckAt = null;
-        }
-
-        // Persist observation and release lease under token ownership
-        $stmt = $this->database->getPdo()->prepare(
-            'UPDATE invoices
-                SET status = ?,
-                    confirmed_received_sats = ?,
-                    unconfirmed_received_sats = ?,
-                    last_checked_at = ?,
-                    next_check_at = ?,
-                    payment_processing_token = NULL,
-                    payment_processing_until = NULL
-              WHERE id = ? AND payment_processing_token = ?'
-        );
-        $stmt->execute([
-            $newStatus,
-            $confirmedSats,
-            $unconfirmedSats,
-            $now,
-            $nextCheckAt,
-            $invoiceId,
-            $lockToken,
-        ]);
-
-        if ($stmt->rowCount() !== 1) {
-            // Lease expired or ownership was concurrently lost
-            return ['changed' => false, 'status' => $currentStatus, 'deliveries_queued' => 0];
-        }
-
-        $deliveriesQueued = 0;
-        $changed = ($newStatus !== $currentStatus);
-        if ($changed) {
-            $eventType = $this->eventForStatus($newStatus);
-            if ($eventType !== null) {
-                $deliveriesQueued = $this->webhookRepository->ensureDeliveries(
-                    $invoiceId,
-                    $storeId,
-                    $eventType,
-                    $now
-                );
+            if ($invoice['btc_address'] !== $observation->getAddress()) {
+                throw new \RuntimeException('Observation address does not match the invoice.');
             }
-        }
-
-        return [
-            'changed' => $changed,
-            'status' => $newStatus,
-            'deliveries_queued' => $deliveriesQueued,
-        ];
+            $now = ($this->clock)();
+            $current = (string) $invoice['status'];
+            $status = InvoiceStateMachine::next($current,
+                BitcoinAmount::fromBtc((string) $invoice['amount'])->toSatoshis(),
+                $observation, (int) $invoice['expires_at'], $now);
+            InvoiceStateMachine::assertTransition($current, $status);
+            $next = match ($status) {
+                'Settled' => null,
+                'Expired' => $now + 300,
+                default => $now + 15,
+            };
+            $update = $pdo->prepare(
+                'UPDATE invoices SET status = ?, confirmed_balance_sats = ?, mempool_delta_sats = ?,
+                    payment_observed_at = ?, last_checked_at = ?, next_check_at = ? WHERE id = ?'
+            );
+            $update->execute([$status, $observation->getConfirmedBalanceSatoshis(),
+                $observation->getMempoolDeltaSatoshis(), $observation->getObservedAt(), $now, $next, $invoiceId]);
+            $changed = $status !== $current;
+            $event = $changed ? InvoiceStateMachine::eventFor($status) : null;
+            $queued = $event === null ? 0 : $this->webhookRepository->enqueueInTransaction(
+                $pdo, $invoiceId, (string) $invoice['store_id'], $event, $now
+            );
+            $release = $pdo->prepare(
+                'UPDATE invoices SET payment_processing_token = NULL, payment_processing_until = NULL WHERE id = ?'
+            );
+            $release->execute([$invoiceId]);
+            return ['changed' => $changed, 'status' => $status, 'deliveries_queued' => $queued];
+        });
     }
 
-    private function releaseInvoiceLease(string $invoiceId, string $lockToken, int $now, ?int $nextCheckAt = null): void
+    private function releaseFailedLease(string $invoiceId, string $token): void
     {
         try {
             $stmt = $this->database->getPdo()->prepare(
-                'UPDATE invoices
-                    SET payment_processing_token = NULL,
-                        payment_processing_until = NULL,
-                        last_checked_at = ?,
-                        next_check_at = ?
-                  WHERE id = ? AND payment_processing_token = ?'
+                'UPDATE invoices SET payment_processing_token = NULL, payment_processing_until = NULL,
+                    next_check_at = ? WHERE id = ? AND payment_processing_token = ?'
             );
-            $stmt->execute([
-                $now,
-                $nextCheckAt ?? ($now + 30),
-                $invoiceId,
-                $lockToken,
-            ]);
+            $stmt->execute([($this->clock)() + 30, $invoiceId, $token]);
         } catch (Throwable) {
+            // A dead connection/process leaves a bounded persistent lease.
         }
-    }
-
-    private function eventForStatus(string $status): ?string
-    {
-        return match ($status) {
-            'Processing' => 'InvoiceProcessing',
-            'Settled' => 'InvoiceSettled',
-            'Expired' => 'InvoiceExpired',
-            default => null,
-        };
     }
 }
