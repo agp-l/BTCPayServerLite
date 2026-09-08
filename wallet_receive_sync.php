@@ -25,7 +25,16 @@ try {
     $results = isset($options['wallet'])
         ? [$worker->synchronizeWallet((string)$options['wallet'],$batch,$budget)]
         : $worker->run($limit,$batch,$budget);
-    echo json_encode(['wallets'=>$results],JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n";
+    $output=['wallets'=>$results];
+    if ($results===[]) {
+        $registered=(int)$db->getPdo()->query('SELECT COUNT(*) FROM wallet_receive_ranges')->fetchColumn();
+        $output['idle_reason']=$registered===0 ? 'no_registered_wallets' : 'no_wallets_due';
+        $output['registered_wallets']=$registered;
+        $output['hint']=$registered===0
+            ? 'No receive ranges are registered. This worker does not discover daemon wallets. For an existing XPUB store, run --wallet=/absolute/wallet/path to initialize its binding. Legacy Electrum stores first need the explicit XPUB repair workflow.'
+            : 'No registered wallet needs work now. Completed ranges are checked again after five minutes; --wallet forces a specific wallet check.';
+    }
+    echo json_encode($output,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n";
     exit(count(array_filter($results,static fn(array $r): bool=>$r['status']==='failed')) ? 1 : 0);
 } catch (Throwable $exception) {
     fwrite(STDERR,ReceiveSyncDiagnostics::error($exception)."\n"); exit(1);
