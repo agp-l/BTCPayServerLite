@@ -11,6 +11,7 @@ final class InstallationSchema
 {
     private array $statements;
     private array $tables = [];
+    private array $collations = [];
 
     public function __construct(string $path)
     {
@@ -28,6 +29,9 @@ final class InstallationSchema
                 $definition = trim($definition);
                 if (preg_match('/\A`?([a-z_]+)`?\s+((?:BIGINT|SMALLINT|INT|VARCHAR|CHAR|BINARY|DECIMAL|ENUM|JSON|LONGTEXT|TEXT|TIMESTAMP)(?:\([^)]*\))?(?:\s+UNSIGNED)?)/i', $definition, $column)) {
                     $columns[$column[1]] = [self::type($column[2]), !str_contains(strtoupper($definition), 'NOT NULL')];
+                    if (preg_match('/\bCOLLATE\s+([a-z0-9_]+)/i', $definition, $collation)) {
+                        $this->collations[$match[1]][$column[1]] = $collation[1];
+                    }
                 } elseif (preg_match('/\A(PRIMARY KEY|(?:(UNIQUE)\s+)?KEY\s+`?([a-z_]+)`?)\s*\(([^)]+)\)/is', $definition, $index)) {
                     $primary = $index[1] === 'PRIMARY KEY';
                     $indexes[$primary ? 'PRIMARY' : $index[3]] = [
@@ -47,6 +51,58 @@ final class InstallationSchema
     }
 
     public function tableNames(): array { return array_keys($this->tables); }
+
+    /** Read-only structural comparison; never imports the fresh-install file into a used DB. */
+    public function compare(PDO $pdo): array
+    {
+        $actual = $pdo->query('SHOW FULL TABLES')->fetchAll(PDO::FETCH_NUM);
+        $tableTypes = array_column($actual, 1, 0);
+        $differences = [];
+        foreach ($this->tables as $table => [$columns, $indexes]) {
+            if (($tableTypes[$table] ?? null) !== 'BASE TABLE') {
+                $differences[] = ['table'=>$table,'kind'=>'table','name'=>$table,'expected'=>'BASE TABLE','actual'=>$tableTypes[$table] ?? 'missing'];
+                continue;
+            }
+            $engine = $pdo->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+            $engine->execute([$table]); $foundEngine = $engine->fetchColumn();
+            if ($foundEngine !== 'InnoDB') {
+                $differences[] = ['table'=>$table,'kind'=>'engine','name'=>$table,'expected'=>'InnoDB','actual'=>$foundEngine];
+            }
+            $foundColumns = [];
+            foreach ($pdo->query('SHOW FULL COLUMNS FROM `'.$table.'`')->fetchAll(PDO::FETCH_ASSOC) as $column) {
+                $type = self::type($column['Type']);
+                if (($columns[$column['Field']][0] ?? null) === 'json' && $type === 'longtext') { $type='json'; }
+                $foundColumns[$column['Field']] = [$type,$column['Null']==='YES'];
+                $expectedCollation = $this->collations[$table][$column['Field']] ?? null;
+                if ($expectedCollation !== null && $column['Collation'] !== $expectedCollation) {
+                    $differences[] = ['table'=>$table,'kind'=>'collation','name'=>$column['Field'],'expected'=>$expectedCollation,'actual'=>$column['Collation']];
+                }
+            }
+            foreach ($columns as $name=>$expected) {
+                if (($foundColumns[$name] ?? null) !== $expected) {
+                    $differences[] = ['table'=>$table,'kind'=>'column','name'=>$name,'expected'=>json_encode($expected),'actual'=>isset($foundColumns[$name]) ? json_encode($foundColumns[$name]) : 'missing'];
+                }
+            }
+            foreach (array_diff_key($foundColumns,$columns) as $name=>$column) {
+                $differences[] = ['table'=>$table,'kind'=>'extra column','name'=>$name,'expected'=>'not in sql.sql','actual'=>json_encode($column)];
+            }
+            $foundIndexes = [];
+            foreach ($pdo->query('SHOW INDEX FROM `'.$table.'`')->fetchAll(PDO::FETCH_ASSOC) as $index) {
+                $foundIndexes[$index['Key_name']][0] = !(bool)$index['Non_unique'];
+                $foundIndexes[$index['Key_name']][1][(int)$index['Seq_in_index']] = $index['Column_name'].($index['Sub_part'] === null ? '' : '('.$index['Sub_part'].')');
+            }
+            foreach ($foundIndexes as &$index) { ksort($index[1]); $index[1]=array_values($index[1]); } unset($index);
+            foreach ($indexes as $name=>$expected) {
+                if (($foundIndexes[$name] ?? null) !== $expected) {
+                    $differences[] = ['table'=>$table,'kind'=>'index','name'=>$name,'expected'=>json_encode($expected),'actual'=>isset($foundIndexes[$name]) ? json_encode($foundIndexes[$name]) : 'missing'];
+                }
+            }
+        }
+        return ['database'=>(string)$pdo->query('SELECT DATABASE()')->fetchColumn(),
+            'ok'=>$differences === [],'differences'=>$differences,
+            'extra_tables'=>array_values(array_diff(array_keys($tableTypes),$this->tableNames())),
+            'scope'=>'Tabulky, InnoDB, typy a NULL sloupců, požadované indexy a explicitní COLLATE. Nekontroluje výchozí hodnoty, cizí klíče, CHECK, triggery ani dokončení datových migrací.'];
+    }
 
     public function import(PDO $pdo): void
     {

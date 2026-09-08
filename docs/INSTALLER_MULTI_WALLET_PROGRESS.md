@@ -282,3 +282,20 @@ Record test results and published commits here as work progresses.
 - Existing mixed 60-process allocation and bounded sync recovery tests also passed.
 - docs/RECEIVE_COORDINATION.md now gives phpMyAdmin upgrade/check-db steps and
   explains config-selected DB and PHP CLI/XAMPP differences. No user DB changed.
+
+## Administrator schema upgrade tool: source checkpoint before tests
+
+- User's --check-db passed on btcpay_lite, MariaDB 10.4.32. Empty wallets means no
+  registered range is due, not daemon discovery. Explicit --wallet can resolve
+  an existing XPUB store; it cannot repair a legacy Electrum store implicitly.
+- Added database_upgrade.php: current active admin/session-version check, CSRF,
+  read-only schema preview, one reviewed migration per POST, displayed-plan hash.
+- Catalog 001–008; historical/unknown migrations remain manual. Partial effects
+  block automatic replay. Source sql.sql remains a fresh-install schema only.
+- Added durable schema_migrations journal (008 and fresh schema), DB advisory
+  lock, checksums, Running/Applied/Failed and last completed statement. Interrupted
+  DDL is not automatically retried; data migrations need stopped writers/backup.
+- Comparison scope is explicit: tables, InnoDB, column type/NULL, required indexes,
+  explicit collations; not defaults/FK/CHECK/data backfill proof. No live DB touched.
+- NEXT: publish source before tests; verify HTTP authorization/CSRF and real MariaDB
+  fresh/006+007 missing/partial upgrade/replay/stale plan/failure cases.
