@@ -12,31 +12,31 @@ class ComposerStaticInit5aa43d90a37b32362e789d573ffded39
     );
 
     public static $prefixLengthsPsr4 = array (
-        'l' =>
+        'l' => 
         array (
             'lastguest\\' => 10,
         ),
-        'M' =>
+        'M' => 
         array (
             'Mdanter\\Ecc\\' => 12,
         ),
-        'F' =>
+        'F' => 
         array (
             'FG\\' => 3,
         ),
-        'E' =>
+        'E' => 
         array (
             'Endroid\\QrCode\\' => 15,
         ),
-        'D' =>
+        'D' => 
         array (
             'DASPRiD\\Enum\\' => 13,
         ),
-        'C' =>
+        'C' => 
         array (
             'Composer\\Semver\\' => 16,
         ),
-        'B' =>
+        'B' => 
         array (
             'BtcPayLite\\' => 11,
             'BitWasp\\Buffertools\\' => 20,
@@ -47,56 +47,56 @@ class ComposerStaticInit5aa43d90a37b32362e789d573ffded39
     );
 
     public static $prefixDirsPsr4 = array (
-        'lastguest\\' =>
+        'lastguest\\' => 
         array (
             0 => __DIR__ . '/..' . '/lastguest/murmurhash/src/lastguest',
         ),
-        'Mdanter\\Ecc\\' =>
+        'Mdanter\\Ecc\\' => 
         array (
             0 => __DIR__ . '/..' . '/mdanter/ecc/src',
         ),
-        'FG\\' =>
+        'FG\\' => 
         array (
             0 => __DIR__ . '/..' . '/fgrosse/phpasn1/lib',
         ),
-        'Endroid\\QrCode\\' =>
+        'Endroid\\QrCode\\' => 
         array (
             0 => __DIR__ . '/..' . '/endroid/qr-code/src',
         ),
-        'DASPRiD\\Enum\\' =>
+        'DASPRiD\\Enum\\' => 
         array (
             0 => __DIR__ . '/..' . '/dasprid/enum/src',
         ),
-        'Composer\\Semver\\' =>
+        'Composer\\Semver\\' => 
         array (
             0 => __DIR__ . '/..' . '/composer/semver/src',
         ),
-        'BtcPayLite\\' =>
+        'BtcPayLite\\' => 
         array (
             0 => __DIR__ . '/../..' . '/classes',
         ),
-        'BitWasp\\Buffertools\\' =>
+        'BitWasp\\Buffertools\\' => 
         array (
             0 => __DIR__ . '/..' . '/bitwasp/buffertools/src/Buffertools',
         ),
-        'BitWasp\\Bitcoin\\' =>
+        'BitWasp\\Bitcoin\\' => 
         array (
             0 => __DIR__ . '/..' . '/shanelic/bitcoin-p8/src',
         ),
-        'BitWasp\\Bech32\\' =>
+        'BitWasp\\Bech32\\' => 
         array (
             0 => __DIR__ . '/..' . '/bitwasp/bech32/src',
         ),
-        'BaconQrCode\\' =>
+        'BaconQrCode\\' => 
         array (
             0 => __DIR__ . '/..' . '/bacon/bacon-qr-code/src',
         ),
     );
 
     public static $prefixesPsr0 = array (
-        'P' =>
+        'P' => 
         array (
-            'Pleo' =>
+            'Pleo' => 
             array (
                 0 => __DIR__ . '/..' . '/pleonasm/merkle-tree/src',
             ),

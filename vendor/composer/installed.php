@@ -1,19 +1,19 @@
 <?php return array(
     'root' => array(
         'name' => 'ag/btcpay-lite',
-        'pretty_version' => 'dev-googleAIstudio',
-        'version' => 'dev-googleAIstudio',
-        'reference' => '6ad77214872e021ea833e526b76de7efe17c5443',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '9dffcc7619a552927d9a5ad945a0115b265092d4',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'dev' => true,
+        'dev' => false,
     ),
     'versions' => array(
         'ag/btcpay-lite' => array(
-            'pretty_version' => 'dev-googleAIstudio',
-            'version' => 'dev-googleAIstudio',
-            'reference' => '6ad77214872e021ea833e526b76de7efe17c5443',
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '9dffcc7619a552927d9a5ad945a0115b265092d4',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

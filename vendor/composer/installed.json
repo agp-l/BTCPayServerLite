@@ -695,6 +695,6 @@
             "install-path": "../shanelic/bitcoin-p8"
         }
     ],
-    "dev": true,
+    "dev": false,
     "dev-package-names": []
 }
