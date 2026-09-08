@@ -369,3 +369,19 @@ Record test results and published commits here as work progresses.
 - Deployment next step: git pull --ff-only; composer install --no-dev --prefer-dist;
   inspect the web-runtime section of database_upgrade.php, then retry creation.
   Exact root cause on user's XAMPP still requires their new diagnostic result.
+
+## Offline provisioning and live daemon lock (2026-09-08)
+
+- User fixed GMP/dependencies and config read ACL for PHP user daemon. The next
+  reproduced error is Electrum rejecting --offline with a daemon lockfile.
+- Verified upstream run_electrum handle_cmd offline branch: it refuses a lockfile
+  before executing any command, including create/getmpk/listaddresses/version.
+- Provisioning now uses a private 0700 random temporary data directory per call
+  for all three offline commands. Final wallet path remains explicitly managed.
+- Only boolean chain-selection keys are carried from the configured data dir;
+  daemon secrets, lockfiles, plugins and wallet defaults are not copied. Cleanup
+  runs on success/failure and does not follow symlinks or remove the wallet.
+- Source checkpoint committed BEFORE tests per user request. Regression testing
+  pending: daemon lock remains intact, offline paths isolated, success/error cleanup.
+- Based on remote 97b97d5 (user committed Composer packages); using isolated
+  worktree provisioning-fix to preserve prior local validation vendor files.

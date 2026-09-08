@@ -69,6 +69,16 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
             throw new RuntimeException('A wallet already exists for this store.');
         }
 
+        $context = new ElectrumOfflineContext($resolvedDataDirectory);
+        try {
+            return $this->provisionOffline($resolvedExecutable, $context->directory(), $resolvedWalletDirectory, $walletPath);
+        } finally {
+            $context->close();
+        }
+    }
+
+    private function provisionOffline(string $resolvedExecutable, string $resolvedDataDirectory, string $resolvedWalletDirectory, string $walletPath): ProvisionedWallet
+    {
         $command = [
             $resolvedExecutable,
             '-D',
