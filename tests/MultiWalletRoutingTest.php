@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 require __DIR__ . '/support/CoreTestSupport.php';
-use BtcPayLite\{BtcDashboard, ElectrumRPC, ElectrumRPCException, ElectrumWallet, WalletBalanceError};
+use BtcPayLite\{BtcDashboard, ElectrumRPC, ElectrumRPCException, ElectrumWallet, WalletBalanceError, WalletLockManager};
 
 $dir=coreDirectory();$port=random_int(20000,50000);
 file_put_contents($dir.'/wallets.json',json_encode(['/wallets/wallet_1','/wallets/wallet_3']));
@@ -39,7 +39,15 @@ try {
     $wallet=new ElectrumWallet($rpc);
     try { $rpc->callWallet('list_wallets','/wallets/wallet_1');throw new LogicException('Daemon command accepted wallet context'); }
     catch(InvalidArgumentException $e) {}
-    $wallet->loadWallet('/wallets/wallet_1');
+    // A held mutation lock cannot block loading/reading an already-loaded wallet.
+    (new WalletLockManager())->withWalletLock('/wallets/wallet_1', static function () use ($wallet): void {
+        $wallet->loadWallet('/wallets/wallet_1');
+        coreSame('0.00008827', $wallet->getWalletBalanceExact('/wallets/wallet_1')['confirmed'], 'Loaded read acquired the write lock');
+    });
+    coreConcurrent(2, static function () use ($port): bool {
+        (new ElectrumWallet(new ElectrumRPC('127.0.0.1', $port, null, null, 2, 1)))->loadWallet('/wallets/first_load');
+        return true;
+    });
     $dashboard=new BtcDashboard($wallet,'/wallets',null,'/wallets/wallet_1');
     $wallet->loadWallet('/wallets/wallet_2');
     $wallet->loadWallet('/wallets/wallet_2');
@@ -48,7 +56,7 @@ try {
     coreSame([],$dashboard->transactions(),'History used wrong wallet');
     coreSame([],$dashboard->addresses()['items'],'Addresses/UTXO used wrong wallet');
     $loaded=$wallet->getLoadedWallets();sort($loaded);
-    coreSame(['/wallets/wallet_1','/wallets/wallet_2','/wallets/wallet_3'],$loaded,'Opening one wallet evicted another');
+    coreSame(['/wallets/first_load','/wallets/wallet_1','/wallets/wallet_2','/wallets/wallet_3'],$loaded,'Opening one wallet evicted another');
     $wallet->loadWallet('/wallets/race');
     coreCheck(in_array('/wallets/race',$wallet->getLoadedWallets(),true),'Benign load race was not accepted');
     $results=coreConcurrent(2,static function(int $i)use($port): string {
@@ -63,7 +71,7 @@ try {
         coreSame('Chyba přihlášení',WalletBalanceError::statusLabel($e),'Authentication must not become Offline');
     }
     $requests=array_map(static fn(string $line): array=>json_decode($line,true),file($dir.'/requests.jsonl',FILE_IGNORE_NEW_LINES));
-    $loads=0;
+    $loads=0; $firstLoads=0;
     foreach($requests as $request) {
         coreCheck($request['method']!=='close_wallet','Normal request closed a peer wallet');
         coreSame('/',$request['uri'],'Daemon endpoint acquired mutable URL context');
@@ -71,9 +79,11 @@ try {
         if(in_array($request['method'],['getbalance','listaddresses','listunspent','onchain_history'],true)) {
             coreCheck(isset($request['params']['wallet_path'])&&!isset($request['params']['wallet']),'Wallet command is missing upstream wallet_path');
         }
+        if ($request['method']==='load_wallet' && $request['params']['wallet_path']==='/wallets/first_load') { ++$firstLoads; }
         if($request['method']==='load_wallet'&&$request['params']['wallet_path']==='/wallets/wallet_2') { ++$loads; }
     }
     coreSame(1,$loads,'Already-loaded wallet was loaded repeatedly');
+    coreSame(1,$firstLoads,'Concurrent first load performed duplicate mutations');
     echo "[PASS] Actual JSON-RPC transport: three wallets retained, explicit paths, idempotent loading, benign race, parallel isolation and exact 0.00008827 BTC\n";
 } finally {
     proc_terminate($server);fclose($pipes[0]);proc_close($server);

@@ -118,6 +118,15 @@ try {
     coreSame(102, (int) $pdo->query("SELECT xpub_last_index FROM stores WHERE id='recover'")->fetchColumn(), 'Retry allocated another address/index');
     echo "[PASS] Response-write failure rolls back invoice and retries the same durable address/index\n";
 
+    $pdo = null;
+    coreConcurrent(20, static fn (int $i): array => coreApi()->createInvoice($i % 2 === 0 ? 'bulk' : 'worker_store',
+        ['amount'=>'0.00000002'], $i % 2 === 0 ? 'bulk-key' : 'worker_store-key'));
+    $pdo = coreDatabase()->getPdo();
+    $counts = $pdo->query('SELECT COUNT(*) AS invoices, COUNT(DISTINCT btc_address) AS addresses, COUNT(DISTINCT address_index) AS indices, COUNT(DISTINCT derivation_path) AS paths FROM invoices')->fetch();
+    coreSame(122, (int) $counts['invoices'], 'Shared XPUB test fixture count');
+    foreach ($counts as $count) { coreSame(122, (int) $count, 'Stores sharing one XPUB reused a receive resource'); }
+    echo "[PASS] 20 parallel invoices across two stores share one sequence; addresses, indices and paths remain unique\n";
+
     // Isolate monitoring cases from address-creation stress invoices.
     $pdo->exec("UPDATE invoices SET status='Settled'");
     $pdo->exec("INSERT INTO webhooks (id,store_id,url,secret,created_at) VALUES ('wh_core','worker_store','https://merchant.example/hook','test-secret',1)");

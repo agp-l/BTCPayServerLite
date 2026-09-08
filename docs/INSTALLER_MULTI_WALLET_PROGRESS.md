@@ -121,3 +121,15 @@ Record test results and published commits here as work progresses.
   derive expected count from schema. Existing shared-key tests expect global
   high-water indices instead of independent per-store restarts.
 - Sequence initialization scans historical stores only when a pool is absent.
+
+### Test checkpoint (committed before execution)
+
+- Repair/branch validation published as 1a60544.
+- Added real offline CLI process test, public-only result/cleanup checks, unsupported
+  key and receive-branch rejection; shared-key prefix identity checks.
+- Multi-wallet HTTP fixture now reads successfully while the same mutation lock is
+  held, and two processes perform the first load exactly once.
+- Real DB tests now cover admin/client XPUB metadata propagation, client-created
+  second store, zero RPC after provisioning, and 20 concurrent invoices across
+  different stores sharing the same key (in addition to existing 100-way tests).
+- Full baseline suite currently running locally on MariaDB; inspect results next.
