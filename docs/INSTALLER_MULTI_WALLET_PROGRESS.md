@@ -254,3 +254,18 @@ Record test results and published commits here as work progresses.
   the user's live daemon without the actual configured environment.
 - Retain local Composer validation dependencies outside commits. Continue frequent
   small source commits before tests and keep this checkpoint current.
+
+## Reported CLI PDOException: diagnosis checkpoint before tests
+
+- User's installed CLI emitted only `Receive synchronization failed: PDOException`.
+  This hides the SQLSTATE/driver code, so the actual local cause is not known.
+- Added read-only --check-db: actual selected DB, CLI PHP/ini, server version,
+  missing required tables/columns, migration filenames and key-hash collations.
+  It validates the exact worker selection SQL with LIMIT 0 and no Electrum RPC.
+- Normal CLI now checks schema before constructing the RPC client. Missing
+  migrations produce actionable output instead of an anonymous exception class.
+- PDO diagnostics preserve SQLSTATE/driver codes through wrapped exceptions and
+  map common errors safely, without raw SQL values/passwords/RPC responses.
+- Source checkpoint is published before tests. Next reproduce missing migration,
+  partial schema and healthy --check-db through actual PHP CLI against MariaDB;
+  verify unknown SQL errors do not expose sensitive exception messages.

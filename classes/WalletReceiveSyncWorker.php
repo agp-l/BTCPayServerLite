@@ -8,6 +8,11 @@ use PDO;
 /** Bounded registration of reserved receive ranges in Electrum; never an invoice dependency. */
 final class WalletReceiveSyncWorker
 {
+    public const PENDING_WALLETS_SQL = 'SELECT r.wallet_path FROM wallet_receive_ranges r
+            LEFT JOIN xpub_address_sequences s ON s.key_hash=r.key_hash
+            WHERE GREATEST(COALESCE(s.next_index,0),r.initial_next_index)>r.registered_next_index OR r.checked_at<?
+            ORDER BY r.checked_at,r.wallet_hash LIMIT ?';
+
     public function __construct(private Database $database, private ElectrumWallet $wallet, private ?WalletLockManager $locks = null)
     { $this->locks ??= new WalletLockManager(); }
 
@@ -15,10 +20,7 @@ final class WalletReceiveSyncWorker
     {
         if ($walletLimit < 1 || $walletLimit > 20) { throw new InvalidArgumentException('Wallet limit must be 1..20.'); }
         $this->validateBudget($maxAddresses, $budgetSeconds);
-        $stmt = $this->database->getPdo()->prepare('SELECT r.wallet_path FROM wallet_receive_ranges r
-            LEFT JOIN xpub_address_sequences s ON s.key_hash=r.key_hash
-            WHERE GREATEST(COALESCE(s.next_index,0),r.initial_next_index)>r.registered_next_index OR r.checked_at<?
-            ORDER BY r.checked_at,r.wallet_hash LIMIT ?');
+        $stmt = $this->database->getPdo()->prepare(self::PENDING_WALLETS_SQL);
         $stmt->bindValue(1,time()-300,PDO::PARAM_INT); $stmt->bindValue(2,$walletLimit,PDO::PARAM_INT); $stmt->execute();
         $results = [];
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $path) {
