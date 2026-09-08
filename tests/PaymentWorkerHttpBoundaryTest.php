@@ -18,11 +18,13 @@ try {
         usleep(20000);
     }
     coreCheck($ready, 'HTTP test server did not start');
-    $body = file_get_contents('http://127.0.0.1:' . $port . '/payment_worker.php', false,
+    foreach (['payment_worker.php','wallet_receive_sync.php','repair_store_xpub.php'] as $entrypoint) {
+    $body = file_get_contents('http://127.0.0.1:' . $port . '/' . $entrypoint, false,
         stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 2]]));
     coreCheck(str_contains($http_response_header[0] ?? '', '404'), 'Payment worker is publicly runnable');
     coreSame('', $body, 'Worker initialized application/config or scanned over HTTP');
-    echo "[PASS] payment_worker.php returns HTTP 404 before configuration or any scan\n";
+    echo "[PASS] {$entrypoint} returns HTTP 404 before configuration or any scan\n";
+    }
 } finally {
     proc_terminate($server); fclose($pipes[0]); proc_close($server); unlink($log);
 }

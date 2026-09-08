@@ -194,3 +194,16 @@ Record test results and published commits here as work progresses.
   source audit and deployment instructions. External CLI users still must respect
   the application's receive allocator; no application can intercept arbitrary
   authenticated daemon commands issued outside its process ecosystem.
+
+### Receive coordination tests checkpoint (before execution)
+
+- CLI synchronization source published as 9ecf261.
+- Added real-MariaDB 60-process mixed Greenfield/admin/stateless allocation test
+  with forbidden RPC and forbidden XPUB wallet lock, exact shared high water,
+  address-only v3 plus v1/v2 status, explicit mixed legacy rejection, and binding
+  survival after stores are deleted.
+- Sync tests inject lost response after daemon mutation, restore an older wallet
+  while DB hints claim a newer range, reject wrong MPK, enforce batch size and
+  simulate a competing worker holding the same wallet lock.
+- HTTP guard test now covers payment worker, receive sync and repair endpoints.
+- Run the new integration test, then the full suite; no test result claimed yet.
