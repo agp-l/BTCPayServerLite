@@ -143,3 +143,17 @@ Record test results and published commits here as work progresses.
 - Repair also preserves MAX invoice.address_index across all stores for the wallet,
   in addition to persisted counters and Electrum receiving-address high water.
 - Run the full 57-file suite on this checkpoint; then finish documentation/CI.
+
+## Verified checkpoint / resume here
+
+- Main source 12306d7: full local MariaDB run PASSED, 57 files, 0 failures.
+- GitHub CI PASSED: https://github.com/agp-l/BTCPayServerLite/actions/runs/34177553920
+- Audit/upgrade/operator instructions: docs/XPUB_FIRST_MULTI_WALLET_AUDIT.md.
+- Migration 006 must precede running new DB sequence code on an old database.
+- No real localhost database/daemon/config was accessed or changed. Do not commit
+  local vendor files. No source changes await testing at this checkpoint.
+- Known remaining receive-range integration: Electrum does not learn local XPUB
+  reservations automatically. Admin new_address, stateless requests and external
+  address writers must not independently allocate from the same XPUB receive
+  branch. See audit limits before a future sync/address-range coordination pass.
+- Keep frequent small commits BEFORE tests and record validation afterwards.

@@ -103,7 +103,7 @@ data. Do not automatically purge unresolved reservations.
 
 Electrum allocation occurs outside the DB transaction. A crash between its mutation
 and snapshot persistence can leave an unused address. It cannot create a second
-invoice under the reserved ID. XPUB avoids this RPC gap entirely. Existing generator
+invoice under the reserved ID. XPUB avoids this RPC gap entirely. Historical file-generator
 index domains remain per store; do not configure the same XPUB/derivation branch in
 independent stores that have independent counters.
 
@@ -183,3 +183,12 @@ The acceptance suite covers all thirteen requested invariants, including actual
 checkpoint all 53 test files passed with real MariaDB, and 213 PHP files passed
 syntax checks. Electrum calls were controlled test doubles; an actual daemon
 integration smoke test remains deployment validation.
+
+## XPUB provisioning follow-up (2026-09-08)
+
+DB-backed stores now share a durable sequence by public key/chain code across
+stores and SLIP-0132 aliases (migration 006). New wallet provisioning exports
+validated public metadata offline once. See [the follow-up audit](XPUB_FIRST_MULTI_WALLET_AUDIT.md)
+for corrected ownership, installation, repair, verification and receive-range
+synchronization limits. The per-store limitation above still applies to the
+legacy file index store, not the DB sequence.

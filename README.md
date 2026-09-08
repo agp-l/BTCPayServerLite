@@ -403,6 +403,24 @@ return [
 
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.
 
+## XPUB-first provisioning (8. září 2026)
+
+Nové standardní wallets předají jednorázově ověřený veřejný klíč do `stores`.
+Faktury potom používají DB rezervaci a lokální derivaci bez Electrum RPC. Obchody
+sdílející XPUB sdílejí i persistentní indexovou sekvenci. Již loaded admin wallet
+se při čtení nezamyká výhradním mutation lockem.
+
+Při upgradu z `e88594d` aplikujte nejprve
+[`migrations/006_shared_xpub_address_sequences.sql`](migrations/006_shared_xpub_address_sequences.sql).
+Nová DB může vzniknout ze současného `sql.sql` nebo přes opravený instalátor.
+Pro staré obchody slouží explicitní `php repair_store_xpub.php --store=ID`;
+změna vyžaduje `--apply --maintenance` po pozastavení writerů dané wallet.
+
+[Audit, commity, testy a provozní omezení](docs/XPUB_FIRST_MULTI_WALLET_AUDIT.md)
+vysvětlují i synchronizaci Electrum receive rozsahu: lokální XPUB derivace sama
+neprodlužuje gap limit a nesmí sdílet větev s nezávislým generováním adres přes
+admin/stateless/externí Electrum writer bez další koordinace.
+
 ## Databáze a migrace
 
 Pro upgrade z `cbeba360` zastavte API/worker zápisy a postupně aplikujte
