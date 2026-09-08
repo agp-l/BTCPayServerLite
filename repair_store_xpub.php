@@ -30,6 +30,9 @@ try {
         throw new RuntimeException('Stored XPUB belongs to another key; automatic replacement refused.');
     }
     $floor = max($receive->nextIndex, (int) $before['xpub_last_index']);
+    $issued = $pdo->prepare('SELECT MAX(i.address_index) FROM invoices i INNER JOIN stores s ON s.id=i.store_id WHERE s.wallet_path=?');
+    $issued->execute([$before['wallet_path']]); $lastIssued = $issued->fetchColumn();
+    if ($lastIssued !== null && $lastIssued !== false) { $floor = max($floor, (int) $lastIssued + 1); }
     if (isset($options['apply'])) {
         $db->transactional(function (PDO $pdo) use ($before, $receive, $identity, &$floor): void {
             $stmt = $pdo->prepare('SELECT * FROM stores WHERE id = ? FOR UPDATE'); $stmt->execute([$before['id']]);

@@ -100,7 +100,7 @@ $tests = [];
 
 $tests['loads one wallet without closing another wallet'] = static function (): void {
     $rpc = new RecordingElectrumRPC([
-        'list_wallets' => [[['path' => '/wallets/other']]],
+        'list_wallets' => [[['path' => '/wallets/other']], [['path' => '/wallets/other']]],
         'load_wallet' => ['/wallets/store'],
     ]);
     $wallet = new ElectrumWallet($rpc);
@@ -111,7 +111,7 @@ $tests['loads one wallet without closing another wallet'] = static function (): 
     assertSameValue('list_wallets', $rpc->calls[0]['method'], 'Loaded wallets must be inspected first.');
     assertSameValue(
         ['wallet_path' => '/wallets/store'],
-        $rpc->calls[1]['params'],
+        $rpc->calls[2]['params'],
         'load_wallet did not receive the requested path.'
     );
 

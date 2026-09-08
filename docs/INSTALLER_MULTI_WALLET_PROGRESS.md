@@ -133,3 +133,13 @@ Record test results and published commits here as work progresses.
   second store, zero RPC after provisioning, and 20 concurrent invoices across
   different stores sharing the same key (in addition to existing 100-way tests).
 - Full baseline suite currently running locally on MariaDB; inspect results next.
+
+### Verification in progress
+
+- Tests published as dca767a. Offline CLI provisioning test PASSED.
+- Full first local MariaDB run: 55 passed, one old ElectrumWalletTest fixture
+  needed the new second list_wallets response for the unloaded slow path. Updated
+  that fixture to model the read-before-lock plus read-under-lock sequence.
+- Repair also preserves MAX invoice.address_index across all stores for the wallet,
+  in addition to persisted counters and Electrum receiving-address high water.
+- Run the full 57-file suite on this checkpoint; then finish documentation/CI.
