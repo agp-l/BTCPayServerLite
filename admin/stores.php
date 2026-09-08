@@ -106,7 +106,7 @@ if ($service instanceof AdminOperationsService
     } catch (AdminOperationsException $exception) {
         http_response_code($exception->getHttpStatus());
         $pageError = $exception->getMessage();
-        error_log('Admin store operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+        \BtcPayLite\StoreCreationDiagnostics::log($exception);
     } catch (Throwable $exception) {
         http_response_code(500);
         $pageError = 'Operaci se nyní nepodařilo dokončit.';

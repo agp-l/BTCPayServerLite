@@ -153,7 +153,7 @@ if ($service instanceof ClientDashboardService && ($_SERVER['REQUEST_METHOD'] ??
     } catch (ClientDashboardException $exception) {
         http_response_code($exception->getHttpStatus());
         $pageError = $exception->getMessage();
-        error_log('Client dashboard operation failed: ' . ($exception->getPrevious()?->getMessage() ?? $exception->getMessage()));
+        \BtcPayLite\StoreCreationDiagnostics::log($exception);
     } catch (Throwable $exception) {
         http_response_code(500);
         $pageError = 'Operaci se nyní nepodařilo dokončit. Zkuste to prosím později.';

@@ -42,6 +42,7 @@ class XpubAddressGenerator implements AddressGeneratorInterface
         ?string $scriptType = null,
         int $changeBranch = 0
     ) {
+        XpubRuntime::assertAvailable();
         $this->indexStore = $indexStore;
         $this->changeBranch = $changeBranch;
 

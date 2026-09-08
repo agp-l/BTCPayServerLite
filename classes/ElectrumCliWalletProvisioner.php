@@ -39,28 +39,29 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
 
     public function provision(string $storeId): ProvisionedWallet
     {
+        XpubRuntime::assertAvailable();
         if (!preg_match('/\Astore_[a-f0-9]{32}\z/D', $storeId)) {
             throw new RuntimeException('Store ID is invalid for wallet provisioning.');
         }
         if (!function_exists('proc_open')) {
-            throw new RuntimeException('Process execution is disabled on this server.');
+            throw new StoreCreationException('process_disabled', 'PHP webového serveru má zakázané proc_open.');
         }
 
         $resolvedExecutable = realpath($this->executable);
         $resolvedDataDirectory = realpath($this->electrumDataDirectory);
         $resolvedWalletDirectory = realpath($this->walletDirectory);
         if ($resolvedExecutable === false || !is_file($resolvedExecutable) || !is_executable($resolvedExecutable)) {
-            throw new RuntimeException('Configured Electrum executable is unavailable.');
+            throw new StoreCreationException('electrum_executable', 'Electrum CLI není dostupné nebo spustitelné pro uživatele PHP. Ověřte electrum_cli_path.');
         }
         if ($resolvedDataDirectory === false || !is_dir($resolvedDataDirectory)) {
-            throw new RuntimeException('Configured Electrum data directory is unavailable.');
+            throw new StoreCreationException('electrum_data_directory', 'Electrum datový adresář není dostupný pro uživatele PHP. Ověřte electrum_data_dir a oprávnění.');
         }
         if (
             $resolvedWalletDirectory === false
             || !is_dir($resolvedWalletDirectory)
             || !is_writable($resolvedWalletDirectory)
         ) {
-            throw new RuntimeException('Configured wallet directory is unavailable or not writable.');
+            throw new StoreCreationException('wallet_directory', 'Adresář peněženek není dostupný nebo zapisovatelný pro uživatele PHP. Ověřte store_wallets_dir a oprávnění.');
         }
 
         $walletPath = $resolvedWalletDirectory . DIRECTORY_SEPARATOR . $storeId . '_wallet';
@@ -85,7 +86,7 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
         $pipes = [];
         $process = proc_open($command, $descriptors, $pipes, null, null, ['bypass_shell' => true]);
         if (!is_resource($process)) {
-            throw new RuntimeException('Electrum wallet process could not be started.');
+            throw new StoreCreationException('electrum_start', 'Proces Electrum CLI se nepodařilo spustit.');
         }
 
         fclose($pipes[0]);
@@ -110,7 +111,7 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
                 }
                 if (microtime(true) >= $deadline) {
                     proc_terminate($process);
-                    throw new RuntimeException('Electrum wallet creation timed out.');
+                    throw new StoreCreationException('electrum_create_timeout', 'Vytváření peněženky překročilo časový limit.');
                 }
 
                 usleep(50_000);
@@ -127,7 +128,7 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
         }
 
         if ($exitCode !== 0) {
-            throw new RuntimeException('Electrum wallet creation failed.');
+            throw new StoreCreationException('electrum_create_failed', 'Electrum CLI skončilo chybou. Ověřte jeho Python prostředí a přístup uživatele PHP k datovému adresáři.');
         }
 
         $resolvedWallet = realpath($walletPath);
@@ -137,10 +138,10 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
             || is_link($walletPath)
             || dirname($resolvedWallet) !== $resolvedWalletDirectory
         ) {
-            throw new RuntimeException('Electrum did not create the expected wallet file.');
+            throw new StoreCreationException('wallet_file_missing', 'Electrum nevytvořilo očekávaný wallet soubor.');
         }
         if (!chmod($resolvedWallet, 0660)) {
-            throw new RuntimeException('Electrum wallet permissions could not be restricted.');
+            throw new StoreCreationException('wallet_permissions', 'Nepodařilo se nastavit oprávnění nového wallet souboru.');
         }
 
         try {

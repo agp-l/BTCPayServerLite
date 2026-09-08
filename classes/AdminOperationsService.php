@@ -69,7 +69,7 @@ final class AdminOperationsService
                 }
             }
             throw new AdminOperationsException(
-                'Obchod a jeho peněženku se nyní nepodařilo vytvořit.',
+                StoreCreationDiagnostics::message($exception),
                 503,
                 $exception
             );
@@ -127,7 +127,7 @@ final class AdminOperationsService
         } catch (Throwable $exception) {
             $this->discardProvisionedWallet($provisionedWallet);
             throw new AdminOperationsException(
-                'Klientský obchod se nyní nepodařilo vytvořit.',
+                StoreCreationDiagnostics::message($exception),
                 503,
                 $exception
             );

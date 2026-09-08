@@ -327,3 +327,15 @@ Record test results and published commits here as work progresses.
   opens /BTCPayLite/database_upgrade.php after normal admin login. Their database
   and Electrum daemon have not been accessed or changed by this session.
 - Local vendor changes are validation dependencies only; keep out of commits.
+
+## Store creation failure: first source checkpoint
+
+- User reports generic failure in admin/client; their real PHP/web log has not been
+  supplied. Found deployment gap: git does not contain bitcoin-p8/ECC dependencies;
+  Composer install is required, and installer omitted GMP/dependency checks.
+- Added XpubRuntime requirement checks to installer, XPUB generator and before
+  spawning Electrum provisioning. Missing runtime now fails before creating a key.
+- Added safe categorized store errors (PHP/dependency/path/provisioning/DB) in admin
+  and client; no raw subprocess stdout/stderr, seed material or SQL values exposed.
+- Next: expose read-only actual web PHP preflight to admin, run real store insert
+  and provisioning integration tests, publish checkpoints before verification.

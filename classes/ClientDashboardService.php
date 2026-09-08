@@ -109,7 +109,7 @@ final class ClientDashboardService
             );
         } catch (Throwable $exception) {
             throw new ClientDashboardException(
-                'Obchod se nyní nepodařilo vytvořit. Zkuste to prosím později.',
+                StoreCreationDiagnostics::message($exception),
                 503,
                 $exception
             );

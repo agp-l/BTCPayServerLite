@@ -45,7 +45,7 @@ final class InstallationManager
             && extension_loaded('pdo_mysql')
             && in_array('mysql', PDO::getAvailableDrivers(), true);
 
-        return [
+        return array_merge(XpubRuntime::requirements(), [
             [
                 'name' => 'PHP 8.0+ (64 bit)',
                 'ok' => PHP_VERSION_ID >= 80000 && PHP_INT_SIZE === 8,
@@ -84,7 +84,7 @@ final class InstallationManager
                     : 'Povolte uživateli PHP vytvořit config.php a instalační zámek v adresáři aplikace.',
                 'required' => true,
             ],
-        ];
+        ]);
     }
 
     public function canInstall(): bool
