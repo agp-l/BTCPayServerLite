@@ -70,3 +70,21 @@ Record test results and published commits here as work progresses.
   and passed on rerun. All production behaviors and new integration tests passed.
 - Source syntax validation: 217 PHP files, zero errors. Next publish this verified
   implementation, finish audit documentation and confirm the full GitHub CI run.
+
+## 2026-09-08 follow-up: XPUB-first provisioning
+
+- Baseline e88594d CI passed (56 test files):
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34149766167
+- Reviewed every production change in e88594d. KEEP explicit store selection,
+  ownership, wallet_path RPC scope, exact amounts and error categories. FIX the
+  missing provisioning-to-XPUB metadata flow and exclusive lock on loaded reads.
+- New user instruction: publish coherent source checkpoints BEFORE tests, then
+  record validation separately. Do not wait for the entire task to make a commit.
+- First checkpoint: loadWallet validates and checks list_wallets before locking;
+  only an unloaded target takes the shared per-wallet lock and rechecks within it.
+  Tests pending for this new change at publication.
+- Next: structured provisioning result, export/validate public key once, persist
+  metadata in all store creation paths, explicit repair command for existing data.
+  Preserve conservative SQL default electrum for incomplete historical rows.
+- Important design risk to resolve: several stores can share a single wallet/XPUB;
+  their receive-index allocation must not restart independently and reuse addresses.

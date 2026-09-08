@@ -36,8 +36,15 @@ class ElectrumWallet
      */
     public function loadWallet(string $walletPath, ?string $password = null): void
     {
-        (new WalletLockManager())->withWalletLock($walletPath, fn () => $this->ensureWalletLoaded($walletPath, $password));
-        $this->activeWalletPath = $this->validateWalletPath($walletPath);
+        $walletPath = $this->validateWalletPath($walletPath);
+        // Already loaded wallets are a read-only fast path. A signing/address
+        // mutation must not make an unrelated balance page report wallet busy.
+        if (!$this->containsWalletPath($this->getLoadedWallets(), $walletPath)) {
+            // Recheck inside the lock: another process may have loaded it since
+            // the first observation. ensureWalletLoaded never closes peers.
+            (new WalletLockManager())->withWalletLock($walletPath, fn () => $this->ensureWalletLoaded($walletPath, $password));
+        }
+        $this->activeWalletPath = $walletPath;
     }
 
     /**
