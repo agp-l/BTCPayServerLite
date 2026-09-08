@@ -31,7 +31,7 @@ interface ClientDashboardRepository
     /** @return list<array<string,mixed>> */
     public function fetchRequests(int $userId, int $limit): array;
 
-    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void;
+    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath, ?ProvisionedWallet $receive = null): void;
 
     public function ownsStore(int $userId, string $storeId): bool;
 

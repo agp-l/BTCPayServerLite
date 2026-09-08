@@ -37,7 +37,7 @@ final class RegistrationStoreRepositoryFixture implements ClientDashboardReposit
     public function fetchPayouts(int $userId, int $limit): array { return []; }
     public function fetchIntegrations(int $userId): array { return []; }
     public function fetchRequests(int $userId, int $limit): array { return []; }
-    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
+    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath, ?\BtcPayLite\ProvisionedWallet $receive = null): void
     {
         if ($this->fail) throw new RuntimeException('Simulated persistence failure.');
         $this->created = compact('userId', 'id', 'name', 'apiKey', 'walletPath');
@@ -55,8 +55,8 @@ final class RegistrationStoreRepositoryFixture implements ClientDashboardReposit
 final class RegistrationWalletProvisionerFixture implements StoreWalletProvisioner
 {
     public ?string $discarded = null;
-    public function provision(string $storeId): string { return '/wallets/' . $storeId . '_wallet'; }
-    public function discard(string $walletPath): void { $this->discarded = $walletPath; }
+    public function provision(string $storeId): \BtcPayLite\ProvisionedWallet { return new \BtcPayLite\ProvisionedWallet('/wallets/' . $storeId . '_wallet', 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8'); }
+    public function discard(string $walletPath, ?\BtcPayLite\ProvisionedWallet $receive = null): void { $this->discarded = $walletPath; }
 }
 
 $stores = new RegistrationStoreRepositoryFixture();

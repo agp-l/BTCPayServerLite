@@ -37,7 +37,7 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
         $this->timeoutSeconds = $timeoutSeconds;
     }
 
-    public function provision(string $storeId): string
+    public function provision(string $storeId): ProvisionedWallet
     {
         if (!preg_match('/\Astore_[a-f0-9]{32}\z/D', $storeId)) {
             throw new RuntimeException('Store ID is invalid for wallet provisioning.');
@@ -143,7 +143,48 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
             throw new RuntimeException('Electrum wallet permissions could not be restricted.');
         }
 
-        return $resolvedWallet;
+        try {
+            $publicKey = $this->readPublicCommand($resolvedExecutable, $resolvedDataDirectory, $resolvedWallet, 'getmpk');
+            $addresses = $this->readPublicCommand($resolvedExecutable, $resolvedDataDirectory, $resolvedWallet, 'listaddresses', ['--receiving']);
+            if (!is_string($publicKey) || !is_array($addresses) || array_values($addresses) !== $addresses) {
+                throw new ElectrumWalletException('Invalid public wallet provisioning response.', 'getmpk');
+            }
+            return new ProvisionedWallet($resolvedWallet, $publicKey, count($addresses));
+        } catch (\Throwable $exception) {
+            // The fresh wallet has never been loaded by this provisioner.
+            $this->discard($resolvedWallet);
+            throw $exception;
+        }
+    }
+
+    /** Runs only explicitly public, offline commands. Creation output is never retained. */
+    private function readPublicCommand(string $executable, string $dataDir, string $walletPath, string $method, array $options = []): mixed
+    {
+        $process = proc_open([$executable, '-D', $dataDir, $method, '--offline', '-w', $walletPath, ...$options],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, null, ['bypass_shell' => true]);
+        if (!is_resource($process)) { throw new RuntimeException('Public wallet inspection could not start.'); }
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false); stream_set_blocking($pipes[2], false);
+        $output = ''; $code = -1; $deadline = microtime(true) + $this->timeoutSeconds;
+        try {
+            do {
+                $output .= stream_get_contents($pipes[1]); stream_get_contents($pipes[2]);
+                $status = proc_get_status($process);
+                if (!$status['running']) { $code = $status['exitcode']; break; }
+                if (microtime(true) >= $deadline || strlen($output) > 1048576) {
+                    proc_terminate($process);
+                    throw new RuntimeException('Public wallet inspection exceeded its limit.');
+                }
+                usleep(20000);
+            } while (true);
+            $output .= stream_get_contents($pipes[1]);
+        } finally {
+            fclose($pipes[1]); fclose($pipes[2]); proc_close($process);
+        }
+        if ($code !== 0) { throw new ElectrumWalletException('Offline public wallet inspection failed.', $method); }
+        // Electrum CLI prints scalar strings directly and structured values as JSON.
+        $decoded = json_decode(trim($output), true);
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : trim($output);
     }
 
     public function discard(string $walletPath): void

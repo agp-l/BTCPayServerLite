@@ -6,7 +6,7 @@ namespace BtcPayLite;
 
 interface StoreWalletProvisioner
 {
-    public function provision(string $storeId): string;
+    public function provision(string $storeId): ProvisionedWallet;
 
     public function discard(string $walletPath): void;
 }

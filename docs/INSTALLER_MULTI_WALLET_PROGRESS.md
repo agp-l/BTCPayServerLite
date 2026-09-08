@@ -88,3 +88,22 @@ Record test results and published commits here as work progresses.
   Preserve conservative SQL default electrum for incomplete historical rows.
 - Important design risk to resolve: several stores can share a single wallet/XPUB;
   their receive-index allocation must not restart independently and reuse addresses.
+
+### XPUB source checkpoint (publish before tests)
+
+- load-read fix published as 6b74b80; validation to follow.
+- Fresh wallet provisioning now returns validated public receive metadata. CLI
+  creates offline, exports getmpk and receiving addresses offline exactly once;
+  no seed/private output is retained and no daemon wallet needs loading for setup.
+- Electrum public-key prefixes determine script type (xpub/tpub = p2pkh,
+  ypub/upub = nested SegWit, zpub/vpub = native SegWit). Unsupported/invalid public
+  exports fail provisioning; they do not silently select Electrum generation.
+- Admin, registration and client store repositories persist/reuse public metadata.
+  Legacy wallets remain explicitly electrum until an operator runs repair.
+- Added migration 006_shared_xpub_address_sequences.sql, also in sql.sql. Shared
+  key/chain-code sequences prevent different stores/key-prefix aliases from
+  restarting the same receive branch. Existing high water seeds the sequence;
+  the durable pool must survive deleting stores. Apply migration before this code.
+- Tests pending at this checkpoint. Next: explicit existing-wallet repair command,
+  actual CLI/public export fixture, no-lock load tests, shared-XPUB concurrency,
+  adapt existing high-water assertions and installer table count to new schema.

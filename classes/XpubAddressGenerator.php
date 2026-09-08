@@ -174,6 +174,10 @@ class XpubAddressGenerator implements AddressGeneratorInterface
             $effectiveScriptType = 'p2sh-p2wpkh';
         }
 
+        if (!in_array($effectiveScriptType, ['p2pkh', 'p2sh-p2wpkh', 'p2wpkh'], true)) {
+            throw new InvalidArgumentException('Unsupported XPUB script type.');
+        }
+
         $normalizedPayload = hex2bin($normalizedVersionHex) . substr($payload, 4);
         $normalizedKey = Base58::encodeCheck(new Buffer($normalizedPayload));
 

@@ -57,16 +57,15 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         string $id,
         string $name,
         string $apiKey,
-        ?string $walletPath = null,
-        string $addressSource = 'electrum',
-        ?string $xpub = null,
-        string $xpubScriptType = 'p2wpkh'
+        string $walletPath,
+        ?ProvisionedWallet $receive = null
     ): void {
-        // Contract: VALUES (?, ?, ?, ?, NULL)
-        $statement = $this->database->getPdo()->prepare(
-            'INSERT INTO stores (id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)'
+        $pdo = $this->database->getPdo();
+        $metadata = StoreReceiveMetadata::forWallet($pdo, $walletPath, $receive);
+        $statement = $pdo->prepare(
+            'INSERT INTO stores (id, name, api_key, wallet_path, address_source, xpub, xpub_script_type, xpub_last_index, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)'
         );
-        $statement->execute([$id, $name, $apiKey, $walletPath, $addressSource, $xpub, $xpubScriptType]);
+        $statement->execute([$id, $name, $apiKey, $walletPath, $metadata['address_source'], $metadata['xpub'], $metadata['xpub_script_type'], $metadata['xpub_last_index']]);
     }
 
     public function fetchClientWallet(int $userId): ?string
@@ -89,7 +88,8 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
         string $name,
         string $apiKey,
         string $proposedWalletPath,
-        int $createdAt
+        int $createdAt,
+        ?ProvisionedWallet $receive = null
     ): ?string {
         return $this->database->transactional(function (PDO $pdo) use (
             $userId,
@@ -97,7 +97,8 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
             $name,
             $apiKey,
             $proposedWalletPath,
-            $createdAt
+            $createdAt,
+            $receive
         ): ?string {
             $statement = $pdo->prepare(
                 "SELECT id FROM users
@@ -118,10 +119,11 @@ final class PdoAdminOperationsRepository implements AdminOperationsRepository
                 ? $existingWallet
                 : $proposedWalletPath;
 
+            $metadata = StoreReceiveMetadata::forWallet($pdo, $walletPath, $receive);
             $statement = $pdo->prepare(
-                'INSERT INTO stores (id, name, api_key, wallet_path, user_id) VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO stores (id, name, api_key, wallet_path, user_id, address_source, xpub, xpub_script_type, xpub_last_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $statement->execute([$id, $name, $apiKey, $walletPath, $userId]);
+            $statement->execute([$id, $name, $apiKey, $walletPath, $userId, $metadata['address_source'], $metadata['xpub'], $metadata['xpub_script_type'], $metadata['xpub_last_index']]);
 
             if ($existingWallet === false) {
                 $statement = $pdo->prepare(

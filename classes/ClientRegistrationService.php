@@ -41,14 +41,16 @@ final class ClientRegistrationService
         $walletPath = '';
 
         try {
-            $walletPath = $this->walletProvisioner->provision($storeId);
+            $receive = $this->walletProvisioner->provision($storeId);
+            $walletPath = $receive->walletPath;
             $userId = ($this->transactional)(function () use (
                 $email,
                 $password,
                 $passwordConfirm,
                 $storeId,
                 $apiKey,
-                $walletPath
+                $walletPath,
+                $receive
             ): int {
                 $userId = $this->auth->registerUser($email, $password, $passwordConfirm);
                 $this->stores->assignWallet($userId, $walletPath, time());
@@ -57,7 +59,8 @@ final class ClientRegistrationService
                     $storeId,
                     'Můj první e-shop',
                     $apiKey,
-                    $walletPath
+                    $walletPath,
+                    $receive
                 );
 
                 return $userId;

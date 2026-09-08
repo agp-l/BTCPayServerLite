@@ -18,9 +18,9 @@ final class AdminInvoiceRepositoryFixture implements AdminOperationsRepository
             ? ['id' => $storeId, 'wallet_path' => '/selected-wallet']
             : null;
     }
-    public function createStore(string $id, string $name, string $apiKey, string $walletPath): void {}
+    public function createStore(string $id, string $name, string $apiKey, string $walletPath, ?\BtcPayLite\ProvisionedWallet $receive = null): void {}
     public function fetchClientWallet(int $userId): ?string { return null; }
-    public function createClientStore(int $userId, string $id, string $name, string $apiKey, string $proposedWalletPath, int $createdAt): ?string { return null; }
+    public function createClientStore(int $userId, string $id, string $name, string $apiKey, string $proposedWalletPath, int $createdAt, ?\BtcPayLite\ProvisionedWallet $receive = null): ?string { return null; }
     public function storeExists(string $storeId): bool { return true; }
     public function fetchWebhooks(): array { return []; }
     public function findOrCreateWebhook(string $storeId, string $url, int $createdAt): array { return []; }

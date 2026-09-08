@@ -34,7 +34,7 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
             : null;
     }
 
-    public function createStore(string $id, string $name, string $apiKey, string $walletPath): void
+    public function createStore(string $id, string $name, string $apiKey, string $walletPath, ?\BtcPayLite\ProvisionedWallet $receive = null): void
     {
         if ($this->failStoreCreation) {
             throw new RuntimeException('Simulated store persistence failure.');
@@ -47,7 +47,7 @@ final class AdminOperationsRepositoryFixture implements AdminOperationsRepositor
         return $userId === 7 ? $this->clientWallet : null;
     }
 
-    public function createClientStore(int $userId, string $id, string $name, string $apiKey, string $proposedWalletPath, int $createdAt): ?string
+    public function createClientStore(int $userId, string $id, string $name, string $apiKey, string $proposedWalletPath, int $createdAt, ?\BtcPayLite\ProvisionedWallet $receive = null): ?string
     {
         if ($userId !== 7) return null;
         $this->createdStore = compact('id', 'name', 'apiKey', 'proposedWalletPath', 'userId', 'createdAt');
@@ -81,12 +81,12 @@ final class AdminWalletProvisionerFixture implements StoreWalletProvisioner
 {
     public ?string $discarded = null;
 
-    public function provision(string $storeId): string
+    public function provision(string $storeId): \BtcPayLite\ProvisionedWallet
     {
-        return '/wallets/' . $storeId . '_wallet';
+        return new \BtcPayLite\ProvisionedWallet('/wallets/' . $storeId . '_wallet', 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8');
     }
 
-    public function discard(string $walletPath): void
+    public function discard(string $walletPath, ?\BtcPayLite\ProvisionedWallet $receive = null): void
     {
         $this->discarded = $walletPath;
     }

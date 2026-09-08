@@ -200,15 +200,16 @@ final class PdoClientDashboardRepository implements ClientDashboardRepository
         return $this->rows($statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath): void
+    public function createStore(int $userId, string $id, string $name, string $apiKey, string $walletPath, ?ProvisionedWallet $receive = null): void
     {
+        $metadata = StoreReceiveMetadata::forWallet($this->database->getPdo(), $walletPath, $receive);
         $statement = $this->database->getPdo()->prepare(
-            'INSERT INTO stores (id, name, api_key, wallet_path, user_id)
-             SELECT ?, ?, ?, wallet_path, user_id
+            'INSERT INTO stores (id, name, api_key, address_source, xpub, xpub_script_type, xpub_last_index, wallet_path, user_id)
+             SELECT ?, ?, ?, ?, ?, ?, ?, wallet_path, user_id
              FROM client_wallets
              WHERE user_id = ? AND wallet_path = ?'
         );
-        $statement->execute([$id, $name, $apiKey, $userId, $walletPath]);
+        $statement->execute([$id, $name, $apiKey, $metadata['address_source'], $metadata['xpub'], $metadata['xpub_script_type'], $metadata['xpub_last_index'], $userId, $walletPath]);
         if ($statement->rowCount() !== 1) {
             throw new RuntimeException('Store wallet ownership could not be verified.');
         }

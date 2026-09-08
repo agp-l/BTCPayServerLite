@@ -30,7 +30,7 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
         }
 
         try {
-            $stmt = $pdo->prepare('SELECT xpub_last_index FROM stores WHERE id = ? FOR UPDATE');
+            $stmt = $pdo->prepare('SELECT xpub, xpub_last_index FROM stores WHERE id = ? FOR UPDATE');
             $stmt->execute([$storeId]);
             $row = $stmt->fetch();
 
@@ -42,8 +42,25 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
                 );
             }
 
-            $currentIndex = (int) ($row['xpub_last_index'] ?? 0);
+            $identity = XpubDerivationIdentity::describe((string) $row['xpub']);
+            // Initialize once from every existing spelling of this XPUB. The pool
+            // row serializes different stores sharing a receive branch, without
+            // any Electrum lock or RPC. Never delete pool rows with a store.
+            $seed = $pdo->prepare('SELECT COALESCE(MAX(xpub_last_index), 0) FROM stores WHERE xpub IN (?, ?, ?, ?, ?, ?)');
+            $seed->execute($identity['aliases']);
+            $floor = max((int) $row['xpub_last_index'], (int) $seed->fetchColumn());
+            $pool = $pdo->prepare('INSERT INTO xpub_address_sequences (key_hash, next_index) VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE next_index = GREATEST(next_index, VALUES(next_index))');
+            $pool->execute([$identity['id'], $floor]);
+            $pool = $pdo->prepare('SELECT next_index FROM xpub_address_sequences WHERE key_hash = ? FOR UPDATE');
+            $pool->execute([$identity['id']]);
+            $currentIndex = (int) $pool->fetchColumn();
+            if ($currentIndex >= 2147483648) {
+                throw new AddressGenerationException('Non-hardened receive indices exhausted.', GeneratedAddress::SOURCE_XPUB, 422);
+            }
             $nextIndex = $currentIndex + 1;
+            $pool = $pdo->prepare('UPDATE xpub_address_sequences SET next_index = ? WHERE key_hash = ?');
+            $pool->execute([$nextIndex, $identity['id']]);
 
             $updateStmt = $pdo->prepare('UPDATE stores SET xpub_last_index = ? WHERE id = ?');
             $updateStmt->execute([$nextIndex, $storeId]);

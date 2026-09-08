@@ -51,12 +51,14 @@ final class AdminOperationsService
         ];
 
         try {
-            $store['wallet_path'] = $this->walletProvisioner->provision($store['id']);
+            $receive = $this->walletProvisioner->provision($store['id']);
+            $store = array_replace($store, $receive->columns());
             $this->repository->createStore(
                 $store['id'],
                 $store['name'],
                 $store['api_key'],
-                $store['wallet_path']
+                $store['wallet_path'],
+                $receive
             );
         } catch (Throwable $exception) {
             if ($store['wallet_path'] !== '') {
@@ -90,11 +92,13 @@ final class AdminOperationsService
             'wallet_path' => '',
         ];
         $provisionedWallet = null;
+        $receive = null;
 
         try {
             $knownWallet = $this->repository->fetchClientWallet($userId);
             if ($knownWallet === null) {
-                $provisionedWallet = $this->walletProvisioner->provision($store['id']);
+                $receive = $this->walletProvisioner->provision($store['id']);
+                $provisionedWallet = $receive->walletPath;
             }
             $createdAt = ($this->clock)();
             if (!is_int($createdAt) || $createdAt < 1) {
@@ -106,7 +110,8 @@ final class AdminOperationsService
                 $store['name'],
                 $store['api_key'],
                 $knownWallet ?? $provisionedWallet ?? '',
-                $createdAt
+                $createdAt,
+                $receive
             );
             if ($walletPath === null) {
                 throw new AdminOperationsException('Aktivní klient nebyl nalezen.', 404);
