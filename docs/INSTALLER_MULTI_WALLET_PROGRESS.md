@@ -232,3 +232,25 @@ Record test results and published commits here as work progresses.
   port and fail with startup diagnostics if readiness is not reached. This is a
   fixture correction; no production RPC retry or timeout behavior was changed.
 - Publish this fix before running it; then confirm CI and finish operations docs.
+
+## Receive coordination verified / resume here
+
+- Last source/test main: ab96acd. Final full CI PASSED:
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34179267951
+- Focused receive test on 0bc0e08 and corrected HTTP routing fixture PASSED locally.
+  Full preceding 58-file MariaDB suite passed; final CI includes all subsequent
+  guards/tests. PHP syntax: 228 files, zero errors.
+- Operational guide: docs/RECEIVE_COORDINATION.md. Migration 007 required on top
+  of 006. Fresh sql.sql and installer include both. No user DB/config modified.
+- Installed admin/stateless/Greenfield now share the receive sequence. Explicit
+  legacy Electrum stores on a managed wallet fail closed until repaired. No
+  source implementation work is uncommitted or awaiting its first verification.
+- CLI sync deliberately registers bounded ranges, without increasing gap limit;
+  registered does not mean blockchain synchronized. External daemon writers and
+  standalone integrations without shared DB remain outside application control.
+- Next substantive work, if requested: deployment smoke test against a disposable
+  real Electrum wallet, operational backlog measurements, and later separate payout
+  UTXO/broadcast recovery audit. Do not invent production credentials or operate
+  the user's live daemon without the actual configured environment.
+- Retain local Composer validation dependencies outside commits. Continue frequent
+  small source commits before tests and keep this checkpoint current.

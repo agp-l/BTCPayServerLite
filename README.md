@@ -416,10 +416,16 @@ Nová DB může vzniknout ze současného `sql.sql` nebo přes opravený instal�
 Pro staré obchody slouží explicitní `php repair_store_xpub.php --store=ID`;
 změna vyžaduje `--apply --maintenance` po pozastavení writerů dané wallet.
 
-[Audit, commity, testy a provozní omezení](docs/XPUB_FIRST_MULTI_WALLET_AUDIT.md)
-vysvětlují i synchronizaci Electrum receive rozsahu: lokální XPUB derivace sama
-neprodlužuje gap limit a nesmí sdílet větev s nezávislým generováním adres přes
-admin/stateless/externí Electrum writer bez další koordinace.
+[Audit XPUB provisioningu](docs/XPUB_FIRST_MULTI_WALLET_AUDIT.md) doplňuje novější
+[koordinace admin/stateless/Greenfield adres](docs/RECEIVE_COORDINATION.md).
+Instalovaná aplikace nyní sdílí rezervace i pro admin a stateless tvorbu.
+Před tímto upgradem aplikujte také
+[`migrations/007_wallet_receive_ranges.sql`](migrations/007_wallet_receive_ranges.sql).
+
+`php wallet_receive_sync.php` postupně zpřístupňuje rezervované adresy Electru
+v omezených dávkách mimo tvorbu faktur. Nespouští se přes HTTP. Podrobné nastavení,
+obnova a význam progressu jsou v dokumentaci koordinace. Přímé externí Electrum
+writery stále nesmějí nezávisle přidělovat adresy ze stejné větve.
 
 ## Databáze a migrace
 

@@ -192,3 +192,11 @@ validated public metadata offline once. See [the follow-up audit](XPUB_FIRST_MUL
 for corrected ownership, installation, repair, verification and receive-range
 synchronization limits. The per-store limitation above still applies to the
 legacy file index store, not the DB sequence.
+
+## Shared receive allocation and bounded synchronization
+
+See [receive coordination](RECEIVE_COORDINATION.md) for migration 007, the durable
+wallet binding, shared Greenfield/admin/stateless reservations, address-only v3
+tokens and CLI-only range registration. Provider status still never initializes
+the lazy receive database. External daemon writers must use the same allocator
+or a different receive branch. RPC registration does not imply completed SPV sync.

@@ -159,6 +159,12 @@ Nové testy byly commitované před spuštěním podle požadavku uživatele.
 
 ## Provozní hranice a návazná práce
 
+**Navazující aktualizace:** admin a instalovaná stateless tvorba jsou nyní připojené
+ke společné sekvenci. Přibyl dávkový CLI sync worker a migrace 007. Pro aktuální
+postup použijte [dokumentaci koordinace](RECEIVE_COORDINATION.md); následující popis
+nezapojeného admin/stateless toku zaznamenává stav před touto aktualizací.
+
+
 Testy používají skutečnou MariaDB a transport/procesy s deterministickými Electrum
 fixtures; nejsou důkazem nasazení proti konkrétnímu uživatelskému daemonu.
 Před použitím existující wallet ověřte její backup, script type a receive větev.
