@@ -314,3 +314,16 @@ Record test results and published commits here as work progresses.
   existing XPUB store binding, use --wallet with that store's actual wallet path.
 - Pending verification: final SQL preview change rerun plus CI. Automatic migration
   support is intentionally explicit 001–008; historic/backfill scripts are manual.
+
+## Latest verification and handoff
+
+- Final feature main: 6382a90. SQL preview/journal snapshot change PASSED the real
+  DatabaseUpgradeTest again (including actual HTTP POST and crash recovery).
+- Full CI on ff4759d PASSED:
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34205427429
+- Full CI for final 6382a90 was still running at this checkpoint:
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34205713847
+- No source implementation remains uncommitted. User deploys with git pull and
+  opens /BTCPayLite/database_upgrade.php after normal admin login. Their database
+  and Electrum daemon have not been accessed or changed by this session.
+- Local vendor changes are validation dependencies only; keep out of commits.
