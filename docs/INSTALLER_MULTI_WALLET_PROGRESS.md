@@ -221,3 +221,14 @@ Record test results and published commits here as work progresses.
   configuration; provider status must not initialize the lazy allocator/DB.
 - Run the focused receive test after publication, record final CI and lint, then
   publish migration 007/sync operations documentation. No external daemon writes.
+
+### CI fixture recovery checkpoint
+
+- Focused receive test on 0bc0e08 PASSED locally, including stale store rejection
+  and status with invalid DB config. Syntax: 228 PHP files, zero errors.
+- CI 34179064772 stopped in the existing MultiWalletRoutingTest before its first
+  RPC because its HTTP fixture never started listening. The test guessed a port
+  in the ephemeral range and did not assert readiness. Reserve a free OS-selected
+  port and fail with startup diagnostics if readiness is not reached. This is a
+  fixture correction; no production RPC retry or timeout behavior was changed.
+- Publish this fix before running it; then confirm CI and finish operations docs.

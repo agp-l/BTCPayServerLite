@@ -4,7 +4,13 @@ declare(strict_types=1);
 require __DIR__ . '/support/CoreTestSupport.php';
 use BtcPayLite\{BtcDashboard, ElectrumRPC, ElectrumRPCException, ElectrumWallet, WalletBalanceError, WalletLockManager};
 
-$dir=coreDirectory();$port=random_int(20000,50000);
+$dir=coreDirectory();
+// Ask the OS for a free port; a guessed ephemeral port can collide with prior
+// MariaDB stress-test connections and prevent the fixture from starting.
+$reservation=stream_socket_server('tcp://127.0.0.1:0',$errno,$error);
+coreCheck(is_resource($reservation),'Could not reserve a test port');
+$port=(int)substr(strrchr(stream_socket_get_name($reservation,false),':'),1);
+fclose($reservation);
 file_put_contents($dir.'/wallets.json',json_encode(['/wallets/wallet_1','/wallets/wallet_3']));
 file_put_contents($dir.'/router.php', <<<'ROUTER'
 <?php
@@ -31,10 +37,12 @@ $server=proc_open([PHP_BINARY,'-S','127.0.0.1:'.$port,$dir.'/router.php'],
     [0=>['pipe','r'],1=>['file',$dir.'/server.log','a'],2=>['file',$dir.'/server.log','a']],$pipes,$dir);
 coreCheck(is_resource($server),'Could not start RPC transport fixture');
 try {
-    for($i=0;$i<100;++$i) {
+    $ready=false;
+    for($i=0;$i<250;++$i) {
         $socket=@fsockopen('127.0.0.1',$port,$errno,$error,.1);
-        if($socket!==false) { fclose($socket);break; } usleep(20000);
+        if($socket!==false) { fclose($socket);$ready=true;break; } usleep(20000);
     }
+    coreCheck($ready, 'RPC fixture did not start: '.file_get_contents($dir.'/server.log'));
     $rpc=new ElectrumRPC('127.0.0.1',$port,null,null,2,1);
     $wallet=new ElectrumWallet($rpc);
     try { $rpc->callWallet('list_wallets','/wallets/wallet_1');throw new LogicException('Daemon command accepted wallet context'); }
