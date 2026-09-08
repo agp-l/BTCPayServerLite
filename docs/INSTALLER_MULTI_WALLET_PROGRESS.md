@@ -174,3 +174,23 @@ Record test results and published commits here as work progresses.
 - No tests run for this checkpoint yet. Next: bounded CLI range synchronization,
   mixed admin/stateless/Greenfield concurrency tests, old token compatibility,
   restart/crash recovery and updated operational documentation.
+
+### Receive sync source checkpoint (before tests)
+
+- Shared allocation published as a09f6fe. Added WalletReceiveSyncWorker and CLI-only
+  wallet_receive_sync.php. Default 2 wallets / 25 new addresses / 10-second loop
+  budget each; one in-flight RPC remains bounded by the configured timeout.
+- Reads actual MPK/script/first+last receive addresses before extending a range.
+  Uses explicit createnewaddress under the existing per-wallet lock; no gap-limit
+  mutation, close_wallet, signing, invoice status change or DB transaction during RPC.
+- Progress is a scheduling hint only. After crash/timeout/restart the next run
+  re-reads the daemon; an uncertain mutating RPC is never immediately retried.
+- Handles daemon-side auto extension by read-only reconciliation. Concurrent sync
+  workers use the same non-blocking wallet lock; other wallets stay independent.
+- Admin no longer recommends a zero-balance address as if it were unreserved;
+  the existing new-address action returns the actual reserved public address.
+- Repair now establishes the durable receive binding in its DB transaction.
+- Next: mixed three-path concurrency and bounded-sync recovery tests, full suite,
+  source audit and deployment instructions. External CLI users still must respect
+  the application's receive allocator; no application can intercept arbitrary
+  authenticated daemon commands issued outside its process ecosystem.

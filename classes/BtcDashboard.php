@@ -144,7 +144,8 @@ final class BtcDashboard
                 ($right['balance_sats'] <=> $left['balance_sats']) ?: strcmp($left['address'], $right['address'])
         );
 
-        return ['items' => $items, 'recommended_receive' => $recommended];
+        // Installed wallets require an explicit reservation; balance cannot identify an unused invoice address.
+        return ['items' => $items, 'recommended_receive' => $this->addressAllocator === null ? $recommended : null];
     }
 
     /**
