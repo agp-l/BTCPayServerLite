@@ -269,3 +269,16 @@ Record test results and published commits here as work progresses.
 - Source checkpoint is published before tests. Next reproduce missing migration,
   partial schema and healthy --check-db through actual PHP CLI against MariaDB;
   verify unknown SQL errors do not expose sensitive exception messages.
+
+## Receive SQL diagnostics verification
+
+- Source published on main as ecdb1fb, tests separately as e23cf1a before execution.
+- User confirmed SQL was not upgraded; missing migrations are a likely cause,
+  not a verified observation of their localhost database.
+- ReceiveSyncDiagnosticsTest and ReceiveCoordinationTest PASSED on isolated
+  MariaDB: missing 006/007 reproduced; importing those exact migrations restores
+  the actual CLI check; no RPC configuration or DB writes needed; partial table
+  columns detected; wrapped SQLSTATE/driver codes retained without raw secrets.
+- Existing mixed 60-process allocation and bounded sync recovery tests also passed.
+- docs/RECEIVE_COORDINATION.md now gives phpMyAdmin upgrade/check-db steps and
+  explains config-selected DB and PHP CLI/XAMPP differences. No user DB changed.

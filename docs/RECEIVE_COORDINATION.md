@@ -59,6 +59,35 @@ Pokud začínáte ze staršího main, je potřeba nejprve i migrace 006 a předc
 migrace odpovídající vašemu schématu. Nepřepisujte používanou DB celým `sql.sql`.
 Nová databáze může vzniknout z aktuálního `sql.sql` nebo přes instalátor.
 
+### Chyba `Receive synchronization failed: PDOException`
+
+Starší verze vypisovala pouze název výjimky. Chybějící migrace 006/007 mohou tuto
+chybu způsobit, ale samotné hlášení nepotvrzuje konkrétní příčinu. Aktualizujte kód
+a spusťte kontrolu bez Electrum RPC a bez zápisů do DB:
+
+```sh
+git pull --ff-only
+php wallet_receive_sync.php --check-db
+```
+
+Výstup obsahuje skutečnou databázi vybranou v `config.php`, chybějící tabulky či
+sloupce a potřebné soubory migrací. V phpMyAdmin vyberte **tuto databázi**, udělejte
+export zálohy a na kartě Import postupně importujte vypsané soubory. Pro instalaci
+před receive koordinátorem jde o
+[`006_shared_xpub_address_sequences.sql`](../migrations/006_shared_xpub_address_sequences.sql)
+a [`007_wallet_receive_ranges.sql`](../migrations/007_wallet_receive_ranges.sql).
+Potom zopakujte `--check-db` a při `ok: true` spusťte běžný worker. Tato kontrola
+ověřuje DB, nikoli dostupnost daemonu.
+
+Existující neúplná tabulka vyžaduje opravu chybějících sloupců; opakované
+`CREATE TABLE IF NOT EXISTS` je nepřidá. Nepoužívejte celý `sql.sql` jako univerzální
+upgrade používané databáze. Při jiném selhání hlášení zachová SQLSTATE a číselný
+driver code bez zveřejnění SQL hodnot či hesel.
+
+Položky `php_binary` a `php_ini` ukazují skutečné CLI prostředí. Pokud používáte
+XAMPP, lze kontrolu spustit jeho PHP přes
+`/opt/lampp/bin/php wallet_receive_sync.php --check-db` a porovnat výsledek.
+
 Po nasazení lze spouštět CLI worker například pravidelným serverovým cronem:
 
 ```sh
