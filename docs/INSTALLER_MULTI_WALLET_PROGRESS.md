@@ -355,3 +355,17 @@ Record test results and published commits here as work progresses.
   their precise local cause is established without that diagnostic output.
 - docs/STORE_CREATION_TROUBLESHOOTING.md records XAMPP/system PHP distinction and
   operational repair paths. No dependency upgrade or wallet encryption change.
+
+## Final store-runtime checkpoint
+
+- Main source/test revision: 11ef131. Full local suite PASSED: 61 files, 0 failures.
+- CI initially caught a brittle English timeout-message assertion in
+  ClientUiBoundaryTest. It now checks the stable electrum_create_timeout category
+  and proc_terminate; no production timeout protection was removed.
+- Final CI run: https://github.com/agp-l/BTCPayServerLite/actions/runs/34267097755
+  (still running when this checkpoint was written).
+- All source changes are published. Only local validation vendor dependencies stay
+  uncommitted. No private user config is tracked by this work.
+- Deployment next step: git pull --ff-only; composer install --no-dev --prefer-dist;
+  inspect the web-runtime section of database_upgrade.php, then retry creation.
+  Exact root cause on user's XAMPP still requires their new diagnostic result.
