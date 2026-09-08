@@ -37,7 +37,9 @@ final class DatabaseMigrationManager
         }
         $migrations = [];
         foreach (glob($this->root.'/migrations/*.sql') ?: [] as $path) {
-            $file=basename($path); $checksum=hash_file('sha256',$path);
+            $file=basename($path); $sql=file_get_contents($path);
+            if (!is_string($sql)) { throw new RuntimeException('Soubor migrace nelze přečíst.'); }
+            $checksum=hash('sha256',$sql);
             $state='Manual'; $reason='Historická migrace nebo preflight mimo automatický katalog. Postupujte podle komentářů souboru.';
             if (isset(self::CATALOG[$file])) {
                 [$effects,$requirements]=self::CATALOG[$file];
@@ -57,7 +59,7 @@ final class DatabaseMigrationManager
                 elseif ($state === 'Present') { $state='Applied'; $reason='Provedení všech kroků zaznamenal tento nástroj.'; }
                 else { $state='Blocked'; $reason='Historie hlásí dokončení, ale strukturální znaky nyní chybí.'; }
             }
-            $migrations[]=['file'=>$file,'checksum'=>$checksum,'state'=>$state,'reason'=>$reason];
+            $migrations[]=['file'=>$file,'checksum'=>$checksum,'state'=>$state,'reason'=>$reason,'sql'=>$sql];
         }
         $report=['schema'=>$schema,'migrations'=>$migrations];
         $report['plan_hash']=hash('sha256',json_encode($report,JSON_THROW_ON_ERROR));
@@ -79,7 +81,9 @@ final class DatabaseMigrationManager
             if (($entry['state'] ?? null)!=='Pending') { throw new RuntimeException('Tuto migraci nyní nelze bezpečně spustit.'); }
             // DDL implicitly commits. A durable Running record survives crashes and prevents blind replay.
             if (!$this->exists('schema_migrations')) {
-                $this->pdo->exec((string)file_get_contents($this->root.'/migrations/008_schema_migrations.sql'));
+                $journal=array_values(array_filter($report['migrations'],static fn(array $row): bool=>$row['file']==='008_schema_migrations.sql'))[0] ?? null;
+                if ($journal===null) { throw new RuntimeException('Chybí migrace historie.'); }
+                $this->pdo->exec($journal['sql']);
             }
             $stmt=$this->pdo->prepare("INSERT INTO schema_migrations (migration,checksum,state,started_at,admin_id) VALUES (?,?,'Running',?,?)");
             $stmt->execute([$file,$entry['checksum'],time(),$adminId]);

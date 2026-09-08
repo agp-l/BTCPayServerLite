@@ -299,3 +299,18 @@ Record test results and published commits here as work progresses.
   explicit collations; not defaults/FK/CHECK/data backfill proof. No live DB touched.
 - NEXT: publish source before tests; verify HTTP authorization/CSRF and real MariaDB
   fresh/006+007 missing/partial upgrade/replay/stale plan/failure cases.
+
+## Database upgrade verification checkpoint
+
+- Source main 71813f1, initial tests/idle explanation ff4759d; committed before
+  verification. Actual MariaDB tests PASSED: fresh compare, 006/007 import, journal,
+  lock contention, stale plan, repeated POST, partial schema, collation mismatch,
+  interrupted/failed DDL, checksums, HTTP admin/CSRF/revoked account boundary.
+- InstallerIntegrationTest and ReceiveSyncDiagnosticsTest also PASSED with the
+  new 16-table fresh schema. Source still contains no user config or secrets.
+- Added actual escaped SQL preview and execution of the journal DDL from the
+  already reviewed plan snapshot. docs/DATABASE_UPGRADE.md covers scope and recovery.
+- CLI now explains no_registered_wallets versus no_wallets_due. To initialize an
+  existing XPUB store binding, use --wallet with that store's actual wallet path.
+- Pending verification: final SQL preview change rerun plus CI. Automatic migration
+  support is intentionally explicit 001–008; historic/backfill scripts are manual.

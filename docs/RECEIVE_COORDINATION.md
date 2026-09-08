@@ -174,3 +174,24 @@ Implementace vychází z [Electrum commands.py](https://github.com/spesmilo/elec
 Testy používají skutečnou DB a deterministické Electrum fixtures, nikoli uživatelův
 živý daemon. Odesílání pro budoucí směnárnu nadále vyžaduje samostatný audit
 rezervace UTXO, broadcast recovery a účetnictví.
+
+## Prázdný výsledek synchronizace
+
+`wallets: []` není seznam peněženek daemonu. Worker vybírá pouze řádky registru
+`wallet_receive_ranges`, které mají nedoplněný receive rozsah nebo poslední kontrolu
+starší než pět minut. CLI nyní doplní `idle_reason` a `registered_wallets`:
+
+- `no_registered_wallets`: registr je prázdný. Pro existující XPUB store spusťte
+  `php wallet_receive_sync.php --wallet=/skutecna/cesta/k/wallet`.
+  Cesta musí odpovídat danému store. Tím lze vytvořit jeho binding a ihned ověřit
+  receive rozsah; nevzniká nová faktura ani adresní rezervace.
+- `no_wallets_due`: registrované wallets nyní nepotřebují práci; opakovaná kontrola
+  je splatná po pěti minutách. Konkrétní `--wallet` ji může vyžádat ihned.
+
+Legacy Electrum store bez XPUB vyžaduje nejprve explicitní repair postup; worker
+jej sám nepřepíná ani neprochází všechny soubory v adresáři daemonu. Správné DB
+schéma samo o sobě registry nenaplní.
+
+Pro budoucí kontrolu a provádění podporovaných migrací použijte administrační
+[database_upgrade.php](DATABASE_UPGRADE.md). Běžný `--check-db` kontroluje jen
+DB předpoklady receive workeru; migrační stránka porovnává širší schéma aplikace.

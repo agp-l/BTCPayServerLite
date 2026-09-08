@@ -60,7 +60,7 @@ $csrf=AuthManager::csrfToken();
 <label><input type="checkbox" name="maintenance" value="1" required> Zastavil jsem zápisy aplikace a workery.</label>
 <div class="scroll"><table><tr><th>Soubor</th><th>Stav</th><th>Postup</th></tr>
 <?php $labels=['Pending'=>'Čeká','Present'=>'Struktura přítomna','Applied'=>'Provedeno nástrojem','Blocked'=>'Vyžaduje kontrolu','Manual'=>'Ruční postup']; foreach ($report['migrations'] as $migration): ?>
-<tr><td><code><?= $html($migration['file']) ?></code></td><td><?= $html($labels[$migration['state']]) ?></td><td><?= $html($migration['reason']) ?>
+<tr><td><code><?= $html($migration['file']) ?></code><details><summary>Zobrazit SQL</summary><pre><?= $html($migration['sql']) ?></pre></details></td><td><?= $html($labels[$migration['state']]) ?></td><td><?= $html($migration['reason']) ?>
 <?php if ($migration['state']==='Pending'): ?><p><button name="migration" value="<?= $html($migration['file']) ?>">Spustit tuto migraci</button></p><?php endif ?></td></tr>
 <?php endforeach ?></table></div></form>
 <p>Automatický katalog zahrnuje migrace 001–008. Starší datové migrace a neznámé nové soubory vyžadují vlastní postup; nástroj je nespouští podle názvu. Rozdíly nemaže ani neopravuje odhadnutými ALTER příkazy.</p>
