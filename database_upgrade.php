@@ -32,6 +32,7 @@ try {
         $notice='Migrace dokončena. Níže je nová kontrola schématu.';
     }
     $report=$manager->inspect();
+    $storeEnvironment=\BtcPayLite\StoreCreationDiagnostics::environment($config);
 } catch (Throwable $exception) {
     http_response_code(400);
     if ($exception instanceof PDOException || $exception instanceof \BtcPayLite\DatabaseException) {
@@ -51,6 +52,13 @@ $csrf=AuthManager::csrfToken();
 <?php if ($report!==null): $schema=$report['schema']; ?>
 <p>Databáze: <strong><?= $html($schema['database']) ?></strong>. <?= $schema['ok'] ? 'Kontrolované části odpovídají sql.sql.' : 'Byly nalezeny rozdíly vůči sql.sql.' ?></p>
 <p><small><?= $html($schema['scope']) ?> Dodatečné tabulky zůstávají beze změny.</small></p>
+<?php if (isset($storeEnvironment)): ?>
+<h2>Prostředí pro vytváření obchodů</h2>
+<p>PHP <?= $html($storeEnvironment['php_version']) ?> (<?= $html($storeEnvironment['php_sapi']) ?>), uživatel procesu: <strong><?= $html($storeEnvironment['process_user']) ?></strong>.<br>Načtené php.ini: <code><?= $html($storeEnvironment['php_ini']) ?></code></p>
+<p>Kontrola se provádí přímo v PHP webového serveru. Nevytváří peněženku ani nespouští Electrum. Dostupnost jeho Python závislostí ověří až samotné spuštění.</p>
+<div class="scroll"><table><tr><th>Požadavek</th><th>Stav</th><th>Podrobnosti</th></tr>
+<?php foreach ($storeEnvironment['checks'] as $check): ?><tr><td><?= $html($check['name']) ?></td><td><?= $check['ok'] ? 'OK' : 'Vyžaduje opravu' ?></td><td><?= $html($check['detail']) ?></td></tr><?php endforeach ?></table></div>
+<?php endif ?>
 <?php if ($schema['differences']!==[]): ?><div class="scroll"><table><tr><th>Tabulka / prvek</th><th>Rozdíl</th><th>Očekáváno</th><th>Nalezeno</th></tr>
 <?php foreach ($schema['differences'] as $diff): ?><tr><td><?= $html($diff['table'].'.'.$diff['name']) ?></td><td><?= $html($diff['kind']) ?></td><td><?= $html($diff['expected']) ?></td><td><?= $html($diff['actual']) ?></td></tr><?php endforeach ?></table></div><?php endif ?>
 <?php if ($schema['extra_tables']!==[]): ?><p>Dodatečné tabulky: <?= $html(implode(', ',$schema['extra_tables'])) ?></p><?php endif ?>
