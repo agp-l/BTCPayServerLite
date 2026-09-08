@@ -22,12 +22,14 @@ final class BtcDashboard
     private string $walletsDirectory;
     private BitcoinMarketDataProvider $marketData;
     private ?string $walletPath;
+    private ?\Closure $addressAllocator;
 
     public function __construct(
         ElectrumWallet $wallet,
         string $walletsDirectory,
         ?BitcoinMarketDataProvider $marketData = null,
-        ?string $walletPath = null
+        ?string $walletPath = null,
+        ?callable $addressAllocator = null
     ) {
         $walletsDirectory = rtrim(trim($walletsDirectory), DIRECTORY_SEPARATOR);
         if ($walletsDirectory === '' || str_contains($walletsDirectory, "\0")) {
@@ -35,6 +37,7 @@ final class BtcDashboard
         }
 
         $this->wallet = $wallet;
+        $this->addressAllocator = $addressAllocator === null ? null : \Closure::fromCallable($addressAllocator);
         $this->walletPath = $walletPath === null ? null : WalletLockManager::canonicalWalletPath($walletPath);
         $this->walletsDirectory = $walletsDirectory;
         $this->marketData = $marketData ?? new HttpBitcoinMarketDataProvider();
@@ -233,6 +236,10 @@ final class BtcDashboard
 
     public function newAddress(): string
     {
+        if ($this->walletPath !== null && $this->addressAllocator !== null) {
+            $address = ($this->addressAllocator)($this->walletPath);
+            if ($address !== null) { return $address->getAddress(); }
+        }
         if ($this->walletPath === null) { return $this->wallet->getNewAddress(); }
         return (new ElectrumAddressGenerator($this->wallet))->generateAddress(
             new AddressGenerationContext('admin', $this->walletPath)

@@ -157,3 +157,20 @@ Record test results and published commits here as work progresses.
   address writers must not independently allocate from the same XPUB receive
   branch. See audit limits before a future sync/address-range coordination pass.
 - Keep frequent small commits BEFORE tests and record validation afterwards.
+
+## 2026-09-08 receive coordination follow-up (source checkpoint before tests)
+
+- Baseline 2915df0; local vendor validation files retained and excluded from commits.
+- Verified upstream: add_request chooses wallet.get_unused_address(), independent
+  of local XPUB reservations. Native RPC cannot attach add_request to an arbitrary
+  supplied address. Keep walletless status; use address-only token v3 instead.
+- Added migration 007_wallet_receive_ranges.sql (also fresh sql.sql): durable
+  wallet-path/public-key binding survives store deletion and supports sync progress.
+- Unified wallet-authorized admin/stateless allocation with the existing shared
+  DB sequence. Installed stateless factory opens DB lazily on creation only;
+  provider status and standalone mode retain their previous dependency boundaries.
+- Explicit Electrum stores sharing an XPUB-managed wallet now fail with a repair
+  instruction rather than letting two independent generators reuse a receive branch.
+- No tests run for this checkpoint yet. Next: bounded CLI range synchronization,
+  mixed admin/stateless/Greenfield concurrency tests, old token compatibility,
+  restart/crash recovery and updated operational documentation.

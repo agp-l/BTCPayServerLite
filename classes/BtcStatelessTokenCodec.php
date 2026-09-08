@@ -150,7 +150,7 @@ final class BtcStatelessTokenCodec
 
         $version = 1;
         if (array_key_exists('ver', $payload)) {
-            if (!is_int($payload['ver']) || !in_array($payload['ver'], [1, 2], true)) {
+            if (!is_int($payload['ver']) || !in_array($payload['ver'], [1, 2, 3], true)) {
                 throw $this->invalidToken('Unsupported invoice token version.');
             }
             $version = $payload['ver'];
@@ -159,7 +159,7 @@ final class BtcStatelessTokenCodec
         $requestId = null;
         if (array_key_exists('r', $payload)) {
             $requestId = $this->requireString($payload['r'], 'request ID', 128);
-        } elseif ($version >= 2) {
+        } elseif ($version === 2) {
             throw $this->invalidToken('Invoice token is missing its payment request ID.');
         }
 

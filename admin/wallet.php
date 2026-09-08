@@ -62,6 +62,7 @@ $feeLow = 1;
 $feeMed = 1;
 $feeHigh = 1;
 $mpk = '';
+$newReceiveAddress = null;
 
 $rpc = \BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 $wallet = new ElectrumWallet($rpc);
@@ -99,7 +100,7 @@ try {
     }
 
     $wallet->loadWallet($activeWalletPath);
-    $dashboard = new BtcDashboard($wallet, $walletDirectory, new HttpBitcoinMarketDataProvider(), $activeWalletPath);
+    $dashboard = new BtcDashboard($wallet, $walletDirectory, new HttpBitcoinMarketDataProvider(), $activeWalletPath, \BtcPayLite\WalletReceiveCoordinator::allocatorFromConfig($config));
     $connStatus = 'Online';
     $fiatText = 'Připojeno k peněžence ' . $currentWalletName;
 
@@ -108,7 +109,7 @@ try {
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
         if ($action === 'new_address') {
-            $dashboard->newAddress();
+            $newReceiveAddress = $dashboard->newAddress();
             $toastMsg = 'Nová přijímací adresa byla vytvořena.';
         } elseif ($action === 'export_keys') {
             $password = is_string($_POST['export_password'] ?? null)
@@ -164,7 +165,7 @@ try {
     $transactions = $dashboard->transactions();
     $market = $dashboard->marketSnapshot('CZK');
 
-    $receiveAddress = $addresses['recommended_receive'] ?? 'Vytvořte novou přijímací adresu';
+    $receiveAddress = $newReceiveAddress ?? $addresses['recommended_receive'] ?? 'Vytvořte novou přijímací adresu';
     $fees = $market['fees'];
     $feeLow = $fees['economy'];
     $feeMed = $fees['standard'];

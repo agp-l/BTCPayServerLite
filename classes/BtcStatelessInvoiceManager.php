@@ -30,15 +30,18 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     private Closure $clock;
     private ?BlockchainProviderInterface $blockchainProvider;
     private WalletLockManager $lockManager;
+    private ?Closure $addressAllocator;
 
     public function __construct(
         ElectrumWallet $wallet,
         string $secretKey,
         ?callable $clock = null,
         ?BlockchainProviderInterface $blockchainProvider = null,
-        ?WalletLockManager $lockManager = null
+        ?WalletLockManager $lockManager = null,
+        ?callable $addressAllocator = null
     ) {
         $this->wallet = $wallet;
+        $this->addressAllocator = $addressAllocator === null ? null : Closure::fromCallable($addressAllocator);
         $this->tokenCodec = new BtcStatelessTokenCodec($secretKey);
         $this->clock = $clock === null
             ? static fn (): int => time()
@@ -70,12 +73,20 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         // Validate caller data before creating a mutable Electrum request.
         $this->encodeJson($customData, 'custom invoice data', self::MAX_CUSTOM_DATA_BYTES);
 
-        $request = $this->reservePaymentRequest($amount, $description, $expirationSeconds, $walletPath);
+        $generated = null;
+        if ($this->addressAllocator !== null && $walletPath !== null) {
+            if ($this->blockchainProvider === null) {
+                throw new InvalidArgumentException('Coordinated stateless addresses require a walletless BlockchainProvider.');
+            }
+            $generated = ($this->addressAllocator)($walletPath);
+        }
+        $request = $generated === null
+            ? $this->reservePaymentRequest($amount, $description, $expirationSeconds, $walletPath)
+            : ['address' => $generated->getAddress()];
         $now = ($this->clock)();
         $payload = [
-            'ver' => 2,
+            'ver' => $generated === null ? 2 : 3,
             'a' => $request['address'],
-            'r' => $request['request_id'],
             'v' => $amount->toBtcString(),
             'd' => $description,
             'p' => $customData,
@@ -83,10 +94,11 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             'e' => $now + $expirationSeconds,
         ];
 
+        if (isset($request['request_id'])) { $payload['r'] = $request['request_id']; }
         try {
             $token = $this->tokenCodec->encode($payload);
         } catch (Throwable $exception) {
-            $this->removePaymentRequestQuietly($request['request_id'], $walletPath);
+            if (isset($request['request_id'])) { $this->removePaymentRequestQuietly($request['request_id'], $walletPath); }
             throw $exception;
         }
 
@@ -108,6 +120,9 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
     public function checkStatelessPaymentStatus(string $token, ?string $walletPath = null): array
     {
         $invoice = $this->decodeStatelessToken($token);
+        if (($invoice['ver'] ?? 1) === 3 && $this->blockchainProvider === null) {
+            throw new InvalidArgumentException('Address-only tokens require a walletless BlockchainProvider.');
+        }
         $expected = $this->requirePositiveAmount((string) $invoice['v']);
         $now = ($this->clock)();
         $isExpired = $now >= (int) $invoice['e'];

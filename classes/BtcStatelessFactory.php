@@ -10,7 +10,8 @@ use RuntimeException;
 /**
  * Small dependency factory for the standalone stateless-invoice subsystem.
  *
- * It intentionally creates no Database connection and can therefore be used
+ * Status creates no Database connection. Creation can use an injected lazy
+ * shared receive allocator in installed mode; standalone mode can still be used
  * by a minimal integration that only ships the Electrum and stateless classes.
  */
 final class BtcStatelessFactory
@@ -63,7 +64,9 @@ final class BtcStatelessFactory
                 $this->wallet(),
                 $this->requiredString('secret_key'),
                 null,
-                $this->blockchainProvider()
+                $this->blockchainProvider(),
+                null,
+                WalletReceiveCoordinator::allocatorFromConfig($this->config)
             );
         }
 

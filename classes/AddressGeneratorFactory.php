@@ -67,6 +67,9 @@ class AddressGeneratorFactory
         }
 
         if ($source === GeneratedAddress::SOURCE_ELECTRUM) {
+            if ($this->database !== null && !empty($store['wallet_path'])) {
+                (new WalletReceiveCoordinator($this->database))->assertLegacyGenerationAllowed((string) $store['wallet_path']);
+            }
             return new ElectrumAddressGenerator($this->requireWallet(), $this->lockManager);
         }
 
