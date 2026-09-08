@@ -18,7 +18,7 @@ $checks = [
     ) && !str_contains($source, 'FROM stores ORDER BY id LIMIT 1'),
     'uses parameterized store inserts' => str_contains(
         $source,
-        'VALUES (?, ?, ?, ?, NULL)'
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)'
     ),
     'locks idempotent webhook lookup' => str_contains(
         $source,

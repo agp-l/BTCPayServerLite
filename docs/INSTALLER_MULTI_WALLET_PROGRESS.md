@@ -107,3 +107,17 @@ Record test results and published commits here as work progresses.
 - Tests pending at this checkpoint. Next: explicit existing-wallet repair command,
   actual CLI/public export fixture, no-lock load tests, shared-XPUB concurrency,
   adapt existing high-water assertions and installer table count to new schema.
+
+### Repair checkpoint (before validation)
+
+- XPUB provisioning/sequence checkpoint published as 0893a5c.
+- Added CLI-only repair_store_xpub.php: one explicit store; default inspect/plan,
+  --apply --maintenance after pausing writers for that wallet. Reads outside DB
+  transaction; compares current store, preserves high water, never overwrites a
+  different public key and never silently falls back after an RPC error.
+- Verify first and last Electrum receiving addresses against local derivation
+  before accepting an exported XPUB, both during new provisioning and repair.
+- Installer parser now recognizes IF NOT EXISTS sequence DDL; table-count tests
+  derive expected count from schema. Existing shared-key tests expect global
+  high-water indices instead of independent per-store restarts.
+- Sequence initialization scans historical stores only when a pool is absent.

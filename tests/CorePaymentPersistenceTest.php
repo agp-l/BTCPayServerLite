@@ -95,7 +95,7 @@ try {
     foreach ($responses as $response) { coreSame($responses[0], $response, 'Idempotent response changed'); }
     $pdo = coreDatabase()->getPdo();
     coreSame(1, (int) $pdo->query("SELECT COUNT(*) FROM invoices WHERE store_id='idem'")->fetchColumn(), 'Duplicate idempotent invoice');
-    coreSame(1, (int) $pdo->query("SELECT xpub_last_index FROM stores WHERE id='idem'")->fetchColumn(), 'Duplicate idempotent index');
+    coreSame(101, (int) $pdo->query("SELECT xpub_last_index FROM stores WHERE id='idem'")->fetchColumn(), 'Duplicate idempotent index');
     $saved = $pdo->query("SELECT * FROM api_idempotency_keys WHERE store_id='idem'")->fetch();
     coreSame('Completed', $saved['state'], 'Explicit completed state');
     coreSame($responses[0]['body']['id'], $saved['resource_id'], 'Resource ID not persisted');
@@ -115,7 +115,7 @@ try {
     $pdo->exec('DROP TRIGGER fail_response');
     $retry = coreApi()->createInvoiceWithIdempotency('recover', ['amount' => '0.00000002'], 'recover-key', 'recover-key');
     coreSame($claim['resource_id'], $retry['body']['id'], 'Retry allocated another invoice ID');
-    coreSame(1, (int) $pdo->query("SELECT xpub_last_index FROM stores WHERE id='recover'")->fetchColumn(), 'Retry allocated another address/index');
+    coreSame(102, (int) $pdo->query("SELECT xpub_last_index FROM stores WHERE id='recover'")->fetchColumn(), 'Retry allocated another address/index');
     echo "[PASS] Response-write failure rolls back invoice and retries the same durable address/index\n";
 
     // Isolate monitoring cases from address-creation stress invoices.

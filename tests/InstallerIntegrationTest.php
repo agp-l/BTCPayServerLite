@@ -57,7 +57,7 @@ try {
     $pdo->exec('ALTER TABLE invoices DROP COLUMN payment_observed_at');
     try { (new InstallationManager($root))->install($input($name)); throw new RuntimeException('Outdated schema accepted'); }
     catch (InstallerException $e) { coreCheck(str_contains($e->getMessage(),'Struktura'),'Wrong schema failure'); }
-    coreSame(13,count($pdo->query('SHOW TABLES')->fetchAll()),'Installer dropped imported schema');
+    coreSame(count((new InstallationSchema($root.'/sql.sql'))->tableNames()),count($pdo->query('SHOW TABLES')->fetchAll()),'Installer dropped imported schema');
     coreSame(0,(int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),'Invalid schema created admin');
     echo "[PASS] Outdated imported schema rejected without deletion\n";
 

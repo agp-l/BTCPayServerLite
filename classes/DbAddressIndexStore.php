@@ -46,9 +46,14 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
             // Initialize once from every existing spelling of this XPUB. The pool
             // row serializes different stores sharing a receive branch, without
             // any Electrum lock or RPC. Never delete pool rows with a store.
-            $seed = $pdo->prepare('SELECT COALESCE(MAX(xpub_last_index), 0) FROM stores WHERE xpub IN (?, ?, ?, ?, ?, ?)');
-            $seed->execute($identity['aliases']);
-            $floor = max((int) $row['xpub_last_index'], (int) $seed->fetchColumn());
+            $known = $pdo->prepare('SELECT next_index FROM xpub_address_sequences WHERE key_hash = ?');
+            $known->execute([$identity['id']]);
+            $floor = (int) $row['xpub_last_index'];
+            if ($known->fetchColumn() === false) {
+                $seed = $pdo->prepare('SELECT COALESCE(MAX(xpub_last_index), 0) FROM stores WHERE xpub IN (?, ?, ?, ?, ?, ?)');
+                $seed->execute($identity['aliases']);
+                $floor = max($floor, (int) $seed->fetchColumn());
+            }
             $pool = $pdo->prepare('INSERT INTO xpub_address_sequences (key_hash, next_index) VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE next_index = GREATEST(next_index, VALUES(next_index))');
             $pool->execute([$identity['id'], $floor]);

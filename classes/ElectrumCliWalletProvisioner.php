@@ -149,7 +149,9 @@ final class ElectrumCliWalletProvisioner implements StoreWalletProvisioner
             if (!is_string($publicKey) || !is_array($addresses) || array_values($addresses) !== $addresses) {
                 throw new ElectrumWalletException('Invalid public wallet provisioning response.', 'getmpk');
             }
-            return new ProvisionedWallet($resolvedWallet, $publicKey, count($addresses));
+            $receive = new ProvisionedWallet($resolvedWallet, $publicKey, count($addresses));
+            WalletXpubReader::verifyAddresses($receive, $addresses);
+            return $receive;
         } catch (\Throwable $exception) {
             // The fresh wallet has never been loaded by this provisioner.
             $this->discard($resolvedWallet);

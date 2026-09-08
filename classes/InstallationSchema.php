@@ -20,7 +20,7 @@ final class InstallationSchema
         }
         $this->statements = InstallationManager::splitSqlStatements($sql);
         foreach ($this->statements as $statement) {
-            if (!preg_match('/\ACREATE TABLE\s+`?([a-z_]+)`?\s*\((.*)\)\s*ENGINE=InnoDB\b/is', $statement, $match)) {
+            if (!preg_match('/\ACREATE TABLE\s+(?:IF NOT EXISTS\s+)?`?([a-z_]+)`?\s*\((.*)\)\s*ENGINE=InnoDB\b/is', $statement, $match)) {
                 continue;
             }
             $columns = []; $indexes = [];
