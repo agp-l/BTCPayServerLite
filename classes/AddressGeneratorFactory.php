@@ -57,7 +57,7 @@ class AddressGeneratorFactory
                 if ($this->database === null) {
                     $indexStore = new FileAddressIndexStore();
                 } else {
-                    $indexStore = new DbAddressIndexStore($this->database);
+                    $indexStore = new DbAddressIndexStore($this->database, $xpub, isset($store['xpub_script_type']) ? (string) $store['xpub_script_type'] : null);
                 }
             }
 

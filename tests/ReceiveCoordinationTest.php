@@ -60,7 +60,7 @@ try {
     $db=receiveDb($config);$pdo=$db->getPdo();$identity=XpubDerivationIdentity::describe($key);
     coreSame(62,(int)$pdo->query('SELECT next_index FROM xpub_address_sequences')->fetchColumn(),'Three paths did not share one sequence');
     coreSame(20,(int)$pdo->query('SELECT COUNT(*) FROM invoices')->fetchColumn(),'Stateless/admin allocation unexpectedly inserted invoice rows');
-    $throwingAllocator=static function(string $path): never { throw new LogicException('Status touched allocation/database'); };
+    $throwingAllocator=static function(string $path): ?\BtcPayLite\GeneratedAddress { throw new LogicException('Status touched allocation/database'); };
     $kernel=new BtcStatelessInvoiceManager(new ElectrumWallet(new NoReceiveRpc()),str_repeat('s',32),null,new ReceiveProvider(),null,$throwingAllocator);
     $codec=new BtcStatelessTokenCodec(str_repeat('s',32));
     foreach ([1,2,3] as $version) {
@@ -70,6 +70,17 @@ try {
     }
     try { (new AddressGeneratorFactory(new ElectrumWallet(new NoReceiveRpc()),$db))->forStore(['address_source'=>'electrum','wallet_path'=>'/wallets/shared']);throw new LogicException('Mixed legacy generator accepted'); }
     catch(AddressGenerationException $e) { coreSame(409,$e->getCode(),'Mixed source error'); }
+    $snapshot=$pdo->query("SELECT * FROM stores WHERE id='shared'")->fetch();
+    $generator=(new AddressGeneratorFactory(new ElectrumWallet(new NoReceiveRpc()),$db))->forStore($snapshot);
+    $pdo->exec("UPDATE stores SET xpub_script_type='p2wpkh' WHERE id='shared'");
+    try { $generator->generateAddress(new AddressGenerationContext('shared','/wallets/shared'));throw new LogicException('Stale generator snapshot accepted'); }
+    catch(AddressGenerationException $e) { coreSame(409,$e->getCode(),'Stale receive configuration was not rejected'); }
+    coreSame(62,(int)$pdo->query('SELECT next_index FROM xpub_address_sequences')->fetchColumn(),'Stale snapshot consumed an index');
+    $pdo->exec("UPDATE stores SET xpub_script_type='p2pkh' WHERE id='shared'");
+    $factory=new \BtcPayLite\BtcStatelessFactory(['secret_key'=>str_repeat('s',32),'rpc_host'=>'127.0.0.1','rpc_port'=>1,
+        'db_host'=>'127.0.0.1','db_name'=>'must_not_open','db_port'=>0]);
+    (new ReflectionProperty($factory,'blockchainProvider'))->setValue($factory,new ReceiveProvider());
+    coreSame('paid',$factory->service()->checkStatus($codec->encode($payload))['status'],'Production stateless status opened invalid DB configuration');
     $rpc=new class($db,$key) extends ElectrumRPC {
         public int $known=2;public int $created=0;public bool $failAfterMutation=false;public bool $wrongKey=false;
         public function __construct(private Database $db,private string $key) { parent::__construct('127.0.0.1',1); }

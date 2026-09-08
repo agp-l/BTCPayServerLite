@@ -207,3 +207,17 @@ Record test results and published commits here as work progresses.
   simulate a competing worker holding the same wallet lock.
 - HTTP guard test now covers payment worker, receive sync and repair endpoints.
 - Run the new integration test, then the full suite; no test result claimed yet.
+
+### Verified receive coordination; final snapshot guard checkpoint
+
+- Source/test commit e381c5c passed all 58 files locally with MariaDB and in CI:
+  https://github.com/agp-l/BTCPayServerLite/actions/runs/34178829353
+- Runtime audit confirmed normal creation flows enter the coordinated allocator;
+  only sync/explicit legacy primitives still invoke createnewaddress/add_request.
+- Added a final reservation guard: a generator built from a stale store XPUB/script
+  snapshot fails before reserving if DB configuration changed. This avoids deriving
+  under one key/script while consuming another configuration's index.
+- Added direct production stateless-factory test with deliberately invalid DB
+  configuration; provider status must not initialize the lazy allocator/DB.
+- Run the focused receive test after publication, record final CI and lint, then
+  publish migration 007/sync operations documentation. No external daemon writes.

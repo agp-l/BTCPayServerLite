@@ -14,7 +14,7 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
 {
     private Database $database;
 
-    public function __construct(Database $database)
+    public function __construct(Database $database, private ?string $expectedXpub = null, private ?string $expectedScriptType = null)
     {
         $this->database = $database;
     }
@@ -42,6 +42,10 @@ class DbAddressIndexStore implements AddressIndexStoreInterface
                 );
             }
 
+            if (($this->expectedXpub !== null && $row['xpub'] !== $this->expectedXpub)
+                || ($this->expectedScriptType !== null && $row['xpub_script_type'] !== $this->expectedScriptType)) {
+                throw new AddressGenerationException('Store receive configuration changed before reservation; retry with a fresh store snapshot.', 'xpub', 409);
+            }
             if (trim((string) $row['wallet_path']) !== '') {
                 (new WalletReceiveRegistry($pdo))->bind($row['wallet_path'], $row['xpub'], $row['xpub_script_type'], (int) $row['xpub_last_index']);
             }
