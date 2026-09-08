@@ -339,3 +339,19 @@ Record test results and published commits here as work progresses.
   and client; no raw subprocess stdout/stderr, seed material or SQL values exposed.
 - Next: expose read-only actual web PHP preflight to admin, run real store insert
   and provisioning integration tests, publish checkpoints before verification.
+
+## Store creation runtime verification
+
+- Source published as 0380fc2, web diagnostics/tests as 9b0e582 before verification.
+- StoreCreationIntegrationTest PASSED against isolated MariaDB: first admin-created
+  client store, second shared store and client-created store keep XPUB metadata and
+  one wallet assignment; schema errors identify SQL cause in both flows.
+- PHP -n test reproduces absent GMP and returns a safe actionable category before
+  spawning Electrum. Missing executable and sensitive PDO-message suppression pass.
+- WalletProvisioningTest, InstallerIntegrationTest and DatabaseUpgradeTest PASSED.
+  No real user daemon, DB, wallet or permissions were changed.
+- User should deploy code, run composer install with the lockfile, then inspect
+  actual web PHP in database_upgrade.php and retry store creation. Do not claim
+  their precise local cause is established without that diagnostic output.
+- docs/STORE_CREATION_TROUBLESHOOTING.md records XAMPP/system PHP distinction and
+  operational repair paths. No dependency upgrade or wallet encryption change.

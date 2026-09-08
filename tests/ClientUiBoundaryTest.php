@@ -93,7 +93,8 @@ if (
     str_contains($sources['provisioner'], 'shell_exec(')
     || !str_contains($sources['provisioner'], 'proc_open($command')
     || !str_contains($sources['provisioner'], "['bypass_shell' => true]")
-    || !str_contains($sources['provisioner'], 'creation timed out')
+    || !str_contains($sources['provisioner'], 'electrum_create_timeout')
+    || !str_contains($sources['provisioner'], 'proc_terminate($process)')
 ) {
     throw new RuntimeException('Wallet provisioning process boundary is not hardened.');
 }
