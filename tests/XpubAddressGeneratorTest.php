@@ -96,3 +96,22 @@ if (count($generated) !== 100) {
 }
 
 echo "XpubAddressGeneratorTest passed.\n";
+
+// Generic BIP32 keys need an explicit policy; SLIP-0132 y/z/u/v remain unambiguous.
+$aliases = BtcPayLite\XpubDerivationIdentity::describe($testXpub)['aliases'];
+foreach ([0,3] as $i) {
+    try { new XpubAddressGenerator($aliases[$i], new MockMemoryIndexStore()); throw new RuntimeException('Ambiguous key accepted'); }
+    catch (InvalidArgumentException $e) { if (!str_contains($e->getMessage(), 'explicitly')) { throw $e; } }
+}
+foreach ([1=>'p2sh-p2wpkh',2=>'p2wpkh',4=>'p2sh-p2wpkh',5=>'p2wpkh'] as $i=>$script) {
+    $implicit = new XpubAddressGenerator($aliases[$i], new MockMemoryIndexStore());
+    $explicit = new XpubAddressGenerator($aliases[$i], new MockMemoryIndexStore(), $script);
+    if ($implicit->generateAddress($context)->getAddress() !== $explicit->generateAddress($context)->getAddress()) { throw new RuntimeException('SLIP-0132 inference mismatch'); }
+    $receive = new BtcPayLite\ProvisionedWallet('/wallets/test', $aliases[$i]);
+    if ($receive->scriptType !== $implicit->getScriptType()) { throw new RuntimeException('Provisioning policy mismatch'); }
+}
+foreach (['',null,'invalid'] as $script) {
+    try { (new BtcPayLite\AddressGeneratorFactory(null, null, null, new MockMemoryIndexStore()))->forStore(['address_source'=>'xpub','xpub'=>$aliases[2],'xpub_script_type'=>$script]); throw new RuntimeException('Missing store policy accepted'); }
+    catch (BtcPayLite\AddressGenerationException $e) { if ($e->getCode() !== 422) { throw $e; } }
+}
+echo "[PASS] Explicit generic-key policy, SLIP-0132 prefixes, provisioning consistency and missing store policy rejection\n";

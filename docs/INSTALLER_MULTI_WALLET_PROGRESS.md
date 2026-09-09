@@ -472,3 +472,28 @@ Record test results and published commits here as work progresses.
   defaults currently differ from explicit Electrum provisioning; targeted review
   queued after finishing session feature. Existing zero-RPC/shared-index architecture
   and read fast-path remain intact; no broad rewrite requested.
+
+## Session and targeted core review verification
+
+- Session source published 415e579; XPUB explicit policy 8ca50f9.
+- Full suite PASSED: 64 files, 0 failures, isolated MariaDB enabled, including
+  real HTTP remembered token restoration/rotation/logout and POST rejection.
+- Added docs/SESSION_LOGIN.md and CORE_TARGETED_REVIEW_2026_09.md with call-site
+  classification, deployment instructions and explicitly deferred items.
+- Last narrow repair correction after suite: preserve shared sequence in reported
+  and stored repair floor; reject mismatching explicit policy on existing XPUB store.
+  Relevant syntax/static checks pending; no live user repair run.
+- User must apply migration 009 via existing updater, then log in once with the
+  30-day checkbox. Normal login without checkbox works without migration 009.
+
+## Final checkpoint: remembered login and narrow XPUB audit
+
+- Full pre-repair suite: PASS 64/64 with MariaDB. Post-repair targeted actual CLI
+  test LegacyRepairPolicyTest: PASS for floor=100 despite Electrum count=2 and
+  rejection of existing-store script mismatch. New total test files: 65.
+- PHP lint: PASS 245 files before adding the final tested repair fixture.
+- AuthManagerTest manual includes updated for RememberedLogin; no production
+  autoload failure was present. HTTP fixture verifies actual cookie lifecycle.
+- Normal login, optional 30-day device login and migration 009 ready for deployment.
+- Still not claimed: execution on user's real Apache/Electrum, automatic cleanup
+  of uncertain provisioning failure, admin request snapshot optimization.

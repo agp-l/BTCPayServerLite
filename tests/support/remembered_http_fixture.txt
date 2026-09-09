@@ -1,0 +1,18 @@
+<?php
+require __DIR__.'/classes/AuthManager.php';
+require __DIR__.'/vendor/autoload.php';
+$config=require __DIR__.'/config.php';
+$db=new BtcPayLite\Database($config['db_host'],$config['db_name'],$config['db_user'],$config['db_pass'],$config['db_port']);
+$auth=new BtcPayLite\AuthManager($db);
+BtcPayLite\AuthManager::startSession();
+$action=$_GET['action'] ?? 'form';
+if ($action==='login') {
+    BtcPayLite\AuthManager::requireCsrfToken($_POST['csrf'] ?? null);
+    $auth->login('admin@example.test','correct horse battery staple','127.0.0.1',true);
+} elseif ($action==='private') {
+    BtcPayLite\AuthManager::requireRole('admin','/index.php');
+} elseif ($action==='logout') {
+    BtcPayLite\AuthManager::requireCsrfToken($_POST['csrf'] ?? null);
+    $auth->logout(); echo 'logged out'; exit;
+}
+echo json_encode(['csrf'=>BtcPayLite\AuthManager::csrfToken(),'user'=>$_SESSION['user_id'] ?? null]);

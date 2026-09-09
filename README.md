@@ -618,3 +618,9 @@ Vedle testů je před nasazením nutný smoke test proti skutečné testovací d
 3. Samostatná verzovaná dokumentace a první konkrétní CMS plugin postavený nad `BtcPayLiteExampleClient`.
 
 Po dokončení těchto bodů bude možné říct, že je auditovaný celý webový projekt, ne pouze platební jádro a API/webhook hranice.
+
+### Zapamatování přihlášení
+
+Volba při přihlášení udrží zařízení přihlášené až 30 dní přes odvolatelný token.
+Nejprve použijte migraci 009 v database_upgrade.php. Běžná nečinnost je 8 hodin.
+Podrobnosti: [správa přihlášení](docs/SESSION_LOGIN.md).

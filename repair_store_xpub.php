@@ -29,6 +29,9 @@ try {
     if (trim((string) $before['xpub']) !== '' && XpubDerivationIdentity::describe($before['xpub'])['id'] !== $identity['id']) {
         throw new RuntimeException('Stored XPUB belongs to another key; automatic replacement refused.');
     }
+    if ($before['address_source'] === 'xpub' && \BtcPayLite\XpubAddressGenerator::requireScriptType($before['xpub_script_type']) !== $receive->scriptType) {
+        throw new RuntimeException('Stored XPUB script policy differs from the wallet; automatic replacement refused.');
+    }
     $floor = max($receive->nextIndex, (int) $before['xpub_last_index']);
     $issued = $pdo->prepare('SELECT MAX(i.address_index) FROM invoices i INNER JOIN stores s ON s.id=i.store_id WHERE s.wallet_path=?');
     $issued->execute([$before['wallet_path']]); $lastIssued = $issued->fetchColumn();
@@ -41,6 +44,8 @@ try {
             $stmt->execute($identity['aliases']); $floor = max($floor, (int) $stmt->fetchColumn());
             $stmt = $pdo->prepare('INSERT INTO xpub_address_sequences (key_hash,next_index) VALUES (?,?) ON DUPLICATE KEY UPDATE next_index=GREATEST(next_index,VALUES(next_index))');
             $stmt->execute([$identity['id'], $floor]);
+            $stmt = $pdo->prepare('SELECT next_index FROM xpub_address_sequences WHERE key_hash=? FOR UPDATE');
+            $stmt->execute([$identity['id']]); $floor = max($floor, (int) $stmt->fetchColumn());
             (new \BtcPayLite\WalletReceiveRegistry($pdo))->bind($receive->walletPath, $receive->xpub, $receive->scriptType, $floor);
             $stmt = $pdo->prepare("UPDATE stores SET address_source='xpub', xpub=?, xpub_script_type=?, xpub_last_index=? WHERE id=?");
             $stmt->execute([$receive->xpub, $receive->scriptType, $floor, $before['id']]);

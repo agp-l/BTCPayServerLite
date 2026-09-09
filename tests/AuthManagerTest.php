@@ -6,6 +6,7 @@ require_once __DIR__ . '/../classes/AuthException.php';
 require_once __DIR__ . '/../classes/AuthUserRepository.php';
 require_once __DIR__ . '/../classes/LoginTelemetryRepository.php';
 require_once __DIR__ . '/../classes/AuthManager.php';
+require_once __DIR__ . '/../classes/RememberedLogin.php';
 
 use BtcPayLite\AuthException;
 use BtcPayLite\AuthManager;
@@ -199,6 +200,8 @@ expectAuthException(
 $passes[] = 'creates and verifies a per-session CSRF token';
 
 $_SESSION['auth_last_activity'] = time() - 1801;
+assertSameValue(true, AuthManager::hasRole('client'), 'Session still expires after 30 minutes');
+$_SESSION['auth_last_activity'] = time() - 28801;
 assertSameValue(false, AuthManager::hasRole('client'), 'Expired idle session was accepted');
 $passes[] = 'expires an idle authenticated session';
 
