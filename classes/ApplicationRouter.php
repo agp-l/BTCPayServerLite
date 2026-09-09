@@ -57,6 +57,13 @@ final class ApplicationRouter
             '/admin/users' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/users.php', 'users', 'admin'
             ),
+            '/database_upgrade.php' => [
+                'methods' => ['GET', 'HEAD', 'POST'],
+                'redirect' => '/admin/database_upgrade',
+            ],
+            '/admin/database_upgrade' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'admin/database_upgrade.php', 'database_upgrade', 'admin'
+            ),
             '/admin/settings' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/settings.php', 'settings', 'admin'
             ),

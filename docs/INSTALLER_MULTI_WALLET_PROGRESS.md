@@ -497,3 +497,12 @@ Record test results and published commits here as work progresses.
 - Normal login, optional 30-day device login and migration 009 ready for deployment.
 - Still not claimed: execution on user's real Apache/Electrum, automatic cleanup
   of uncertain provisioning failure, admin request snapshot optimization.
+
+## Admin database upgrade integration — source checkpoint
+
+- Canonical admin route `/admin/database_upgrade`, menu Nástroje → Aktualizace systému.
+- Controller in admin/database_upgrade.php; HTML in admin/views/database_upgrade_view.php,
+  shared admin header/footer/CSS. Root database_upgrade.php is a compatibility 308 alias.
+- Front controller owns role/account/session-version validation. Direct handler access is
+  denied; migration CSRF, backup/maintenance confirmations, plan hash and DB lock retained.
+- Source committed before validation. Next: route and real HTTP/MariaDB regression checks.

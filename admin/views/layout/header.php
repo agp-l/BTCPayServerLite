@@ -28,6 +28,7 @@ $menuContext = [
     'invoices' => ['label' => 'Faktury', 'icon' => 'fa-file-invoice'],
     'webhooks' => ['label' => 'Webhooky', 'icon' => 'fa-wave-square'],
     'url_invoices' => ['label' => 'URL faktury', 'icon' => 'fa-link'],
+    'database_upgrade' => ['label' => 'Aktualizace systému', 'icon' => 'fa-database'],
     'settings' => ['label' => 'Nastavení', 'icon' => 'fa-gear'],
     'account' => ['label' => 'Účet', 'icon' => 'fa-user-shield'],
     'users' => ['label' => 'Klienti', 'icon' => 'fa-users'],
@@ -96,6 +97,7 @@ $navItem = static function (
       <div class="admin-nav-group">
         <div class="admin-nav-label">Nástroje</div>
         <?php $navItem('/admin/url_invoices', 'url_invoices', 'fa-link', 'URL faktury'); ?>
+        <?php $navItem('/admin/database_upgrade', 'database_upgrade', 'fa-database', 'Aktualizace systému'); ?>
         <?php $navItem('/admin/settings', 'settings', 'fa-gear', 'Nastavení'); ?>
         <?php $navItem('/admin/account', 'account', 'fa-user-shield', 'Změna hesla'); ?>
         <a href="<?php echo $routeUrl('/'); ?>" class="admin-nav-link" target="_blank" rel="noopener">

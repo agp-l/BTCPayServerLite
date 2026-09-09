@@ -1616,3 +1616,11 @@ select:focus-visible, textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+/* Database maintenance uses the shared admin cards and responsive tables. */
+.database-upgrade-card p { margin: 12px 0; }
+.database-upgrade-card td { vertical-align: top; overflow-wrap: anywhere; }
+.database-upgrade-card code { overflow-wrap: anywhere; }
+.database-upgrade-card details { margin-top: 8px; }
+.database-upgrade-card summary { cursor: pointer; }
+.database-upgrade-card pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.database-upgrade-card label { display: block; }
