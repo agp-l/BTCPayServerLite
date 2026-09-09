@@ -424,3 +424,18 @@ Record test results and published commits here as work progresses.
 - No local allocation failure reproduced. User must pull main, retry New address
   and send the new address-specific error code; do not claim the underlying local
   cause is fixed. The action error appears at the top while balance reads continue.
+
+## Repeatable deployment toolkit (2026-09-09, source checkpoint)
+
+- User confirmed shared lock ACL fix restored address creation; now requests a
+  reproducible deployment instead of remembering console fixes from this thread.
+- Added bin/deployment.php (CLI-only, bootstrap diagnostics without installed vendor)
+  and DeploymentEnvironment: current runtime checks plus reviewable permissions
+  script generated from config paths and explicit web/worker/Electrum accounts.
+- Permission plan preserves ownership/lockfiles, sets existing and default ACLs
+  for wallet locks, blockchain cache and managed wallets; config access read-only.
+- Web StoreCreationDiagnostics now includes locks, existing files, cache, temp
+  directory, config-file readability and PHP curl/PDO. Daemon data dir no longer
+  falsely requires PHP write access after offline context isolation.
+- Pending: deployment guide, XAMPP GMP recipe, web link and tests. Source committed
+  before verification. Tool generates a script; it never invokes sudo or SQL/RPC.

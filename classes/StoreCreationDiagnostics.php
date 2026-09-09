@@ -54,9 +54,11 @@ final class StoreCreationDiagnostics
         ];
         foreach ($paths as $key=>$path) {
             $valid=is_string($path) && $path!=='' && !str_contains($path,"\0");
-            $ok=$valid && ($key==='electrum_cli_path' ? is_file($path) && is_executable($path) : is_dir($path) && is_readable($path) && is_writable($path));
+            $ok=$valid && ($key==='electrum_cli_path' ? is_file($path) && is_executable($path)
+                : is_dir($path) && is_readable($path) && ($key==='electrum_data_dir' || is_writable($path)));
             $checks[]=['name'=>$key,'ok'=>$ok,'detail'=>$valid ? $path : 'Neplatná cesta v config.php'];
         }
+        $checks=array_merge($checks,DeploymentEnvironment::checks($config,dirname(__DIR__)));
         $uid=function_exists('posix_geteuid') ? posix_geteuid() : null;
         $account=$uid!==null && function_exists('posix_getpwuid') ? posix_getpwuid($uid) : false;
         return ['php_version'=>PHP_VERSION,'php_sapi'=>PHP_SAPI,'php_ini'=>php_ini_loaded_file() ?: '(žádné)',
