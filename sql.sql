@@ -335,7 +335,7 @@ CREATE TABLE `remembered_logins` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE payment_worker_runtime (
-    source VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+    source VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     run_token CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     state VARCHAR(16) NOT NULL,
     started_at BIGINT UNSIGNED NOT NULL,
@@ -346,5 +346,6 @@ CREATE TABLE payment_worker_runtime (
     transitioned INT UNSIGNED NOT NULL DEFAULT 0,
     failed INT UNSIGNED NOT NULL DEFAULT 0,
     deliveries_queued INT UNSIGNED NOT NULL DEFAULT 0,
-    error_type VARCHAR(64) NULL
+    error_type VARCHAR(64) NULL,
+    PRIMARY KEY (source)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

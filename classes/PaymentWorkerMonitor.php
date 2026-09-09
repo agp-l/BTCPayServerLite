@@ -17,9 +17,12 @@ final class PaymentWorkerMonitor
 
     public function start(string $source, string $token): void
     {
+        // The runner holds the instance lock: any previous Running row is abandoned.
+        $this->pdo->exec("UPDATE payment_worker_runtime SET state='Failed',finished_at=UNIX_TIMESTAMP(),
+            last_failed_at=UNIX_TIMESTAMP(),error_type='interrupted' WHERE state='Running'");
         $stmt = $this->pdo->prepare("INSERT INTO payment_worker_runtime (source,run_token,state,started_at)
             VALUES (?,?,'Running',UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE
-            run_token=VALUES(run_token),state='Running',started_at=UNIX_TIMESTAMP(),finished_at=NULL,error_type=NULL");
+            run_token=VALUES(run_token),state='Running',started_at=UNIX_TIMESTAMP(),finished_at=NULL,error_type=NULL,scanned=0,transitioned=0,failed=0,deliveries_queued=0");
         $stmt->execute([$source, $token]);
     }
 

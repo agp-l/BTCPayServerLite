@@ -67,14 +67,15 @@ try {
     echo "[PASS] DDL failure after a committed step is journaled and never automatically replayed\n";
 
     foreach (['database_upgrade.php', 'index.php', 'admin/database_upgrade.php', 'admin/views/database_upgrade_view.php',
-        'admin/views/layout/header.php', 'admin/views/layout/footer.php', 'pages/error.php'] as $file) {
+        'admin/views/layout/header.php', 'admin/views/layout/footer.php', 'pages/error.php',
+        'admin/payment_monitor.php', 'admin/views/payment_monitor_view.php'] as $file) {
         if (!is_dir(dirname($root.'/'.$file))) { mkdir(dirname($root.'/'.$file),0700,true); }
         copy($source.'/'.$file,$root.'/'.$file);
     }
     symlink($source.'/vendor',$root.'/vendor');
     symlink($source.'/assets',$root.'/assets');
     file_put_contents($root.'/router.php','<?php if (is_file(__DIR__.parse_url($_SERVER["REQUEST_URI"],PHP_URL_PATH))) { return false; } $_SERVER["SCRIPT_NAME"]="/index.php"; require __DIR__."/index.php";');
-    file_put_contents($root.'/config.php','<?php return '.var_export(['db_host'=>$host,'db_port'=>$port,'db_name'=>$name,'db_user'=>$user,'db_pass'=>$pass],true).';');
+    file_put_contents($root.'/config.php','<?php return '.var_export(['db_host'=>$host,'db_port'=>$port,'db_name'=>$name,'db_user'=>$user,'db_pass'=>$pass,'rpc_host'=>'127.0.0.1','rpc_port'=>1],true).';');
     $pdo->exec("INSERT INTO users (email,password_hash,role) VALUES ('admin@example.test','unused','admin')");
     $id=(int)$pdo->lastInsertId();
     // Test-only authenticated session fixture. Production still revalidates role/status/version in DB.
@@ -101,6 +102,8 @@ try {
         coreCheck(str_contains($headers[0],'308'),'Legacy POST must retain its method on redirect');
         [$body,$headers]=$request('admin/database_upgrade'); coreCheck(str_contains($headers[0],'303'),'Anonymous migration page allowed');
         [$body,$headers]=$request('admin/database_upgrade.php'); coreCheck(str_contains($headers[0],'404'),'Direct controller allowed');
+        [$body,$headers]=$request('admin/payment_monitor'); coreCheck(str_contains($headers[0],'303'),'Anonymous monitoring allowed');
+        [$body,$headers]=$request('admin/payment_monitor.php'); coreCheck(str_contains($headers[0],'404'),'Direct monitoring handler allowed');
         [$body,$headers]=$request('session.php'); $cookie='';
         foreach ($headers as $header) { if (preg_match('/^Set-Cookie: ([^;]+)/i',$header,$m)) { $cookie=$m[1]; } }
         $pdo->exec('DROP TABLE wallet_receive_ranges');
@@ -133,6 +136,21 @@ try {
         coreCheck(str_contains($headers[0],'200') && str_contains($body,'Migrace dokončena'),'Authorized POST failed: '.$body);
         coreSame('Applied',$state($m7),'Authorized POST did not apply migration');
         coreSame(true,$manager->inspect()['schema']['ok'],'Post-upgrade comparison failed');
+        [$body,$headers]=$request('admin/payment_monitor',null,$cookie);
+        coreCheck(str_contains($headers[0],'200') && str_contains($body,'Kontrola plateb') && str_contains($body,'admin-shell'),'Monitor page unavailable');
+        coreSame(0,(int)$pdo->query('SELECT COUNT(*) FROM payment_worker_runtime')->fetchColumn(),'GET started a worker');
+        preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$body,$csrf);
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'run'],$cookie);
+        coreCheck(str_contains($headers[0],'400'),'Monitor missing CSRF accepted');
+        coreSame(0,(int)$pdo->query('SELECT COUNT(*) FROM payment_worker_runtime')->fetchColumn(),'Invalid POST started worker');
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'run','csrf_token'=>$csrf[1]],$cookie);
+        coreCheck(str_contains($headers[0],'200') && str_contains($body,'Zkontrolováno: 0'),'Manual empty batch failed: '.$body);
+        coreSame('Succeeded',$pdo->query("SELECT state FROM payment_worker_runtime WHERE source='manual'")->fetchColumn(),'Manual POST not recorded');
+        coreSame(0,(int)$pdo->query("SELECT COUNT(*) FROM payment_worker_runtime WHERE source='cli'")->fetchColumn(),'Manual POST impersonated cron');
+        $pdo->exec("UPDATE users SET role='client' WHERE id=$id");
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'run','csrf_token'=>$csrf[1]],$cookie);
+        coreCheck(str_contains($headers[0],'303'),'Former admin can start a scan');
+        echo "[PASS] Admin payment monitoring GET, no-RPC empty POST, CSRF and role revocation\n";
         echo "[PASS] Actual HTTP: anonymous denied, admin GET read-only, CSRF enforced, revoked account denied, authorized POST upgrades\n";
     } finally { proc_terminate($server); fclose($pipes[0]); proc_close($server); }
 } finally {

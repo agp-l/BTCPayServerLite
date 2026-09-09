@@ -185,3 +185,9 @@ Zdroje: [PHP phpize](https://www.php.net/manual/en/install.pecl.phpize.php),
 [PHP php-config](https://www.php.net/manual/en/install.pecl.php-config.php),
 [Composer CLI](https://getcomposer.org/doc/03-cli.md#check-platform-reqs),
 [Electrum CLI](https://electrum.readthedocs.io/en/latest/cmdline.html).
+
+### Dohled a systemd timer pro platby
+
+Admin **Nástroje → Kontrola plateb** ukazuje skutečné běhy a umožní ruční kontrolu.
+Generátor `bin/deployment.php --payment-systemd=service|timer` a přesné instalační
+kroky jsou v [Kontrole plateb](PAYMENT_MONITORING.md). Nezapínejte cron i timer současně.

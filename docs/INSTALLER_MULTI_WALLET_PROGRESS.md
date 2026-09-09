@@ -531,3 +531,19 @@ Record test results and published commits here as work progresses.
 - State machine suggestions are not applied: partial-payment policy would conflict with
   the explicitly agreed terminal/non-regressing transitions. No new payment semantics.
 - Next: targeted DB/HTTP tests, deployment instructions and final checkpoint.
+
+### Payment monitoring — validation and delivery checkpoint
+
+- 67 test files passed with isolated MariaDB, 0 failures. Includes existing invoice
+  lease concurrency and atomic webhook tests, new heartbeat/source/cooldown/recovery
+  tests and actual admin HTTP GET/POST/CSRF/role revocation. Changed PHP lint passed.
+- 010 upgrades an existing schema; fresh schema comparison passes. Fresh sql.sql uses
+  a separate PRIMARY KEY definition required by the existing schema parser; the already
+  published migration SQL remains unchanged (same resulting schema, checksum preserved).
+- Added deployment.php --payment-systemd=service|timer, emitting reviewable units with
+  explicit non-root worker user and selected PHP; no automatic system installation.
+  Timer waits 15s after completion. CLI-only boundaries remain intact.
+- docs/PAYMENT_MONITORING.md documents migration, manual limits, honest scheduler
+  evidence, CLI --check scope, installation/recovery and unchanged partial/late policy.
+- No access to the user's Linux deployment: OS timer installation and real Electrum
+  smoke test must occur there. Local tests use isolated DB/provider fixtures.

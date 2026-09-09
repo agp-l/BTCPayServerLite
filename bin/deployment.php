@@ -12,9 +12,15 @@ spl_autoload_register(static function (string $class) use ($root): void {
     }
 });
 try {
-    $options = getopt('', ['help', 'check', 'permissions', 'web-user:', 'worker-user:', 'electrum-user:']);
+    $options = getopt('', ['help', 'check', 'permissions', 'web-user:', 'worker-user:', 'electrum-user:', 'payment-systemd:', 'php-binary:']);
     if (isset($options['help'])) {
         echo "php bin/deployment.php --check\nphp bin/deployment.php --permissions --web-user=daemon --worker-user=ag --electrum-user=ag > /tmp/btcpay-permissions.sh\n";
+        echo "php bin/deployment.php --payment-systemd=service --worker-user=ag --php-binary=/usr/bin/php8.3\nphp bin/deployment.php --payment-systemd=timer\n";
+        exit;
+    }
+    if (isset($options['payment-systemd'])) {
+        echo \BtcPayLite\PaymentWorkerSchedule::render((string)$options['payment-systemd'], $root,
+            (string)($options['php-binary'] ?? PHP_BINARY), (string)($options['worker-user'] ?? ''));
         exit;
     }
     $config = is_file($root . '/config.php') ? require $root . '/config.php' : [];

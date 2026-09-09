@@ -624,3 +624,5 @@ Po dokončení těchto bodů bude možné říct, že je auditovaný celý webov
 Volba při přihlášení udrží zařízení přihlášené až 30 dní přes odvolatelný token.
 Nejprve použijte migraci 009 v database_upgrade.php. Běžná nečinnost je 8 hodin.
 Podrobnosti: [správa přihlášení](docs/SESSION_LOGIN.md).
+
+Kontrola plateb: v administraci **Nástroje → Kontrola plateb**. Ruční dávka, stav CLI běhů a [návod pro zapnutí automatického monitoringu](docs/PAYMENT_MONITORING.md). Vyžaduje migraci 010.
