@@ -439,3 +439,19 @@ Record test results and published commits here as work progresses.
   falsely requires PHP write access after offline context isolation.
 - Pending: deployment guide, XAMPP GMP recipe, web link and tests. Source committed
   before verification. Tool generates a script; it never invokes sudo or SQL/RPC.
+
+## Deployment toolkit delivery checkpoint
+
+- Source on main 22664b8; guide, pinned XAMPP recipe, admin link and tests 506ac48.
+- DeploymentEnvironmentTest PASSED; shell syntax check for GMP recipe PASSED.
+- StoreCreationIntegrationTest and DatabaseUpgradeTest PASSED, including real
+  HTTP admin authentication/CSRF/read-only GET and isolated MariaDB migrations.
+- The GMP recipe was NOT compiled/installed in this environment; it records the
+  user's working 8.0.30 approach, pins official source checksum and verifies the
+  built module against target PHP before installation. Other PHP versions reject.
+- Added fresh-installer config.php 0600 bootstrap instructions: run generator as
+  web account, then execute reviewed permission plan. No PHP config execution as root.
+- User confirmed previous address failure resolved by shared lock ACL. Next use:
+  git pull; php bin/deployment.php --check; read docs/DEPLOYMENT.md. Actual server
+  preparation remains an explicit local operation; no local user infrastructure
+  was changed from this environment.

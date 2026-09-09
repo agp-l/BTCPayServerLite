@@ -116,6 +116,12 @@ sudo sh "$permissions_file"
 rm -- "$permissions_file"
 ```
 
+Pokud čerstvý instalátor vytvořil config.php pod účtem `daemon` s režimem 0600,
+správce `ag` jej ještě nepřečte. V kroku generování použijte
+`sudo -u daemon /usr/bin/php8.3 bin/deployment.php --permissions --web-user=daemon --worker-user=ag --electrum-user=ag > "$permissions_file"`
+a pokračujte kontrolou a spuštěním skriptu. PHP konfigurace se tím vykoná pod
+webovým účtem, nikoliv jako root; výsledný plán přidá CLI účtu právo čtení.
+
 Skript lze opakovat. Povolí přístup ke stávajícím zámkům i dědění ACL nových souborů;
 stejně připraví sdílenou blockchain cache a managed wallet adresář. Nemění vlastníka,
 nemaže lockfile, nemění SQL a nevolá Electrum. Přístup do daemon dat je pro PHP jen

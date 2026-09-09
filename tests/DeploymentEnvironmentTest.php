@@ -43,5 +43,20 @@ try {
     coreCheck(is_array($report) && isset($report['checks'], $report['php_binary']), 'CLI check failed to produce structured report: ' . $error);
     coreSame($report['ok'] ? 0 : 1, $exit, 'Readiness exit status disagrees with report');
     coreCheck(!str_contains($output, 'rpc_pass') && !str_contains($output, 'secret_key'), 'CLI report exposed config');
+    mkdir($root . '/bin'); mkdir($root . '/classes');
+    copy(dirname(__DIR__) . '/bin/deployment.php', $root . '/bin/deployment.php');
+    foreach (['DeploymentEnvironment', 'StoreCreationDiagnostics', 'XpubRuntime'] as $class) {
+        copy(dirname(__DIR__) . '/classes/' . $class . '.php', $root . '/classes/' . $class . '.php');
+    }
+    $proc = proc_open([PHP_BINARY, '-n', $root . '/bin/deployment.php', '--check'], [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes);
+    fclose($pipes[0]); $output = stream_get_contents($pipes[1]); $error = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]);
+    coreSame(1, proc_close($proc), 'Missing vendor/config/extensions reported success');
+    $report = json_decode($output, true);
+    coreCheck(is_array($report) && $report['config_present'] === false, 'Missing Composer prevented bootstrap report: ' . $error);
+    $checks = array_column($report['checks'], 'ok', 'name');
+    coreSame(false, $checks['GMP pro XPUB'], 'Missing GMP not detected without php.ini');
+    coreSame(false, $checks['Composer knihovny pro XPUB'], 'Missing vendor not detected');
+    foreach (glob($root . '/classes/*') as $file) { unlink($file); }
+    unlink($root . '/bin/deployment.php'); rmdir($root . '/classes'); rmdir($root . '/bin');
     echo "[PASS] Deployment report and repeatable ACL plan: scoped accounts, inheritance, safe quoting, no secrets or mutation\n";
 } finally { rmdir($root); }
