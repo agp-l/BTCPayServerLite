@@ -385,3 +385,20 @@ Record test results and published commits here as work progresses.
   pending: daemon lock remains intact, offline paths isolated, success/error cleanup.
 - Based on remote 97b97d5 (user committed Composer packages); using isolated
   worktree provisioning-fix to preserve prior local validation vendor files.
+
+## Offline provisioning verification checkpoint (2026-09-09)
+
+- Source published to main as adec1c5; regression/docs as 1e34c6c.
+- Focused local checks PASSED: WalletProvisioningTest, ClientUiBoundaryTest
+  (10 assertions/groups), StoreCreationIntegrationTest against isolated MariaDB.
+- Regression uses an executable CLI fixture that refuses offline access whenever
+  its selected directory contains a daemon lock. All three commands instead use
+  one private directory per creation; different creations have different dirs.
+- Verified 0700 permissions, no copied RPC secret, unchanged live lock/config,
+  cleanup after success, invalid public metadata and nonzero create exit. Cleanup
+  does not follow a simulated symlink back to the live data directory.
+- User's actual Apache/Python/Electrum installation has NOT been exercised here.
+  Deployment: git pull --ff-only, retry admin store creation. No migration,
+  daemon restart or lockfile deletion is needed for this fix.
+- Worktree: /workspace/scratch/829e566c9a88/provisioning-fix. Original workspace
+  remains untouched with its local validation dependency modifications.
