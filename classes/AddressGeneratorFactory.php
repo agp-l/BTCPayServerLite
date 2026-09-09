@@ -61,7 +61,8 @@ class AddressGeneratorFactory
                 }
             }
 
-            $scriptType = !empty($store['xpub_script_type']) ? (string) $store['xpub_script_type'] : null;
+            try { $scriptType = XpubAddressGenerator::requireScriptType(isset($store['xpub_script_type']) ? (string) $store['xpub_script_type'] : null); }
+            catch (InvalidArgumentException $e) { throw new AddressGenerationException('Store requires an explicit valid xpub_script_type.', 'xpub', 422, $e); }
 
             return new XpubAddressGenerator($xpub, $indexStore, $scriptType);
         }

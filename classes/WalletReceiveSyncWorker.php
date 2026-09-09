@@ -95,7 +95,7 @@ final class WalletReceiveSyncWorker
             public function __construct(private int $index) {}
             public function reserveNextIndex(string $storeId): int { return $this->index; }
         };
-        return (new XpubAddressGenerator($row['xpub'],$store,$row['script_type']))
+        return (new XpubAddressGenerator($row['xpub'],$store,XpubAddressGenerator::requireScriptType($row['script_type'])))
             ->generateAddress(new AddressGenerationContext('receive-sync'))->getAddress();
     }
 

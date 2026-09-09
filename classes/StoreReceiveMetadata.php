@@ -21,7 +21,7 @@ final class StoreReceiveMetadata
         }
         if ($row['address_source'] === 'xpub') {
             // Fail closed; a broken XPUB setting is never an Electrum fallback.
-            new XpubAddressGenerator((string) $row['xpub'], new FileAddressIndexStore(), $row['xpub_script_type']);
+            new XpubAddressGenerator((string) $row['xpub'], new FileAddressIndexStore(), XpubAddressGenerator::requireScriptType($row['xpub_script_type']));
         }
         return $row;
     }

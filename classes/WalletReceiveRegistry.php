@@ -12,6 +12,7 @@ final class WalletReceiveRegistry
     public function bind(string $path, string $xpub, string $script, int $floor): array
     {
         $path = WalletLockManager::canonicalWalletPath($path);
+        $script = XpubAddressGenerator::requireScriptType($script);
         new XpubAddressGenerator($xpub, new FileAddressIndexStore(), $script);
         $key = XpubDerivationIdentity::describe($xpub)['id'];
         $hash = hash('sha256', $path);
@@ -38,7 +39,7 @@ final class WalletReceiveRegistry
     {
         $path = WalletLockManager::canonicalWalletPath($path);
         $bound = $this->registered($path);
-        if ($bound !== null) { return $bound; }
+        if ($bound !== null) { XpubAddressGenerator::requireScriptType($bound['script_type']); return $bound; }
         $stmt = $this->pdo->prepare("SELECT xpub,xpub_script_type,xpub_last_index FROM stores WHERE wallet_path=? AND address_source='xpub'");
         $stmt->execute([$path]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

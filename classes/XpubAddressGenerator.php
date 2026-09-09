@@ -60,6 +60,17 @@ class XpubAddressGenerator implements AddressGeneratorInterface
         }
     }
 
+    /** Store policy must be explicit even when a prefix could suggest a type. */
+    public static function requireScriptType(?string $scriptType): string
+    {
+        $script = strtolower(trim($scriptType ?? ''));
+        if ($script === 'p2sh_p2wpkh') { $script = 'p2sh-p2wpkh'; }
+        if (!in_array($script, ['p2pkh','p2sh-p2wpkh','p2wpkh'], true)) {
+            throw new InvalidArgumentException('Ambiguous or invalid XPUB script policy: provide xpub_script_type explicitly (p2pkh, p2sh-p2wpkh or p2wpkh).');
+        }
+        return $script;
+    }
+
     public function getHierarchicalKey(): HierarchicalKey
     {
         return $this->hierarchicalKey;
@@ -144,7 +155,7 @@ class XpubAddressGenerator implements AddressGeneratorInterface
                 $normalizedVersionHex = self::VERSION_XPUB;
                 break;
             case self::VERSION_XPUB:
-                $inferredScript = 'p2wpkh';
+                $inferredScript = self::requireScriptType($overrideScriptType);
                 $networkName = 'bitcoin';
                 $normalizedVersionHex = self::VERSION_XPUB;
                 break;
@@ -159,7 +170,7 @@ class XpubAddressGenerator implements AddressGeneratorInterface
                 $normalizedVersionHex = self::VERSION_TPUB;
                 break;
             case self::VERSION_TPUB:
-                $inferredScript = 'p2wpkh';
+                $inferredScript = self::requireScriptType($overrideScriptType);
                 $networkName = 'testnet';
                 $normalizedVersionHex = self::VERSION_TPUB;
                 break;
