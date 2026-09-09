@@ -54,4 +54,11 @@ try {
 
 $html = static fn (mixed $text): string => htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $csrfToken = AuthManager::csrfToken();
+$migrationLabels = [
+    'Pending' => 'Čeká',
+    'Present' => 'Struktura přítomna',
+    'Applied' => 'Provedeno nástrojem',
+    'Blocked' => 'Vyžaduje kontrolu',
+    'Manual' => 'Ruční postup',
+];
 require __DIR__ . '/views/database_upgrade_view.php';

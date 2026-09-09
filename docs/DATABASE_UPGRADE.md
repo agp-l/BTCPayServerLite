@@ -1,9 +1,13 @@
 # Aktualizace databáze z prohlížeče
 
 Aktualizujte projekt přes `git pull --ff-only`, přihlaste se jako administrátor
-běžným přihlášením aplikace a otevřete `database_upgrade.php` v kořeni projektu.
+běžným přihlášením aplikace a v menu vyberte **Nástroje → Aktualizace systému**.
 Pro místní XAMPP instalaci například:
-`http://localhost/BTCPayLite/database_upgrade.php`.
+`http://localhost/BTCPayLite/admin/database_upgrade`.
+Původní `database_upgrade.php` zůstává přesměrováním, včetně zachování POST starých formulářů.
+Obsluhu má `admin/database_upgrade.php`, HTML šablonu `admin/views/database_upgrade_view.php`;
+stránka používá společné admin menu, styly a ověřování účtu.
+Nástroj nyní aktualizuje databázové schéma; kód projektu se dále aktualizuje přes Git.
 Nástroj vyžaduje existující config a platný aktivní admin účet; novou instalaci
 nadále vytváří `install.php`. Používá pouze DB, nikoli Electrum konfiguraci/RPC.
 

@@ -66,16 +66,23 @@ try {
     $pdo->exec("DELETE FROM schema_migrations WHERE migration='$m7'");
     echo "[PASS] DDL failure after a committed step is journaled and never automatically replayed\n";
 
-    copy($source.'/database_upgrade.php',$root.'/database_upgrade.php'); symlink($source.'/vendor',$root.'/vendor');
+    foreach (['database_upgrade.php', 'index.php', 'admin/database_upgrade.php', 'admin/views/database_upgrade_view.php',
+        'admin/views/layout/header.php', 'admin/views/layout/footer.php', 'pages/error.php'] as $file) {
+        if (!is_dir(dirname($root.'/'.$file))) { mkdir(dirname($root.'/'.$file),0700,true); }
+        copy($source.'/'.$file,$root.'/'.$file);
+    }
+    symlink($source.'/vendor',$root.'/vendor');
+    symlink($source.'/assets',$root.'/assets');
+    file_put_contents($root.'/router.php','<?php if (is_file(__DIR__.parse_url($_SERVER["REQUEST_URI"],PHP_URL_PATH))) { return false; } $_SERVER["SCRIPT_NAME"]="/index.php"; require __DIR__."/index.php";');
     file_put_contents($root.'/config.php','<?php return '.var_export(['db_host'=>$host,'db_port'=>$port,'db_name'=>$name,'db_user'=>$user,'db_pass'=>$pass],true).';');
     $pdo->exec("INSERT INTO users (email,password_hash,role) VALUES ('admin@example.test','unused','admin')");
     $id=(int)$pdo->lastInsertId();
     // Test-only authenticated session fixture. Production still revalidates role/status/version in DB.
-    file_put_contents($root.'/session.php','<?php require __DIR__."/vendor/autoload.php"; BtcPayLite\\AuthManager::startSession(); $_SESSION=["user_id"=>'.$id.',"role"=>"admin","session_version"=>1,"auth_issued_at"=>time(),"auth_last_activity"=>time()];');
+    file_put_contents($root.'/session.php','<?php require __DIR__."/vendor/autoload.php"; BtcPayLite\\AuthManager::startSession(); $_SESSION=["user_id"=>'.$id.',"role"=>"admin","session_version"=>1,"auth_issued_at"=>time(),"auth_last_activity"=>time(),"auth_seen_recorded_at"=>time()];');
     $socket=stream_socket_server('tcp://127.0.0.1:0',$errno,$errstr); coreCheck($socket!==false,'No test port');
     $httpPort=(int)substr(strrchr(stream_socket_get_name($socket,false),':'),1); fclose($socket);
     $log=$root.'/http.log';
-    $server=proc_open([PHP_BINARY,'-S','127.0.0.1:'.$httpPort,'-t',$root],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,$root);
+    $server=proc_open([PHP_BINARY,'-S','127.0.0.1:'.$httpPort,'-t',$root,$root.'/router.php'],[0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$pipes,$root);
     coreCheck(is_resource($server),'No HTTP fixture');
     try {
         $ready=false;
@@ -87,23 +94,42 @@ try {
             $body=file_get_contents('http://127.0.0.1:'.$httpPort.'/'.$path,false,stream_context_create(['http'=>$options]));
             return [$body,$http_response_header];
         };
-        [$body,$headers]=$request('database_upgrade.php'); coreCheck(str_contains($headers[0],'403'),'Anonymous migration page allowed');
+        [$body,$headers]=$request('database_upgrade.php');
+        coreCheck(str_contains($headers[0],'308'),'Legacy bookmark no longer redirects');
+        coreCheck(str_contains(implode("\n",$headers),'/admin/database_upgrade'),'Legacy target mismatch');
+        [$body,$headers]=$request('database_upgrade.php',['migration'=>$m7]);
+        coreCheck(str_contains($headers[0],'308'),'Legacy POST must retain its method on redirect');
+        [$body,$headers]=$request('admin/database_upgrade'); coreCheck(str_contains($headers[0],'303'),'Anonymous migration page allowed');
+        [$body,$headers]=$request('admin/database_upgrade.php'); coreCheck(str_contains($headers[0],'404'),'Direct controller allowed');
         [$body,$headers]=$request('session.php'); $cookie='';
         foreach ($headers as $header) { if (preg_match('/^Set-Cookie: ([^;]+)/i',$header,$m)) { $cookie=$m[1]; } }
         $pdo->exec('DROP TABLE wallet_receive_ranges');
-        [$body,$headers]=$request('database_upgrade.php',null,$cookie);
+        [$body,$headers]=$request('admin/database_upgrade',null,$cookie);
         coreCheck(str_contains($headers[0],'200') && str_contains($body,'Aktualizace databáze'),'Admin preview unavailable');
         coreSame('Pending',$state($m7),'GET executed migration');
+        coreCheck(str_contains($body,'admin-shell') && str_contains($body,'/assets/admin.css'), 'Shared layout missing');
+        coreCheck(str_contains($body,'admin-nav-link is-active') && str_contains($body,'Aktualizace systému'), 'Menu context missing');
+        coreCheck(str_contains($body,'action="http://127.0.0.1:'.$httpPort.'/admin/database_upgrade"'),'Form target mismatch');
+        coreCheck(!str_contains($body,'<style>'), 'Standalone styles returned');
+        [$asset,$assetHeaders]=$request('assets/admin.css');
+        coreCheck(str_contains($assetHeaders[0],'200') && str_contains($asset,'.admin-shell'), 'Admin stylesheet unavailable');
         preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$body,$csrf);
         preg_match('/name="plan_hash" value="([a-f0-9]+)"/',$body,$plan);
         $post=['migration'=>$m7,'plan_hash'=>$plan[1],'backup'=>'1','maintenance'=>'1'];
-        [$body,$headers]=$request('database_upgrade.php',$post,$cookie); coreCheck(str_contains($headers[0],'400'),'Missing CSRF accepted');
+        [$body,$headers]=$request('admin/database_upgrade',$post,$cookie); coreCheck(str_contains($headers[0],'400'),'Missing CSRF accepted');
         coreSame('Pending',$state($m7),'Missing CSRF changed DB');
         $post['csrf_token']=$csrf[1];
         $pdo->exec("UPDATE users SET status='suspended' WHERE id=$id");
-        [$body,$headers]=$request('database_upgrade.php',$post,$cookie); coreCheck(str_contains($headers[0],'403'),'Suspended admin session accepted');
+        [$body,$headers]=$request('admin/database_upgrade',$post,$cookie); coreCheck(str_contains($headers[0],'303'),'Suspended admin session accepted');
+        coreSame('Pending',$state($m7),'Suspended admin changed schema');
         $pdo->exec("UPDATE users SET status='active' WHERE id=$id");
-        [$body,$headers]=$request('database_upgrade.php',$post,$cookie);
+        // The shared front controller invalidated the suspended session; sign in again.
+        [$body,$headers]=$request('session.php');
+        foreach ($headers as $header) { if (preg_match('/^Set-Cookie: ([^;]+)/i',$header,$m)) { $cookie=$m[1]; } }
+        [$body,$headers]=$request('admin/database_upgrade',null,$cookie);
+        preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$body,$csrf);
+        $post['csrf_token']=$csrf[1];
+        [$body,$headers]=$request('admin/database_upgrade',$post,$cookie);
         coreCheck(str_contains($headers[0],'200') && str_contains($body,'Migrace dokončena'),'Authorized POST failed: '.$body);
         coreSame('Applied',$state($m7),'Authorized POST did not apply migration');
         coreSame(true,$manager->inspect()['schema']['ok'],'Post-upgrade comparison failed');
@@ -111,6 +137,10 @@ try {
     } finally { proc_terminate($server); fclose($pipes[0]); proc_close($server); }
 } finally {
     $admin->exec('DROP DATABASE IF EXISTS `'.$name.'`');
-    foreach (glob($root.'/migrations/*') ?: [] as $file) { unlink($file); } rmdir($root.'/migrations');
-    foreach (glob($root.'/*') ?: [] as $file) { unlink($file); } rmdir($root);
+    $files=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
+    foreach ($files as $file) {
+        if ($file->isDir() && !$file->isLink()) { rmdir($file->getPathname()); }
+        else { unlink($file->getPathname()); }
+    }
+    rmdir($root);
 }

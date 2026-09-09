@@ -37,6 +37,15 @@ routeSame('admin', $admin->getRequiredRole(), 'Admin role is missing');
 routeSame('wallet', $admin->getMenu(), 'Admin menu mismatch');
 $passes[] = 'describes handler role and active menu in one route';
 
+foreach (['GET', 'HEAD', 'POST'] as $method) {
+    $upgrade = $router->match('/admin/database_upgrade', $method);
+    routeSame('admin/database_upgrade.php', $upgrade->getHandler(), 'Upgrade handler mismatch');
+    routeSame('admin', $upgrade->getRequiredRole(), 'Upgrade must be admin-only');
+    routeSame('database_upgrade', $upgrade->getMenu(), 'Upgrade menu mismatch');
+    routeSame('/admin/database_upgrade', $router->match('/database_upgrade.php', $method)->getRedirectPath(), 'Legacy upgrade redirect mismatch');
+}
+$passes[] = 'routes database maintenance and preserves legacy form redirects';
+
 $alias = $router->match('/dashboard', 'GET');
 routeSame(true, $alias->isRedirect(), 'Dashboard alias is not a redirect');
 routeSame('/client', $alias->getRedirectPath(), 'Dashboard redirect target mismatch');

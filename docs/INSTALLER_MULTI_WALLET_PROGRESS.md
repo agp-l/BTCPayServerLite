@@ -506,3 +506,15 @@ Record test results and published commits here as work progresses.
 - Front controller owns role/account/session-version validation. Direct handler access is
   denied; migration CSRF, backup/maintenance confirmations, plan hash and DB lock retained.
 - Source committed before validation. Next: route and real HTTP/MariaDB regression checks.
+
+### Admin upgrade integration — completed verification
+
+- 14 routing checks passed, including GET/HEAD/POST admin protection and legacy alias.
+- Real HTTP/MariaDB integration passed: shared layout/assets and form target, anonymous
+  rejection, direct handler rejection, CSRF enforcement, suspended account rejection,
+  read-only migration preview and successful authorized upgrade. Existing migration
+  locking, stale-plan, checksum, partial-DDL and journal checks also passed.
+- Changed PHP files passed lint; no schema migration is required for this UI integration.
+- User confirmed the page works on their installation. The final template groups schema,
+  migrations and environment checks into shared admin cards; HTML remains separate from
+  the controller. DatabaseMigrationManager remains the sole migration implementation.
