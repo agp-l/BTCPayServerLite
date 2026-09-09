@@ -13,6 +13,9 @@ class PaymentWorker
 {
     public const ELIGIBLE_SQL = "(status IN ('New', 'Processing') OR (status = 'Expired'
         AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0)))";
+    private array $failureCodes = [];
+    public function getFailureCodes(): array { return $this->failureCodes; }
+
     private Closure $clock;
     private int $leaseSeconds;
 
@@ -33,6 +36,7 @@ class PaymentWorker
     /** @return array{scanned:int,transitioned:int,expired:int,failed:int,deliveries_queued:int} */
     public function run(int $batchSize = 50, ?int $maxSeconds = null): array
     {
+        $this->failureCodes = [];
         $deadline = $maxSeconds === null ? null : hrtime(true) / 1e9 + max(1, $maxSeconds);
         $stats = ['scanned' => 0, 'transitioned' => 0, 'expired' => 0, 'failed' => 0, 'deliveries_queued' => 0];
         for ($i = 0; $i < max(1, min($batchSize, 500)); ++$i) {
@@ -58,7 +62,9 @@ class PaymentWorker
             } catch (Throwable $exception) {
                 ++$stats['failed'];
                 $this->releaseFailedLease((string) $invoice['id'], $token);
-                error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . $exception->getMessage());
+                $code = PaymentFailureDiagnostics::code($exception);
+                $this->failureCodes[$code] = ($this->failureCodes[$code] ?? 0) + 1;
+                error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . json_encode(PaymentFailureDiagnostics::details($exception))); 
             }
         }
         return $stats;

@@ -44,7 +44,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             return $cached;
         }
         if (!is_dir($this->cacheDir) && !@mkdir($this->cacheDir, 0770, true) && !is_dir($this->cacheDir)) {
-            throw $this->busy();
+            throw $this->busy(null, 'cache_directory');
         }
         $cached = $this->readCache($key, $address, $this->ttlSeconds);
         if ($cached !== null) {
@@ -52,7 +52,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
         }
         $lock = @fopen($this->path($key, 'lock'), 'c');
         if ($lock === false) {
-            return $this->staleOrFail($key, $address);
+            return $this->staleOrFail($key, $address, null, 'cache_lock_open');
         }
         $deadline = microtime(true) + self::LOCK_WAIT_SECONDS;
         $locked = false;
@@ -66,7 +66,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             } while (microtime(true) < $deadline);
             if (!$locked) {
                 // Never issue an uncoalesced RPC on timeout/cache miss.
-                return $this->staleOrFail($key, $address);
+                return $this->staleOrFail($key, $address, null, 'cache_lock_timeout');
             }
             $cached = $this->readCache($key, $address, $this->ttlSeconds);
             if ($cached !== null) {
@@ -74,7 +74,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             }
             $retryAt = (int) @file_get_contents($this->path($key, 'retry'));
             if ($retryAt > time()) {
-                return $this->staleOrFail($key, $address);
+                return $this->staleOrFail($key, $address, null, 'upstream_backoff');
             }
             try {
                 $observation = $this->queryElectrum($address);
@@ -97,28 +97,32 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
     {
         $balance = $this->rpc->callNetwork('getaddressbalance', ['address' => $address]);
         if (!is_array($balance) || !isset($balance['confirmed'], $balance['unconfirmed'])) {
-            throw new BlockchainProviderException('Invalid address balance response.', 'observe_address', 503);
+            throw new BlockchainProviderException('Invalid address balance response.', 'observe_address', 503, null, 'invalid_balance');
         }
-        $confirmed = max(0, BitcoinAmount::fromBtc($balance['confirmed'])->satoshis());
-        $delta = BitcoinAmount::fromBtc($balance['unconfirmed'])->satoshis();
+        try {
+            $confirmed = max(0, BitcoinAmount::fromBtc($balance['confirmed'])->satoshis());
+            $delta = BitcoinAmount::fromBtc($balance['unconfirmed'])->satoshis();
+        } catch (Throwable $error) {
+            throw new BlockchainProviderException('Invalid address balance amounts.', 'observe_address', 503, $error, 'invalid_balance');
+        }
         // Electrum mempool balance is a delta, possibly negative after a spend.
         // Normalize inconsistent negative totals here, never manufacture historical receipts.
         $delta = max(-$confirmed, $delta);
         return new AddressPaymentObservation($address, $confirmed, $delta, $confirmed + $delta, time());
     }
 
-    private function staleOrFail(string $key, string $address, ?Throwable $previous = null): AddressPaymentObservation
+    private function staleOrFail(string $key, string $address, ?Throwable $previous = null, ?string $reason = null): AddressPaymentObservation
     {
         $cached = $this->readCache($key, $address, $this->staleSeconds);
         if ($cached !== null) {
             return $cached;
         }
-        throw $this->busy($previous);
+        throw $this->busy($previous, $reason);
     }
 
-    private function busy(?Throwable $previous = null): BlockchainProviderException
+    private function busy(?Throwable $previous = null, ?string $reason = null): BlockchainProviderException
     {
-        return new BlockchainProviderException('Blockchain observation is busy. Retry shortly.', 'observe_address', 503, $previous);
+        return new BlockchainProviderException('Blockchain observation unavailable.', 'observe_address', 503, $previous, $reason);
     }
 
     private function path(string $key, string $suffix): string
@@ -170,7 +174,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
         $temp = $path . '.' . bin2hex(random_bytes(8));
         try {
             if (@file_put_contents($temp, $payload) !== strlen($payload) || !@rename($temp, $path)) {
-                throw $this->busy();
+                throw $this->busy(null, 'cache_write');
             }
         } finally {
             if (is_file($temp)) {

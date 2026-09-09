@@ -52,8 +52,8 @@ final class PaymentWorkerRunner
                 $monitor->finish($source, $token, [], 'worker_exception');
                 throw $error;
             }
-            $monitor->finish($source, $token, $stats, $stats['failed'] > 0 ? 'observation_failed' : null);
-            return ['busy'=>false, 'success'=>$stats['failed'] === 0, 'stats'=>$stats];
+            $monitor->finish($source, $token, $stats, $stats['failed'] > 0 ? (array_key_first($worker->getFailureCodes()) ?? 'observation_failed') : null);
+            return ['busy'=>false, 'success'=>$stats['failed'] === 0, 'stats'=>$stats, 'error_types'=>$worker->getFailureCodes()];
         } finally {
             $stmt = $pdo->prepare('SELECT RELEASE_LOCK(?)'); $stmt->execute([$lock]);
         }

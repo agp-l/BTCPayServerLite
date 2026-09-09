@@ -22,7 +22,7 @@ final class PaymentWorkerMonitor
             last_failed_at=UNIX_TIMESTAMP(),error_type='interrupted' WHERE state='Running'");
         $stmt = $this->pdo->prepare("INSERT INTO payment_worker_runtime (source,run_token,state,started_at)
             VALUES (?,?,'Running',UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE
-            run_token=VALUES(run_token),state='Running',started_at=UNIX_TIMESTAMP(),finished_at=NULL,error_type=NULL,scanned=0,transitioned=0,failed=0,deliveries_queued=0");
+            run_token=VALUES(run_token),state='Running',started_at=UNIX_TIMESTAMP(),finished_at=NULL,scanned=0,transitioned=0,failed=0,deliveries_queued=0");
         $stmt->execute([$source, $token]);
     }
 
@@ -31,10 +31,10 @@ final class PaymentWorkerMonitor
         $stmt = $this->pdo->prepare("UPDATE payment_worker_runtime SET state=?,finished_at=UNIX_TIMESTAMP(),
             last_success_at=IF(? IS NULL,UNIX_TIMESTAMP(),last_success_at),
             last_failed_at=IF(? IS NOT NULL,UNIX_TIMESTAMP(),last_failed_at),
-            scanned=?,transitioned=?,failed=?,deliveries_queued=?,error_type=? WHERE source=? AND run_token=?");
+            scanned=?,transitioned=?,failed=?,deliveries_queued=?,error_type=IF(?=0 AND ? IS NULL,error_type,?) WHERE source=? AND run_token=?");
         $stmt->execute([$error === null ? 'Succeeded' : 'Failed', $error, $error,
             $stats['scanned'] ?? 0, $stats['transitioned'] ?? 0, $stats['failed'] ?? 0,
-            $stats['deliveries_queued'] ?? 0, $error, $source, $token]);
+            $stats['deliveries_queued'] ?? 0, $stats['scanned'] ?? 0, $error, $error, $source, $token]);
     }
 
     public function snapshot(): array
@@ -64,6 +64,9 @@ final class PaymentWorkerMonitor
         if ($cli['state'] === 'Running' && !$snapshot['running']) { return 'CLI běh byl přerušen'; }
         $age = $snapshot['now'] - (int) $cli['started_at'];
         if ($age > 120) { return 'CLI kontrola je opožděná'; }
+        if ($cli['error_type'] !== null && $cli['state'] !== 'Running') {
+            return 'CLI se spouští; předchozí chyba kontroly zatím není ověřeně vyřešena';
+        }
         return $cli['state'] === 'Running' ? 'CLI kontrola právě běží' : 'Nedávný CLI běh ověřen';
     }
 }

@@ -547,3 +547,13 @@ Record test results and published commits here as work progresses.
   evidence, CLI --check scope, installation/recovery and unchanged partial/late policy.
 - No access to the user's Linux deployment: OS timer installation and real Electrum
   smoke test must occur there. Local tests use isolated DB/provider fixtures.
+
+## Payment failure diagnostics — source checkpoint
+
+User journal proves timer executes every ~16s. Two observations fail every ~32s;
+30s retry postponement explains intervening empty successful runs. Generic provider
+busy error hid both cache permissions and underlying RPC errors; root cause on the
+user host is still unknown. Added allowlisted cache/RPC/SQL diagnostics, no raw
+upstream messages. Empty batches now retain the last error until a non-empty clean
+batch, independently of successful process heartbeat. No migration or scheduler change.
+Next: regression tests, publish, ask user for new reason from journal.

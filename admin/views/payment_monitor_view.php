@@ -20,6 +20,10 @@ require __DIR__ . '/layout/header.php';
   <h2 class="card-title">Automatické ověřování</h2>
   <p><strong><?= $html($automaticState) ?></strong></p>
   <p class="card-subtitle">Stav vychází ze skutečných CLI běhů. Nepotvrzuje, že je zapnutý cron nebo systemd timer. I ruční příkaz v terminálu se zaznamená jako CLI. Ruční tlačítko níže tento stav neovlivňuje.</p>
+  <?php if (($snapshot['runs']['cli']['error_type'] ?? null) !== null): ?>
+  <div class="alert alert-warning"><?= $html(\BtcPayLite\PaymentFailureDiagnostics::hint($snapshot['runs']['cli']['error_type'])) ?></div>
+  <?php endif; ?>
+  <p>Prázdný běh potvrzuje spuštění programu, nikoli úspěšnou kontrolu plateb. Předchozí chyba zůstává viditelná do další neprázdné úspěšné dávky.</p>
   <p>Za opožděný považujeme CLI běh starší než 2 minuty. Prázdná úspěšná dávka také potvrzuje spuštění workeru.</p>
   <p>Kontrola právě běží: <strong><?= $snapshot['running'] ? 'Ano' : 'Ne' ?></strong>.</p>
   <p>Faktury čekající na kontrolu: <strong><?= $snapshot['due'] ?></strong>. Propadlé rezervace po přerušeném běhu: <strong><?= $snapshot['stale_leases'] ?></strong>.</p>
@@ -44,7 +48,7 @@ require __DIR__ . '/layout/header.php';
       <tr><td><?= $html($label) ?></td>
       <?php if ($run === null): ?><td colspan="4">Zatím nezaznamenán žádný běh.</td>
       <?php else: ?>
-        <td><?= $html($run['state'] === 'Running' && !$snapshot['running'] ? 'Přerušený běh' : $stateLabels[$run['state']]) ?><?php if ($run['error_type'] !== null): ?><br><code><?= $html($run['error_type']) ?></code><?php endif; ?></td>
+        <td><?= $html($run['state'] === 'Running' && !$snapshot['running'] ? 'Přerušený běh' : $stateLabels[$run['state']]) ?><?php if ($run['error_type'] !== null): ?><br><code><?= $html($run['error_type']) ?></code><br><?= $html(\BtcPayLite\PaymentFailureDiagnostics::hint($run['error_type'])) ?><?php endif; ?></td>
         <td><?= $html($formatTime($run['started_at'])) ?><br><?= $html($formatTime($run['finished_at'])) ?></td>
         <td><?= $html($formatTime($run['last_success_at'])) ?><br><?= $html($formatTime($run['last_failed_at'])) ?></td>
         <td><?= (int)$run['scanned'] ?> / <?= (int)$run['transitioned'] ?> / <?= (int)$run['failed'] ?></td>
