@@ -24,6 +24,7 @@ final class DatabaseMigrationManager
         '006_shared_xpub_address_sequences.sql'=>[['xpub_address_sequences'],['stores']],
         '007_wallet_receive_ranges.sql'=>[['wallet_receive_ranges'],['xpub_address_sequences','stores']],
         '008_schema_migrations.sql'=>[['schema_migrations'],['users']],
+        '009_remembered_logins.sql'=>[['remembered_logins'],['users.session_version']],
     ];
 
     public function __construct(private PDO $pdo, private string $root) {}

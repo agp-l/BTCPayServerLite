@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $clientIdentity = is_string($_SERVER['REMOTE_ADDR'] ?? null)
             ? $_SERVER['REMOTE_ADDR']
             : '';
-        $user = $auth->login($email, $password, $clientIdentity);
+        $user = $auth->login($email, $password, $clientIdentity, ($_POST['remember'] ?? '') === '1');
 
         header(
             'Location: ' . $urlManager->url(
@@ -67,4 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $csrfToken = AuthManager::csrfToken();
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && (AuthManager::hasRole('admin') || AuthManager::hasRole('client'))) {
+    header('Location: ' . $urlManager->url($_SESSION['role'] === 'admin' ? '/admin/dashboard' : '/client'), true, 303);
+    exit;
+}
 require __DIR__ . '/views/login_view.php';

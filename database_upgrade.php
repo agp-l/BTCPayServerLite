@@ -72,5 +72,5 @@ $csrf=AuthManager::csrfToken();
 <tr><td><code><?= $html($migration['file']) ?></code><details><summary>Zobrazit SQL</summary><pre><?= $html($migration['sql']) ?></pre></details></td><td><?= $html($labels[$migration['state']]) ?></td><td><?= $html($migration['reason']) ?>
 <?php if ($migration['state']==='Pending'): ?><p><button name="migration" value="<?= $html($migration['file']) ?>">Spustit tuto migraci</button></p><?php endif ?></td></tr>
 <?php endforeach ?></table></div></form>
-<p>Automatický katalog zahrnuje migrace 001–008. Starší datové migrace a neznámé nové soubory vyžadují vlastní postup; nástroj je nespouští podle názvu. Rozdíly nemaže ani neopravuje odhadnutými ALTER příkazy.</p>
+<p>Automatický katalog zahrnuje migrace 001–009. Starší datové migrace a neznámé nové soubory vyžadují vlastní postup; nástroj je nespouští podle názvu. Rozdíly nemaže ani neopravuje odhadnutými ALTER příkazy.</p>
 <?php endif ?></main></html>

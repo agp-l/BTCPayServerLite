@@ -17,21 +17,24 @@ class AuthManager
     private const LOGIN_WINDOW_SECONDS = 900;
     private const MAX_REGISTRATIONS = 3;
     private const REGISTRATION_WINDOW_SECONDS = 3600;
-    private const SESSION_IDLE_SECONDS = 1800;
+    private const SESSION_IDLE_SECONDS = 28800;
     private const SESSION_ABSOLUTE_SECONDS = 43200;
     private const DUMMY_PASSWORD_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
 
     private AuthUserRepository $users;
+    private ?RememberedLogin $remembered = null;
+    private static bool $restoreAttempted = false;
 
     public function __construct(Database|AuthUserRepository $users)
     {
+        if ($users instanceof Database) { $this->remembered = new RememberedLogin($users->getPdo()); }
         $this->users = $users instanceof Database
             ? new PdoAuthUserRepository($users)
             : $users;
     }
 
     /** @return array{id:int,email:string,role:string} */
-    public function login(string $email, string $password, string $clientIdentity = ''): array
+    public function login(string $email, string $password, string $clientIdentity = '', bool $remember = false): array
     {
         $email = $this->normalizeEmail($email);
         if ($password === '' || strlen($password) > self::MAX_PASSWORD_BYTES) {
@@ -95,19 +98,19 @@ class AuthManager
         }
 
         self::startSession();
-        if (!session_regenerate_id(true)) {
-            throw new AuthException('Přihlášení nyní nelze dokončit. Zkuste to prosím později.');
+        if ($remember && $this->remembered === null) { throw new AuthException('Zapamatování přihlášení vyžaduje databázi.'); }
+        $deviceCookie = is_string($_COOKIE[RememberedLogin::COOKIE] ?? null) ? $_COOKIE[RememberedLogin::COOKIE] : '';
+        if ($deviceCookie !== '' && $this->remembered !== null) {
+            try { $this->remembered->revoke($deviceCookie); }
+            catch (\Throwable $e) { throw new AuthException('Staré zapamatování nelze zrušit. Ověřte databázi a migraci 009.', previous: $e); }
         }
-
-        $_SESSION = [
-            'user_id' => $user['id'],
-            'role' => $user['role'],
-            'email' => $user['email'],
-            'session_version' => $sessionVersion,
-            'auth_seen_recorded_at' => $now,
-            'auth_issued_at' => $now,
-            'auth_last_activity' => $now,
-        ];
+        $newCookie = null;
+        if ($remember) {
+            try { $newCookie = $this->remembered->issue(['id'=>$user['id'],'session_version'=>$sessionVersion], $now); }
+            catch (\Throwable $e) { throw new AuthException('Zapamatování nelze zapnout. Spusťte migraci 009 v database_upgrade.php, nebo se přihlaste bez této volby.', previous: $e); }
+        }
+        self::establishSession(['id'=>$user['id'],'role'=>$user['role'],'email'=>$user['email'],'session_version'=>$sessionVersion], $now);
+        RememberedLogin::cookie($newCookie ?? '', $newCookie === null ? $now-42000 : $now+RememberedLogin::LIFETIME);
 
         return [
             'id' => $user['id'],
@@ -161,7 +164,11 @@ class AuthManager
     public function logout(): void
     {
         self::startSession();
-        $_SESSION = [];
+        $cookie = is_string($_COOKIE[RememberedLogin::COOKIE] ?? null) ? $_COOKIE[RememberedLogin::COOKIE] : '';
+        $revokeError = null;
+        try { $this->remembered?->revoke($cookie); }
+        catch (\Throwable $e) { $revokeError = $e; }
+        RememberedLogin::cookie('', time()-42000); $_SESSION = [];
 
         if ((bool) ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
@@ -176,6 +183,7 @@ class AuthManager
         }
 
         session_destroy();
+        if ($revokeError !== null) { throw new AuthException('Relace byla ukončena, ale zapamatování v databázi nelze zrušit. Ověřte dostupnost databáze.', previous: $revokeError); }
     }
 
     public static function startSession(?bool $secure = null): void
@@ -191,6 +199,21 @@ class AuthManager
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_only_cookies', '1');
         ini_set('session.use_trans_sid', '0');
+        // Keep our sessions out of a shared pool collected using another app's
+        // shorter gc_maxlifetime. The directory is private to this app/process UID.
+        if (ini_get('session.save_handler') === 'files') {
+            $base = session_save_path();
+            if ($base === '' || str_contains($base, ';')) { $base = sys_get_temp_dir(); }
+            $uid = function_exists('posix_geteuid') ? (string) posix_geteuid() : 'web';
+            $suffix = '/btcpay-sessions-' . substr(hash('sha256', dirname(__DIR__) . $uid), 0, 16);
+            if (!str_ends_with($base, $suffix)) { $base = rtrim($base, '/') . $suffix; }
+            if (!is_dir($base) && !@mkdir($base, 0700) && !is_dir($base)) { throw new AuthException('Soukromý adresář relací není zapisovatelný.'); }
+            if (is_link($base) || !is_writable($base)) { throw new AuthException('Soukromý adresář relací není dostupný.'); }
+            session_save_path($base);
+            ini_set('session.gc_maxlifetime', (string) self::SESSION_ABSOLUTE_SECONDS);
+            ini_set('session.gc_probability', '1');
+            ini_set('session.gc_divisor', '100');
+        }
         session_name('BTCPAYLITESESSID');
         session_set_cookie_params([
             'lifetime' => 0,
@@ -243,9 +266,14 @@ class AuthManager
             || !is_int($lastActivity)
             || $issuedAt > $now
             || $lastActivity > $now
+            || (isset($_SESSION['remember_until']) && (!is_int($_SESSION['remember_until']) || $now >= $_SESSION['remember_until']))
             || $now - $issuedAt > self::SESSION_ABSOLUTE_SECONDS
             || $now - $lastActivity > self::SESSION_IDLE_SECONDS
         ) {
+            if (!self::$restoreAttempted && in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET','HEAD'], true)) {
+                self::$restoreAttempted = true;
+                if (self::restoreRemembered()) { return self::hasRole($requiredRole, $now); }
+            }
             return false;
         }
 
@@ -270,6 +298,33 @@ class AuthManager
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: same-origin');
         header('X-Frame-Options: DENY');
+    }
+
+    private static function establishSession(array $user, int $now): void
+    {
+        if (!session_regenerate_id(true)) { throw new AuthException('Relaci nelze obnovit.'); }
+        $_SESSION = ['user_id'=>$user['id'],'role'=>$user['role'],'email'=>$user['email'],
+            'session_version'=>$user['session_version'],'auth_seen_recorded_at'=>$now,
+            'auth_issued_at'=>$now,'auth_last_activity'=>$now];
+    }
+
+    private static function restoreRemembered(): bool
+    {
+        $cookie = $_COOKIE[RememberedLogin::COOKIE] ?? null;
+        if (!is_string($cookie) || $cookie === '') { return false; }
+        try {
+            $config = require dirname(__DIR__) . '/config.php';
+            $db = new Database($config['db_host'],$config['db_name'],$config['db_user'],$config['db_pass'],(int)($config['db_port'] ?? 3306));
+            $result = (new RememberedLogin($db->getPdo()))->resume($cookie);
+            if ($result === null) { return false; }
+            self::establishSession($result['user'], time());
+            $_SESSION['remember_until'] = $result['expires_at'];
+            if ($result['cookie'] !== null) { RememberedLogin::cookie($result['cookie'],$result['expires_at']); }
+            return true;
+        } catch (\Throwable $e) {
+            error_log('Remembered login restore failed: ' . $e::class);
+            return false;
+        }
     }
 
     private function normalizeEmail(string $email): string

@@ -455,3 +455,20 @@ Record test results and published commits here as work progresses.
   git pull; php bin/deployment.php --check; read docs/DEPLOYMENT.md. Actual server
   preparation remains an explicit local operation; no local user infrastructure
   was changed from this environment.
+
+## Login persistence source checkpoint (2026-09-09)
+
+- User requests fewer admin logins; existing limits 30m idle/12h absolute confirmed.
+- Normal idle limit increased to 8h (absolute 12h retained). PHP file sessions use
+  an application/UID-private subdirectory with matching GC lifetime, avoiding other
+  apps' short GC in a shared session pool. Existing login may need one fresh login.
+- Optional 30-day remembered login uses a separate random device token with hashed
+  validator in DB, fixed expiry, rotation on restore and 30s previous-token grace
+  for concurrent requests. User status/session_version checked at restore.
+- Migration 009 adds remembered_logins; fresh sql.sql and migration catalog updated.
+- Restoration only on GET/HEAD; POST/CSRF boundaries preserved. Logout revokes the
+  device token. Source checkpoint before tests; verification pending.
+- Read user's AI audit attachment as suggestions. Confirmed generic xpub/tpub
+  defaults currently differ from explicit Electrum provisioning; targeted review
+  queued after finishing session feature. Existing zero-RPC/shared-index architecture
+  and read fast-path remain intact; no broad rewrite requested.
