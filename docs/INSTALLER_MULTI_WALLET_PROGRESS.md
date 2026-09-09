@@ -402,3 +402,16 @@ Record test results and published commits here as work progresses.
   daemon restart or lockfile deletion is needed for this fix.
 - Worktree: /workspace/scratch/829e566c9a88/provisioning-fix. Original workspace
   remains untouched with its local validation dependency modifications.
+
+## Wallet address action diagnosis (2026-09-09)
+
+- User can read balance/seed, but cannot create an address. Exact local error
+  and whether selected wallet has an XPUB binding are still unknown.
+- Confirmed controller defect: new_address failures fell into WalletBalanceError
+  and stopped dashboard reads, misreporting address/DB failures as balance errors.
+- Added safe action-specific diagnostics traversing wrapped SQL, RPC, runtime
+  and lock failures; controller now continues ordinary reads after allocation
+  fails. No raw exception messages or keys are sent to UI/logs.
+- Allocation algorithm/sequence is unchanged; no fallback to bypass a failed XPUB
+  reservation. Source checkpoint before tests; local root cause still needs new
+  address error code from user after deployment.

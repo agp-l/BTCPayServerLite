@@ -109,8 +109,14 @@ try {
         $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
 
         if ($action === 'new_address') {
-            $newReceiveAddress = $dashboard->newAddress();
-            $toastMsg = 'Nová přijímací adresa byla vytvořena.';
+            try {
+                $newReceiveAddress = $dashboard->newAddress();
+                $toastMsg = 'Nová přijímací adresa byla vytvořena.';
+            } catch (Throwable $exception) {
+                \BtcPayLite\WalletAddressError::log($exception);
+                $sendResult = \BtcPayLite\WalletAddressError::message($exception);
+                $sendResultIcon = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ';
+            }
         } elseif ($action === 'export_keys') {
             $password = is_string($_POST['export_password'] ?? null)
                 ? $_POST['export_password']
