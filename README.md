@@ -493,6 +493,11 @@ composer dump-autoload --optimize
 
 ### Nová instalace přes web
 
+Pro nové nasazení i přenos použijte [opakovatelný postup nasazení](docs/DEPLOYMENT.md).
+Obsahuje kontrolu webového/CLI PHP, Composer, reprodukci GMP pro XAMPP,
+generátor sdílených oprávnění podle config.php, migrace a provoz workerů.
+Lokální kontrola: `php bin/deployment.php --check`; plán oprávnění: `php bin/deployment.php --help`.
+
 1. Naklonujte projekt, spusťte `composer install` a nastavte web root na adresář projektu.
 2. Webovému uživateli dočasně povolte vytvořit `config.php` v kořeni projektu. Adresáře peněženek ponechte mimo web root.
 3. Otevřete kořenovou URL aplikace. Pokud `config.php` neexistuje, aplikace vás přesměruje na `install.php`.

@@ -54,6 +54,7 @@ $csrf=AuthManager::csrfToken();
 <p><small><?= $html($schema['scope']) ?> Dodatečné tabulky zůstávají beze změny.</small></p>
 <?php if (isset($storeEnvironment)): ?>
 <h2>Prostředí pro vytváření obchodů</h2>
+<p>Opakovatelné nasazení: <a href="https://github.com/agp-l/BTCPayServerLite/blob/main/docs/DEPLOYMENT.md">návod a uložené instalační kroky</a>. Lokální kontrolu spustíte <code>php bin/deployment.php --check</code>. Plán oprávnění připraví <code>php bin/deployment.php --help</code>.</p>
 <p>PHP <?= $html($storeEnvironment['php_version']) ?> (<?= $html($storeEnvironment['php_sapi']) ?>), uživatel procesu: <strong><?= $html($storeEnvironment['process_user']) ?></strong>.<br>Načtené php.ini: <code><?= $html($storeEnvironment['php_ini']) ?></code></p>
 <p>Kontrola se provádí přímo v PHP webového serveru. Nevytváří peněženku ani nespouští Electrum. Dostupnost jeho Python závislostí ověří až samotné spuštění.</p>
 <div class="scroll"><table><tr><th>Požadavek</th><th>Stav</th><th>Podrobnosti</th></tr>
