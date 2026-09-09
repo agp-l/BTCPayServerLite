@@ -86,3 +86,19 @@ indikace. Návrh na jiné zacházení s partial payment není součástí této 
 
 Webhooky se atomicky zařadí se změnou stavu, ale doručuje je webhook_cron.php.
 Receive sync je další samostatný worker. Jejich heartbeat tato stránka neměří.
+
+## Když se střídají chyby a prázdné úspěšné běhy
+
+Po chybě worker odloží fakturu o 30 sekund. Timer může mezitím vykázat prázdnou
+úspěšnou dávku; to nedokazuje funkční RPC. `error_type` proto zůstává až do další
+neprázdné dávky bez chyby. Poslední úspěch v tabulce stále znamená dokončení běhu.
+
+Journal nově rozlišuje `cache_directory`, `cache_lock_open`, `cache_lock_timeout`,
+`cache_write`, `upstream_backoff`, `rpc_authentication`, `rpc_transport`,
+`rpc_timeout`, `rpc_http`, `rpc_protocol`, `rpc_method_unavailable`, `rpc_remote`,
+`invalid_balance` a `payment_database`. RPC detaily jsou jen číselné HTTP/RPC/cURL
+kódy, databázové jen SQLSTATE. Žádné raw odpovědi či exception zprávy.
+
+Pro `cache_lock_open` nestačí zapisovat do adresáře: worker i PHP uživatel musí
+umět otevřít už existující lock soubory. Použijte plán oprávnění z nasazení;
+neodstraňujte zámky za běhu. Pro jiné kódy postupujte podle vysvětlení v adminu.

@@ -557,3 +557,15 @@ user host is still unknown. Added allowlisted cache/RPC/SQL diagnostics, no raw
 upstream messages. Empty batches now retain the last error until a non-empty clean
 batch, independently of successful process heartbeat. No migration or scheduler change.
 Next: regression tests, publish, ask user for new reason from journal.
+
+### Failure diagnostics — verified
+
+- Cache directory/open/write failures and lock timeout are distinct; RPC authentication,
+  timeout, protocol and missing command preserve typed causes without raw messages.
+- Targeted tests passed: PaymentFailureDiagnosticsTest, PaymentWorkerMonitorTest,
+  CorePaymentArchitectureTest (including 100 concurrent statuses/single-flight), and
+  DatabaseUpgradeTest (actual admin HTTP and migration). Empty retry-window batches
+  retain the warning; non-empty clean batches clear it.
+- No database migration required. User must pull, then inspect a new scheduled failed
+  run's reason. The original generic log does not establish whether their host has a
+  permission failure, RPC failure, or contention; no blind permission changes made.

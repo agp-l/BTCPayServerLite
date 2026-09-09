@@ -43,12 +43,19 @@ try {
     $r=$runner->run('cli'); coreSame(false,$r['success'],'Observation failure reported success');
     $snapshot=$monitor->snapshot(); coreSame('Failed',$snapshot['runs']['cli']['state'],'Failure not recorded');
     coreCheck(!str_contains(json_encode($snapshot),'private-upstream-error'),'Raw error persisted');
+    $empty=$runner->run('cli');
+    coreSame(0,$empty['stats']['scanned'],'Retry delay did not produce empty batch');
+    $snapshot=$monitor->snapshot();
+    coreSame('Succeeded',$snapshot['runs']['cli']['state'],'Empty process heartbeat should succeed');
+    coreSame('observation_failed',$snapshot['runs']['cli']['error_type'],'Empty batch erased unresolved payment failure');
+    coreSame('CLI se spouští; předchozí chyba kontroly zatím není ověřeně vyřešena',PaymentWorkerMonitor::automaticState($snapshot),'False recovery advertised');
     $pdo->exec("UPDATE invoices SET next_check_at=NULL WHERE id='monitor-invoice'");
     $provider->fail=false; $r=$runner->run('cli');
     coreSame(1,$r['stats']['transitioned'],'Shared runner did not transition invoice');
     coreSame('Settled',$pdo->query("SELECT status FROM invoices WHERE id='monitor-invoice'")->fetchColumn(),'Invoice not settled');
     $snapshot=$monitor->snapshot(); coreSame('Succeeded',$snapshot['runs']['cli']['state'],'Recovery did not clear failure state');
     coreCheck($snapshot['runs']['cli']['last_failed_at']!==null,'Lost failure history');
+    coreSame(null,$snapshot['runs']['cli']['error_type'],'Successful nonempty batch did not clear error');
     // Independent connection holds the instance lock: neither source may start another batch.
     $other=new Database($host,$name,$user,$pass,$port);
     $q=$other->getPdo()->prepare('SELECT GET_LOCK(?,0)'); $q->execute([$monitor->lockName()]);

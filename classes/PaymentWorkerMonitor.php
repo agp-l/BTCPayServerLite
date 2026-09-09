@@ -28,6 +28,7 @@ final class PaymentWorkerMonitor
 
     public function finish(string $source, string $token, array $stats, ?string $error): void
     {
+        // Successful process heartbeat is not proof of RPC recovery when no invoice was checked.
         $stmt = $this->pdo->prepare("UPDATE payment_worker_runtime SET state=?,finished_at=UNIX_TIMESTAMP(),
             last_success_at=IF(? IS NULL,UNIX_TIMESTAMP(),last_success_at),
             last_failed_at=IF(? IS NOT NULL,UNIX_TIMESTAMP(),last_failed_at),

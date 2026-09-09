@@ -64,7 +64,7 @@ class PaymentWorker
                 $this->releaseFailedLease((string) $invoice['id'], $token);
                 $code = PaymentFailureDiagnostics::code($exception);
                 $this->failureCodes[$code] = ($this->failureCodes[$code] ?? 0) + 1;
-                error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . json_encode(PaymentFailureDiagnostics::details($exception))); 
+                error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . json_encode(PaymentFailureDiagnostics::details($exception)));
             }
         }
         return $stats;
