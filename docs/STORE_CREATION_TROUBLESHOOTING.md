@@ -54,3 +54,22 @@ Kontrola závislostí probíhá před vytvořením nového wallet souboru. Insta
 vyžaduje GMP a XPUB knihovny také. Stávající [Electrum CLI postup](https://github.com/spesmilo/electrum/blob/master/run_electrum)
 a [veřejné příkazy create/getmpk/listaddresses](https://github.com/spesmilo/electrum/blob/master/electrum/commands.py)
 jsou zachované; bez důkazu nebyla přidána změna hesel nebo RPC fallback.
+
+## Offline command refuses a running daemon
+
+`Daemon already running (lockfile detected)` with `--offline` is a CLI data
+directory conflict, not a reason to stop the payment daemon. Upstream checks
+for a daemon lock before executing even offline `version`, `create`, `getmpk`
+and `listaddresses`: https://github.com/spesmilo/electrum/blob/master/run_electrum
+
+The provisioner now allocates a private temporary data directory per creation,
+uses it for all three offline commands and cleans it in finally. The wallet
+stays at its explicit store_wallets_dir path. Only chain flags are copied from
+electrum_data_dir/config; daemon credentials, plugins and lockfiles stay there.
+The PHP process needs a writable system temporary directory as well as the
+managed wallet directory. No new config option or SQL migration is required.
+
+Deploy with `git pull --ff-only` then retry store creation. Do not delete the
+daemon lock or stop Electrum to make offline provisioning work. Existing wallets
+and repair/monitoring RPC paths remain unchanged. This fixes the demonstrated
+lock conflict; another local Python/permission failure can still require diagnosis.
