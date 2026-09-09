@@ -114,8 +114,7 @@ try {
                 $toastMsg = 'Nová přijímací adresa byla vytvořena.';
             } catch (Throwable $exception) {
                 \BtcPayLite\WalletAddressError::log($exception);
-                $sendResult = \BtcPayLite\WalletAddressError::message($exception);
-                $sendResultIcon = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ';
+                $pageError = \BtcPayLite\WalletAddressError::message($exception);
             }
         } elseif ($action === 'export_keys') {
             $password = is_string($_POST['export_password'] ?? null)

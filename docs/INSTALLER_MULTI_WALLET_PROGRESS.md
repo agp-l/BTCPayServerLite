@@ -415,3 +415,12 @@ Record test results and published commits here as work progresses.
 - Allocation algorithm/sequence is unchanged; no fallback to bypass a failed XPUB
   reservation. Source checkpoint before tests; local root cause still needs new
   address error code from user after deployment.
+
+- WalletAddressErrorTest PASSED for nested SQL error 1146, missing GMP, wrapped
+  wallet locks/RPC failures, XPUB conflicts and suppression of raw messages.
+- BtcDashboardTest PASSED (6 cases). ReceiveCoordinationTest PASSED with isolated
+  MariaDB: 60 concurrent mixed API/admin/stateless allocations, unique addresses,
+  zero wallet RPC/locks for XPUB, persistent binding and bounded receive sync.
+- No local allocation failure reproduced. User must pull main, retry New address
+  and send the new address-specific error code; do not claim the underlying local
+  cause is fixed. The action error appears at the top while balance reads continue.
