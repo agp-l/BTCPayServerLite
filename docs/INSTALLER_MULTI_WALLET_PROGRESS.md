@@ -518,3 +518,16 @@ Record test results and published commits here as work progresses.
 - User confirmed the page works on their installation. The final template groups schema,
   migrations and environment checks into shared admin cards; HTML remains separate from
   the controller. DatabaseMigrationManager remains the sole migration implementation.
+
+## Payment monitoring admin — source checkpoint
+
+- Added admin/payment_monitor controller/view and menu, DB-only GET, CSRF protected
+  bounded manual run using the existing PaymentWorker (no shell or checkout RPC).
+- CLI and manual runner share an instance DB advisory lock; invoice leases and atomic
+  observation/status/outbox transactions remain unchanged. Manual requests are cooled
+  down 15s and bounded to 20 invoices/12s; CLI to 100/45s (whole operation budget).
+- Migration 010 runtime table records CLI/manual separately, including zero-work success,
+  failures and interrupted runs. UI describes observed CLI activity, not installed cron.
+- State machine suggestions are not applied: partial-payment policy would conflict with
+  the explicitly agreed terminal/non-regressing transitions. No new payment semantics.
+- Next: targeted DB/HTTP tests, deployment instructions and final checkpoint.

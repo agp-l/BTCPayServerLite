@@ -11,6 +11,8 @@ use Throwable;
 /** Owns invoice monitoring. RPC is outside transactions; state + outbox commit together. */
 class PaymentWorker
 {
+    public const ELIGIBLE_SQL = "(status IN ('New', 'Processing') OR (status = 'Expired'
+        AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0)))";
     private Closure $clock;
     private int $leaseSeconds;
 
@@ -29,10 +31,13 @@ class PaymentWorker
     }
 
     /** @return array{scanned:int,transitioned:int,expired:int,failed:int,deliveries_queued:int} */
-    public function run(int $batchSize = 50): array
+    public function run(int $batchSize = 50, ?int $maxSeconds = null): array
     {
+        $deadline = $maxSeconds === null ? null : hrtime(true) / 1e9 + max(1, $maxSeconds);
         $stats = ['scanned' => 0, 'transitioned' => 0, 'expired' => 0, 'failed' => 0, 'deliveries_queued' => 0];
         for ($i = 0; $i < max(1, min($batchSize, 500)); ++$i) {
+            // Do not claim work unless a whole bounded observation fits the remaining budget.
+            if ($deadline !== null && hrtime(true) / 1e9 + $this->blockchain->maxObservationDurationSeconds() > $deadline) { break; }
             $token = bin2hex(random_bytes(16));
             // Claim just before observation. A queued batch must not consume its
             // lease while waiting for all earlier RPCs to finish.
@@ -66,8 +71,7 @@ class PaymentWorker
         $update = $pdo->prepare(
             "UPDATE invoices
                 SET payment_processing_token = ?, payment_processing_until = UNIX_TIMESTAMP() + ?
-              WHERE (status IN ('New', 'Processing') OR (status = 'Expired'
-                     AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0)))
+              WHERE " . self::ELIGIBLE_SQL . "
                 AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())
                 AND (next_check_at IS NULL OR next_check_at <= ?)
            ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"

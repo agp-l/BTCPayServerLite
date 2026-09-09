@@ -89,7 +89,7 @@ require __DIR__ . '/layout/header.php';
       </table>
     </div>
   </form>
-  <p>Automatický katalog zahrnuje migrace 001–009. Starší datové migrace a neznámé nové soubory vyžadují vlastní postup; nástroj je nespouští podle názvu. Rozdíly nemaže ani neopravuje odhadnutými ALTER příkazy.</p>
+  <p>Automatický katalog zahrnuje migrace 001–010. Starší datové migrace a neznámé nové soubory vyžadují vlastní postup; nástroj je nespouští podle názvu. Rozdíly nemaže ani neopravuje odhadnutými ALTER příkazy.</p>
 </section>
 <?php endif; ?>
 

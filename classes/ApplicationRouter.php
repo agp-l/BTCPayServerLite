@@ -64,6 +64,9 @@ final class ApplicationRouter
             '/admin/database_upgrade' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/database_upgrade.php', 'database_upgrade', 'admin'
             ),
+            '/admin/payment_monitor' => $this->page(
+                ['GET', 'HEAD', 'POST'], 'admin/payment_monitor.php', 'payment_monitor', 'admin'
+            ),
             '/admin/settings' => $this->page(
                 ['GET', 'HEAD', 'POST'], 'admin/settings.php', 'settings', 'admin'
             ),

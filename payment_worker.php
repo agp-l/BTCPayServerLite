@@ -3,10 +3,6 @@
 declare(strict_types=1);
 
 use BtcPayLite\Database;
-use BtcPayLite\ElectrumBlockchainProvider;
-use BtcPayLite\ElectrumRPCFactory;
-use BtcPayLite\PaymentWorker;
-use BtcPayLite\WebhookDeliveryRepository;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -33,24 +29,23 @@ try {
         $databasePort
     );
 
-    $rpc = ElectrumRPCFactory::fromConfig($config);
-
-    $blockchain = new ElectrumBlockchainProvider($rpc);
-    $webhookRepository = new WebhookDeliveryRepository($database);
-    $worker = new PaymentWorker($database, $blockchain, $webhookRepository);
-
-    $stats = $worker->run(100);
-    $statusCode = 200;
-    $response = [
-        'success' => true,
-        'stats' => $stats,
-        'timestamp' => time(),
-    ];
+    if (in_array('--check', $argv, true)) {
+        $response = (new \BtcPayLite\PaymentWorkerMonitor($database->getPdo()))->snapshot();
+        $response['automatic_state'] = \BtcPayLite\PaymentWorkerMonitor::automaticState($response);
+        $response['scope'] = 'Database and recorded runs only; no blockchain RPC or invoice changes.';
+        $statusCode = 200;
+    } else {
+        $response = \BtcPayLite\PaymentWorkerRunner::fromConfig($database, $config)->run('cli');
+        $statusCode = ($response['busy'] || $response['success']) ? 200 : 500;
+    }
+    $response['timestamp'] = time();
 } catch (Throwable $exception) {
     $statusCode = 500;
     $response = [
         'success' => false,
-        'error' => $exception->getMessage(),
+        'error' => $exception instanceof PDOException && in_array((string)$exception->getCode(), ['42S02','42S22'], true)
+            ? 'Database migration required; open admin/database_upgrade.' : 'Payment worker failed; check database, RPC and cache permissions.',
+        'error_type' => $exception::class,
         'timestamp' => time(),
     ];
 }
