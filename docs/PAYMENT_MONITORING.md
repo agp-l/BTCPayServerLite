@@ -54,7 +54,7 @@ sudo install -m 644 /tmp/btcpay-lite-payment-worker.timer /etc/systemd/system/bt
 sudo systemctl daemon-reload
 sudo systemctl enable --now btcpay-lite-payment-worker.timer
 systemctl status btcpay-lite-payment-worker.timer --no-pager
-systemctl list-timers btcpay-lite-payment-worker.timer
+systemctl list-timers btcpay-lite-payment-worker.timer --no-pager
 journalctl -u btcpay-lite-payment-worker.service -n 30 --no-pager
 ```
 

@@ -1,7 +1,7 @@
 # Opakovatelné nasazení BTCPay Lite
 
 Tento dokument nahrazuje ruční skládání kroků z chatu. Platí pro Linux a současné
-PHP/MySQL/Electrum řešení. Neinstaluje nový serverový stack. Všechny soubory jsou
+PHP/MySQL/Electrum řešení. Neinstaluje nový serverový stack. Návody a generátory jsou
 v Gitu; místní `config.php`, wallet soubory a databáze se do Gitu neukládají.
 
 ## 1. Zapište prostředí cílového serveru
@@ -133,6 +133,31 @@ CLI i generátor stejné hodnoty. Nesdílené mounty nebo odlišné adresáře l
 nespojí. Pokud rodičovská cesta nemá právo průchodu, zkontrolujte `namei -l CESTA`;
 generátor nemění oprávnění celé `/opt`, domovských adresářů ani všech wallet souborů
 rekurzivně. Ručně pojmenované wallet soubory mimo default config vyžadují vlastní ACL.
+
+### Když web funguje, ale CLI hlásí chybu cache
+
+`cache_directory` / `cache_lock_open` znamená jiný problém než obsazený daemon.
+Nejdříve znovu vygenerujte plán oprávnění výše pro oba skutečné účty. Nestačí
+opravit `var/locks`: blockchain observation používá samostatné `var/blockchain`.
+Rodičovský `var` musí dovolit průchod a již existující cache/lock soubory musí
+být přístupné oběma účtům. Default ACL řeší až soubory vytvořené v budoucnu.
+
+Pro zde popsanou instalaci `ag` + `daemon` s výchozí cache byla ověřena tato
+cílená oprava (při vlastním cache adresáři upravte cesty):
+
+```bash
+cd /opt/lampp/htdocs/BTCPayLite
+sudo mkdir -p var/blockchain
+sudo setfacl -m u:ag:rx,u:daemon:rx var
+sudo setfacl -m u:ag:rwx,u:daemon:rwx var/blockchain
+sudo setfacl -d -m u:ag:rwx,u:daemon:rwx var/blockchain
+sudo find var/blockchain -maxdepth 1 -type f -exec setfacl -m u:ag:rw,u:daemon:rw {} +
+```
+
+Zámky nemažte a nepřepínejte pro CLI jiný adresář. Po opravě ověřte neprázdnou
+kontrolu platby v journalu, nikoli jen prázdný úspěšný běh. Dne 10. září 2026 tak
+uživatelský server zpracoval dvě faktury do Expired bez chyby. Příjem a webhook
+vyžadují vlastní test.
 
 ## 5. Kontrola a provoz
 

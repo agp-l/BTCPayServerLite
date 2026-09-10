@@ -569,3 +569,20 @@ Next: regression tests, publish, ask user for new reason from journal.
 - No database migration required. User must pull, then inspect a new scheduled failed
   run's reason. The original generic log does not establish whether their host has a
   permission failure, RPC failure, or contention; no blind permission changes made.
+
+## 2026-09-10 — README and documentation cleanup checkpoint
+
+- User supplied a successful scheduled run at 09:38:33 CEST: scanned 2,
+  transitioned 2, expired 2, failed 0. Shared cache ACL repair resolved the
+  observed deployment failure. This verifies expiry, not funded settlement
+  or webhook delivery; previous diagnostic uncertainty is now resolved.
+- Replaced the oversized outdated README with current installation, admin tools,
+  worker ownership and explicit evidence limits. Extracted API/config reference,
+  added documentation index, testing guide and prioritized ROADMAP.
+- Archived the original refactor checklist with a compatibility pointer. Kept
+  historical audit results, migration SQL, vendor and standalone Node/EJS demo
+  unchanged. Demo has its own entrypoint, so removal is a separate decision.
+- Added the confirmed cache ACL repair to deployment instructions, covering
+  parent traversal, existing files and default ACL; never delete active locks.
+- Source checkpoint before validation. Next: check changed links, verify claims
+  against implementation and review diff; no PHP/SQL behavior changed.
