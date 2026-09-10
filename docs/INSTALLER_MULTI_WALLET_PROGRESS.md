@@ -611,3 +611,14 @@ Next: regression tests, publish, ask user for new reason from journal.
   discussion remains a record, not an outstanding task. Git retains the demo.
 - Source committed before validation. Next: existing PHP routing/UI/checkout
   boundary tests, deleted-path reference scan and diff checks.
+
+### Node demo removal — validated
+
+- Six existing suites passed: FrontControllerBoundaryTest, RouteLinkBoundaryTest,
+  AdminUiBoundaryTest, ClientUiBoundaryTest, CheckoutHttpBoundaryTest and
+  StatelessCheckoutBoundaryTest (60 checks in total).
+- All 27 removed demo paths are absent. No PHP or CI references to their
+  entrypoint, modules, templates or package/metadata files remain.
+- 26 README/ROADMAP local links resolve; git diff --check passes.
+- assets, admin/client/checkout PHP, core classes, Composer and vendor have no
+  diff against the pre-cleanup commit. No new runtime tests or migrations needed.
