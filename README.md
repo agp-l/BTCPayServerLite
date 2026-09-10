@@ -86,7 +86,7 @@ Blockchain RPC běží mimo DB transakci. Po observation worker v jedné krátk�
 
 `New` může přejít na `Processing`, `Expired` nebo `Settled`. Jakákoli zjištěná částečná platba vede na `Processing`; ten se nevrací na `New`. `Expired` může při pozdní platbě přejít na `Processing` nebo `Settled`. `Settled` je terminální. Expired faktury se běžně kontrolují ještě 24 hodin, déle při platební indikaci.
 
-Observation ukládá integer satoshi jako **aktuální confirmed balance a podepsanou mempool delta**, nikoli kumulativní historicky přijaté outputs. Terminální stav chrání už uložené `Settled`; omezení před první observation a další kroky popisuje [plán](docs/ROADMAP.md).
+Observation ukládá integer satoshi jako **aktuální confirmed balance a podepsanou mempool delta**, nikoli kumulativní historicky přijaté outputs. Terminální stav chrání už uložené DB `Settled`. Stateless token sám trvalou paměť tohoto stavu nemá; po utracení se jeho balance-based výsledek může změnit. Omezení před první observation a další kroky popisuje [plán](docs/ROADMAP.md).
 
 ## Integrace a hranice podpory
 

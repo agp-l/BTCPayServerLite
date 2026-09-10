@@ -95,6 +95,6 @@ nikoli pouze úspěšný návrat RPC broadcast.
 
 Nejdřív dokončit provozní důkazy z bodu 1, současně připravit konkrétní návrh
 historických observations z bodu 2. Potom uzavřít provisioning crash recovery
- a monitoring front. Payout reconciliation a potvrzení řešit jako samostatnou
+a monitoring front. Payout reconciliation a potvrzení řešit jako samostatnou
 etapu před směnárnou. Úspěchy průběžně zapsat do historie a odkazovat na commit,
 scénář a prostředí; neoznačovat celý projekt jako auditovaný jednou sadou testů.

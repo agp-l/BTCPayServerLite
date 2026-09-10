@@ -129,4 +129,3 @@ $paymentUrl = $publicBaseUrl . '/url-invoice?token=' . rawurlencode($result['tok
 ```
 
 `secretKey` musí být stabilní tajný řetězec o délce nejméně 16 bajtů. Jeho změna zneplatní všechny dříve vytvořené odkazy. Token obsahuje platební údaje a jejich podpis, nikoli seed, xprv nebo heslo peněženky.
-

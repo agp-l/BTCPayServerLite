@@ -586,3 +586,15 @@ Next: regression tests, publish, ask user for new reason from journal.
   parent traversal, existing files and default ACL; never delete active locks.
 - Source checkpoint before validation. Next: check changed links, verify claims
   against implementation and review diff; no PHP/SQL behavior changed.
+
+### Documentation cleanup — validation complete
+
+- Checked 66 local documentation links/anchors: no missing targets.
+- git diff --check is clean after removing extraction/archive whitespace.
+- Cross-checked current worker eligibility, balance semantics, stateless factory,
+  payout broadcast boundary, deployment ACL generator and admin menu names.
+- Marked the old architecture upgrade paragraph as a historical baseline and
+  linked the current migration/monitoring guides; original test counts retained.
+- No PHP, SQL, dependency or running deployment changes. Full runtime tests were
+  not rerun for this documentation-only pass; no claim of funded payment or
+  webhook end-to-end validation added. Next development steps are in ROADMAP.md.

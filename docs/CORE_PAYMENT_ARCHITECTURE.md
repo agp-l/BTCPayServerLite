@@ -3,6 +3,11 @@
 This document describes the stabilization of `main` from `cbeba360`. The core uses
 the existing PHP/PDO, Electrum, XPUB generator and `shanelic/bitcoin-p8` stack.
 
+For current installation and migration steps use [Deployment](DEPLOYMENT.md) and
+[Database upgrade](DATABASE_UPGRADE.md). [Payment monitoring](PAYMENT_MONITORING.md)
+describes the later bounded CLI/admin runner and heartbeat. Historical validation
+counts below belong to their checkpoint; open work is in [Roadmap](ROADMAP.md).
+
 ## Owners and boundaries
 
 | Responsibility | Owner | External work |
@@ -153,7 +158,8 @@ of `getaddressbalance`; it is not a historical-receipts endpoint.
 
 ## Upgrade and validation
 
-For an installation already at `cbeba360`, stop invoice/worker writers, apply
+Historical stabilization baseline (not the full current upgrade path): for an
+installation already at `cbeba360`, stop invoice/worker writers, apply
 `migrations/004_core_payment_consistency.sql` then
 `migrations/005_idempotency_resource_reservation.sql`, deploy the matching code,
 and resume writers. Fresh installations use `sql.sql` and do not reapply these

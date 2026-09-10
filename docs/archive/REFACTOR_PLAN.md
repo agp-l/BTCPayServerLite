@@ -2,7 +2,7 @@
 
 # BTC Pay Lite – Core PHP Architecture Refactoring Plan
 
-**Branch:** `googleAIstudio`  
+**Branch:** `googleAIstudio`
 **Focus:** Evolutionary refactoring of core PHP classes for concurrency, multi-wallet Electrum, atomic XPUB address derivation, decoupled background payment monitoring, and removal of global lock serialization.
 
 ---
