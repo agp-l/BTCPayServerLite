@@ -33,7 +33,7 @@ composer check-platform-reqs --no-dev
 
 Instalátor zpřístupněte jen správci. Konfiguraci, původní podpisové klíče, databázi a wallet soubory zálohujte společně mimo veřejný web. Smazání `config.php` není upgrade ani obnova používané instalace. [Postup obnovy a oprávnění](docs/DEPLOYMENT.md) zahrnuje rozdílné účty Apache a workeru.
 
-V repozitáři zůstává také samostatný Node/EJS prototyp (`server.js`, `src/`, `views/`, `package.json`). Používá demonstrativní data v paměti a není PHP platebním backendem. `npm start` není instalační ani testovací postup pro tuto aplikaci.
+Aplikace nevyžaduje Node.js, npm ani Bun. Původní samostatné Node/EJS demo bylo odstraněno; obnovit je lze z historie Gitu. Šablony PHP zůstávají v adresářích příslušných modulů (`admin/views`, `client/views`, `checkout/views`) a prohlížečové CSS/JavaScript v `assets/`.
 
 ## Aktualizace existující instance
 

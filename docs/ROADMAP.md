@@ -75,15 +75,15 @@ nikoli pouze úspěšný návrat RPC broadcast.
 
 ## 4. Úklid a kapacita v samostatných krocích
 
-- **Node/EJS prototyp:** `server.js`, `src/`, `views/`, package/bun soubory jsou
-  samostatná aplikace s in-memory daty a demo přihlášením. PHP ji nevolá, ale má
-  vlastní npm entrypoint. Přesunout do jasně odděleného demo balíčku nebo archivu
-  až po ověření, zda jej používá preview/publikování; tento úklid jej nemaže.
+Node/EJS demo bylo 10. září na výslovný požadavek vlastníka odstraněno včetně
+spouštěcích a konfiguračních souborů. PHP šablony a společné assets zůstaly;
+pro případné obnovení slouží historie Gitu. Tento bod je uzavřený.
+
 - **Závislosti:** zmapovat původ a advisories zamčených knihoven, důvod verzovaného
   vendor a vypnutého Composer advisory blocking. Zachovat bitcoin-p8 v tomto
   stabilizačním průchodu; případné změny až s kontrolou derivací a kompatibility.
 - **Webserver:** ověřit skutečnou ochranu zdrojů, config, runtime cache, záloh a
-  demo souborů v Apache/Nginx. Samotný PHP test nepotvrzuje deployment pravidla.
+  ostatních nepublikovatelných souborů v Apache/Nginx. Samotný PHP test nepotvrzuje deployment pravidla.
 - **Kapacita:** změřit latenci fronty, počet RPC, velikost DB/cache a chování při
   pomalém Electru. Dnešní 100procesové testy ověřují invarianty, ne garantovanou
   kapacitu celé služby. Před více hosty vyřešit sdílení file locks/cache; oddělené

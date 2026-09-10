@@ -598,3 +598,16 @@ Next: regression tests, publish, ask user for new reason from journal.
 - No PHP, SQL, dependency or running deployment changes. Full runtime tests were
   not rerun for this documentation-only pass; no claim of funded payment or
   webhook end-to-end validation added. Next development steps are in ROADMAP.md.
+
+## 2026-09-10 — Remove standalone Node/EJS demo (source checkpoint)
+
+- Owner explicitly requested removal after the prior documentation-only pass.
+- Removed server.js, its src/config.js and src/store.js, 20 root views/*.ejs
+  templates, package.json, bun.lock and demo environment/metadata files.
+- PHP and CI reference none of these files. The demo served shared assets but
+  PHP uses those too: assets, PHP module views, Composer and vendor are retained.
+- No OS packages uninstalled, database changes or wallet/config modifications.
+- README and ROADMAP now describe the PHP-only application; historical demo
+  discussion remains a record, not an outstanding task. Git retains the demo.
+- Source committed before validation. Next: existing PHP routing/UI/checkout
+  boundary tests, deleted-path reference scan and diff checks.
