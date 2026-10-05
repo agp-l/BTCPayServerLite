@@ -43,6 +43,18 @@ require __DIR__ . '/layout/header.php';
   </form>
 </section>
 <section class="card">
+  <h2 class="card-title">Pozdní platba konkrétní faktury</h2>
+  <p>Ověří právě jednu fakturu podle ID, i když je Expired déle než 24 hodin. Použije stejnou kontrolu a webhook frontu. Settled ani fakturu kontrolovanou v posledních 10 minutách znovu neskenuje.</p>
+  <p class="card-subtitle">Sdílí desetiminutové omezení ručního tlačítka. Kontrola sama nepotvrzuje ani neodesílá platbu.</p>
+  <form method="post" action="<?= $routeUrl('/admin/payment_monitor') ?>">
+    <input type="hidden" name="csrf_token" value="<?= $html($csrfToken) ?>">
+    <input type="hidden" name="action" value="rescan">
+    <label for="rescan-invoice-id">ID faktury</label>
+    <input id="rescan-invoice-id" name="invoice_id" type="text" required maxlength="64" autocomplete="off">
+    <button class="primary" type="submit" <?= $snapshot['running'] ? 'disabled' : '' ?>>Ověřit tuto fakturu</button>
+  </form>
+</section>
+<section class="card">
   <h2 class="card-title">Poslední běhy</h2>
   <div class="data-table-wrap"><table class="data-table">
     <thead><tr><th>Spuštění</th><th>Výsledek</th><th>Začátek / konec</th><th>Poslední úspěch / chyba</th><th>Zkontrolováno / změněno / chyb</th></tr></thead>

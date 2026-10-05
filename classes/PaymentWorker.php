@@ -35,24 +35,29 @@ class PaymentWorker
     }
 
     /** @return array{scanned:int,transitioned:int,expired:int,failed:int,deliveries_queued:int} */
-    public function run(int $batchSize = 50, ?int $maxSeconds = null): array
+    public function run(int $batchSize = 50, ?int $maxSeconds = null, ?string $invoiceId = null): array
     {
+        if ($invoiceId !== null && preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\z/D', $invoiceId) !== 1) {
+            throw new \InvalidArgumentException('Invalid invoice ID for rescan.');
+        }
         $this->failureCodes = [];
         $deadline = $maxSeconds === null ? null : hrtime(true) / 1e9 + max(1, $maxSeconds);
         $stats = ['scanned' => 0, 'transitioned' => 0, 'expired' => 0, 'failed' => 0, 'deliveries_queued' => 0];
-        for ($i = 0; $i < max(1, min($batchSize, 500)); ++$i) {
+        for ($i = 0; $i < ($invoiceId === null ? max(1, min($batchSize, 500)) : 1); ++$i) {
             // Do not claim work unless a whole bounded observation fits the remaining budget.
             if ($deadline !== null && hrtime(true) / 1e9 + $this->blockchain->maxObservationDurationSeconds() > $deadline) { break; }
             $token = bin2hex(random_bytes(16));
             // Claim just before observation. A queued batch must not consume its
             // lease while waiting for all earlier RPCs to finish.
-            $invoice = $this->claimInvoice($token);
+            $invoice = $this->claimInvoice($token, $invoiceId);
             if ($invoice === null) {
                 break;
             }
             ++$stats['scanned'];
             try {
-                $interval = PaymentCheckPolicy::interval((int) $invoice['created_at'], ($this->clock)(), (string) $invoice['status']);
+                $interval = $invoiceId === null
+                    ? PaymentCheckPolicy::interval((int) $invoice['created_at'], ($this->clock)(), (string) $invoice['status'])
+                    : PaymentCheckPolicy::MIN_INTERVAL;
                 $observation = $this->blockchain instanceof ElectrumBlockchainProvider
                     ? $this->blockchain->observeAddressAtInterval((string) $invoice['btc_address'],
                         BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis(), $interval)
@@ -79,21 +84,24 @@ class PaymentWorker
         return $stats;
     }
 
-    private function claimInvoice(string $token): ?array
+    private function claimInvoice(string $token, ?string $invoiceId): ?array
     {
         $pdo = $this->database->getPdo();
         // Database time keeps independent hosts on the same lease clock.
         $update = $pdo->prepare(
             "UPDATE invoices
                 SET payment_processing_token = ?, payment_processing_until = UNIX_TIMESTAMP() + ?
-              WHERE " . self::ELIGIBLE_SQL . "
+              WHERE " . ($invoiceId === null ? self::ELIGIBLE_SQL : "id = ? AND status IN ('New', 'Processing', 'Expired')") . "
                 AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())
-                AND (next_check_at IS NULL OR next_check_at <= ?)
+                " . ($invoiceId === null ? 'AND (next_check_at IS NULL OR next_check_at <= ?)' : '') . "
                 AND (last_checked_at IS NULL OR last_checked_at <= ?)
            ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"
         );
         $now = ($this->clock)();
-        $update->execute([$token, $this->leaseSeconds, $now - PaymentCheckPolicy::EXPIRED_MONITORING_SECONDS, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
+        $parameters = $invoiceId === null
+            ? [$token, $this->leaseSeconds, $now - PaymentCheckPolicy::EXPIRED_MONITORING_SECONDS, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]
+            : [$token, $this->leaseSeconds, $invoiceId, $now - PaymentCheckPolicy::MIN_INTERVAL];
+        $update->execute($parameters);
         if ($update->rowCount() !== 1) {
             return null;
         }

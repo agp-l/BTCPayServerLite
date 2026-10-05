@@ -12,6 +12,27 @@ if (PHP_SAPI !== 'cli') {
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
+if (in_array('--help', $argv, true)) {
+    echo "Usage: php payment_worker.php [--check | --invoice=INVOICE_ID]\n"
+        . "--check reads DB only. --invoice observes one non-settled invoice, including old Expired; minimum 10 minutes.\n";
+    exit(0);
+}
+$invoiceId = null;
+foreach (array_slice($argv, 1) as $argument) {
+    if ($argument === '--check') { continue; }
+    if (str_starts_with($argument, '--invoice=') && $invoiceId === null
+        && preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\z/D', substr($argument, 10)) === 1) {
+        $invoiceId = substr($argument, 10);
+    } else {
+        fwrite(STDERR, "Invalid option; use --help.\n");
+        exit(1);
+    }
+}
+if ($invoiceId !== null && in_array('--check', $argv, true)) {
+    fwrite(STDERR, "--check and --invoice cannot be combined.\n");
+    exit(1);
+}
+
 require __DIR__ . '/vendor/autoload.php';
 
 try {
@@ -35,7 +56,7 @@ try {
         $response['scope'] = 'Database and recorded runs only; no blockchain RPC or invoice changes.';
         $statusCode = 200;
     } else {
-        $response = \BtcPayLite\PaymentWorkerRunner::fromConfig($database, $config)->run('cli');
+        $response = \BtcPayLite\PaymentWorkerRunner::fromConfig($database, $config)->run('cli', $invoiceId);
         $statusCode = ($response['busy'] || $response['success']) ? 200 : 500;
     }
     $response['timestamp'] = time();

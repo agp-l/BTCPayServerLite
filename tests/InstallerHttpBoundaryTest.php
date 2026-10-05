@@ -5,10 +5,9 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $installer = file_get_contents($root . '/install.php');
 $frontController = file_get_contents($root . '/index.php');
-$apache = file_get_contents($root . '/.htaccess');
 $css = file_get_contents($root . '/assets/install.css');
 
-foreach ([$installer, $frontController, $apache, $css] as $source) {
+foreach ([$installer, $frontController, $css] as $source) {
     if (!is_string($source)) {
         throw new RuntimeException('An installer boundary file is missing.');
     }
@@ -27,9 +26,6 @@ $checks = [
         !str_contains($installer, "posted('db_pass'")
         && !str_contains($installer, "posted('admin_password'")
         && !str_contains($installer, "posted('rpc_pass'"),
-    'Apache denies direct reads of configuration and temporary files' =>
-        str_contains($apache, 'config\\.php')
-        && str_contains($apache, '\\.btcpay-config-'),
     'installer has a dedicated responsive stylesheet' =>
         str_contains($css, '@media (max-width: 620px)')
         && str_contains($css, '--accent: #a855f7'),

@@ -11,6 +11,25 @@ DB práce může přidat dobu čekání na DB. Další ruční běh je možný p
 Zbytek fronty vyřídí další kliknutí nebo plánovač. GET pouze načítá diagnostiku.
 Otevření checkoutu ani vytvoření XPUB faktury worker nespouští.
 
+## Kontrola konkrétní pozdní faktury
+
+Po expiraci se neuhrazená faktura bez platební indikace automaticky sleduje
+ještě 24 hodin. Pokud zákazník zaplatil později, použijte v tomto admin přehledu
+**Pozdní platba konkrétní faktury** a její přesné ID, nebo cílený CLI příkaz:
+
+```bash
+php payment_worker.php --invoice=inv_ID
+```
+
+Kontroluje právě jednu New/Processing/Expired fakturu stejným workerem a outboxem.
+Neprochází všechny staré faktury, nikdy znovu neotevře Settled a neobchází lease,
+společný endpoint budget ani minimálně 10 minut od poslední kontroly. Chybějící
+ID nepřepne na běžnou dávku. `scanned: 0` znamená, že daný řádek nebyl způsobilý
+(neexistuje, Settled, držený lease nebo příliš brzká kontrola), nikoli „nezaplaceno“.
+Admin POST vyžaduje aktivního správce a CSRF a sdílí cooldown ručního běhu.
+Po skutečné observation se obnoví obvyklé plánování podle stavu. `--check` je
+samostatná DB diagnostika a nelze kombinovat s `--invoice`. Nová migrace není nutná.
+
 ## Jak se platba z e-shopu označí jako zaplacená
 
 1. E-shop vytvoří fakturu přes API. BTC Pay Lite uloží její částku a přijímací adresu.

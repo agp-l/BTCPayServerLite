@@ -95,7 +95,16 @@ Synchronizace skutečného Electra ani kompatibilita všech CMS tím nejsou prok
 
 `.htaccess` blokuje interní adresáře, dotfiles, SQL/log/cache/wallet soubory
 a zálohy před front controllery. Skutečný izolovaný Apache 2.4.58 prošel testem
-19 interních cest i zachovaných assets, checkoutu, veřejné dokumentace, API
+21 interních cest i zachovaných assets, checkoutu, veřejné dokumentace, API
 a Authorization v podadresáři. Test používá pouze falešné statické soubory,
 nikoli produkční konfiguraci. V CI je přidaný Apache test a PHP 8.2/8.3 matice;
 checkout používá současnou verzi 7.0.1. Nginx postup je popsaný, nebyl živě ověřen.
+
+## Checkpoint: konkrétní pozdní platba
+
+Admin CSRF POST a CLI `payment_worker.php --invoice=ID` nyní kontrolují pouze
+jeden explicitní non-Settled řádek, i po uplynutí neuhrazeného 24h late okna.
+Používají stejný worker, invoice lease, endpoint budget a atomický outbox.
+Minimální 10min odstup zůstává; chybějící ID neskenuje jiné faktury. Žádná nová
+migrace ani paralelní settlement logika. Testy ověřují skutečnou DB, starý Expired,
+Settled guard, min interval a HTTP CSRF/role hranice.

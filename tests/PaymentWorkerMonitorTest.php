@@ -56,6 +56,21 @@ try {
     $snapshot=$monitor->snapshot(); coreSame('Succeeded',$snapshot['runs']['cli']['state'],'Recovery did not clear failure state');
     coreCheck($snapshot['runs']['cli']['last_failed_at']!==null,'Lost failure history');
     coreSame(null,$snapshot['runs']['cli']['error_type'],'Successful nonempty batch did not clear error');
+    $pdo->exec("INSERT INTO invoices (id,store_id,btc_address,amount,status,created_at,expires_at,next_check_at)
+        VALUES ('late-invoice','monitor','late-address','0.00000001','Expired',UNIX_TIMESTAMP()-200000,UNIX_TIMESTAMP()-90000,UNIX_TIMESTAMP()+3600)");
+    $before = $provider->calls;
+    coreSame(0,$runner->run('cli')['stats']['scanned'],'Automatic scan crossed unpaid late window');
+    coreSame(1,$runner->run('cli','late-invoice')['stats']['scanned'],'Explicit old invoice rescan was not claimed');
+    coreSame($before+1,$provider->calls,'Rescan did not observe exactly one address');
+    coreSame('Settled',$pdo->query("SELECT status FROM invoices WHERE id='late-invoice'")->fetchColumn(),'Late payment not settled');
+    coreSame(0,$runner->run('cli','late-invoice')['stats']['scanned'],'Settled rescan bypassed terminal state');
+    coreSame(0,$runner->run('cli','missing-invoice')['stats']['scanned'],'Missing ID fell back to unrelated invoices');
+    $pdo->exec("UPDATE invoices SET status='Expired',last_checked_at=UNIX_TIMESTAMP(),next_check_at=0 WHERE id='late-invoice'");
+    coreSame(0,$runner->run('cli','late-invoice')['stats']['scanned'],'Rescan bypassed ten-minute guard');
+    $pdo->exec("UPDATE invoices SET last_checked_at=UNIX_TIMESTAMP()-600 WHERE id='late-invoice'");
+    coreSame(1,$runner->run('cli','late-invoice')['stats']['scanned'],'Rescan did not allow ten-minute boundary');
+    try { $runner->run('cli', 'bad/id'); throw new LogicException('Unsafe ID accepted'); }
+    catch (InvalidArgumentException) {}
     // Independent connection holds the instance lock: neither source may start another batch.
     $other=new Database($host,$name,$user,$pass,$port);
     $q=$other->getPdo()->prepare('SELECT GET_LOCK(?,0)'); $q->execute([$monitor->lockName()]);

@@ -147,8 +147,15 @@ try {
         coreCheck(str_contains($headers[0],'200') && str_contains($body,'Zkontrolováno: 0'),'Manual empty batch failed: '.$body);
         coreSame('Succeeded',$pdo->query("SELECT state FROM payment_worker_runtime WHERE source='manual'")->fetchColumn(),'Manual POST not recorded');
         coreSame(0,(int)$pdo->query("SELECT COUNT(*) FROM payment_worker_runtime WHERE source='cli'")->fetchColumn(),'Manual POST impersonated cron');
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'rescan','invoice_id'=>'missing-invoice'],$cookie);
+        coreCheck(str_contains($headers[0],'400'),'Rescan missing CSRF accepted');
+        $pdo->exec("UPDATE payment_worker_runtime SET started_at=UNIX_TIMESTAMP()-601 WHERE source='manual'");
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'rescan','invoice_id'=>'bad/id','csrf_token'=>$csrf[1]],$cookie);
+        coreCheck(str_contains($headers[0],'400'),'Invalid rescan ID accepted');
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'rescan','invoice_id'=>'missing-invoice','csrf_token'=>$csrf[1]],$cookie);
+        coreCheck(str_contains($headers[0],'200') && str_contains($body,'Faktura se nekontrolovala'),'Missing rescan invoice was misleading or fell back');
         $pdo->exec("UPDATE users SET role='client' WHERE id=$id");
-        [$body,$headers]=$request('admin/payment_monitor',['action'=>'run','csrf_token'=>$csrf[1]],$cookie);
+        [$body,$headers]=$request('admin/payment_monitor',['action'=>'rescan','invoice_id'=>'missing-invoice','csrf_token'=>$csrf[1]],$cookie);
         coreCheck(str_contains($headers[0],'303'),'Former admin can start a scan');
         echo "[PASS] Admin payment monitoring GET, no-RPC empty POST, CSRF and role revocation\n";
         echo "[PASS] Actual HTTP: anonymous denied, admin GET read-only, CSRF enforced, revoked account denied, authorized POST upgrades\n";

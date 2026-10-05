@@ -17,11 +17,16 @@ $csrfToken = AuthManager::csrfToken();
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         AuthManager::requireCsrfToken($_POST['csrf_token'] ?? null);
-        if (($_POST['action'] ?? '') !== 'run') { throw new RuntimeException('Neplatná akce.'); }
+        $action = $_POST['action'] ?? '';
+        if (!in_array($action, ['run', 'rescan'], true)) { throw new RuntimeException('Neplatná akce.'); }
+        $invoiceId = $action === 'rescan' && is_string($_POST['invoice_id'] ?? null) ? trim($_POST['invoice_id']) : null;
+        if ($action === 'rescan' && ($invoiceId === null || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\z/D', $invoiceId) !== 1)) {
+            throw new RuntimeException('Neplatné ID faktury.');
+        }
         // Release the session mutex so the administrator can still navigate during RPC.
         session_write_close();
         ignore_user_abort(true);
-        $result = PaymentWorkerRunner::fromConfig($database, $config, true)->run('manual');
+        $result = PaymentWorkerRunner::fromConfig($database, $config, true)->run('manual', $invoiceId);
         if ($result['busy']) {
             $notice = $result['reason'] === 'cooldown'
                 ? 'Další ruční kontrolu lze spustit po 10 minutách.'
@@ -31,6 +36,9 @@ try {
             $notice = sprintf('Zkontrolováno: %d. Změny stavů: %d. Chyby: %d. Webhooky zařazené k doručení: %d.',
                 $stats['scanned'], $stats['transitioned'], $stats['failed'], $stats['deliveries_queued']);
             if (!$result['success']) { $pageError = 'Některé faktury se nepodařilo ověřit. Zkontrolujte Electrum RPC a oprávnění ke cache.'; }
+            if ($invoiceId !== null && $stats['scanned'] === 0) {
+                $notice = 'Faktura se nekontrolovala: neexistuje, je Settled, je právě rezervovaná nebo od poslední kontroly neuplynulo 10 minut.';
+            }
         }
     }
     $snapshot = (new PaymentWorkerMonitor($database->getPdo()))->snapshot();

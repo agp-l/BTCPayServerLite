@@ -29,8 +29,11 @@ final class PaymentWorkerRunner
             new WebhookDeliveryRepository($database)));
     }
 
-    public function run(string $source): array
+    public function run(string $source, ?string $invoiceId = null): array
     {
+        if ($invoiceId !== null && preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\z/D', $invoiceId) !== 1) {
+            throw new \InvalidArgumentException('Invalid invoice ID for rescan.');
+        }
         if (!in_array($source, ['cli', 'manual'], true)) { throw new RuntimeException('Unknown payment run source.'); }
         $pdo = $this->database->getPdo();
         if ($pdo->inTransaction()) { throw new RuntimeException('Payment scan cannot run inside a transaction.'); }
@@ -48,7 +51,7 @@ final class PaymentWorkerRunner
             $monitor->start($source, $token);
             try {
                 $worker = ($this->factory)();
-                $stats = $worker->run($source === 'manual' ? 20 : 100, $source === 'manual' ? 12 : 45);
+                $stats = $worker->run($source === 'manual' ? 20 : 100, $source === 'manual' ? 12 : 45, $invoiceId);
             } catch (Throwable $error) {
                 $monitor->finish($source, $token, [], 'worker_exception');
                 throw $error;

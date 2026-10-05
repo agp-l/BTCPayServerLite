@@ -21,7 +21,7 @@ mkdir($project, 0755);
 copy(dirname(__DIR__) . '/.htaccess', $project . '/.htaccess');
 $blocked = [
     'config.php', 'config.php.bak', 'sql.sql', 'composer.json', 'composer.lock',
-    'dump.SQL', 'notes.log', 'old.php~', '.git/config', '.env',
+    'dump.SQL', 'notes.log', 'old.php~', '.git/config', '.env', '.btcpay-config-test', '.install.lock',
     'vendor/autoload.php', 'classes/Database.php', 'tests/fixture.txt',
     'migrations/001.sql', 'docs/README.md', 'var/blockchain/observation.json',
     'var/blockchain/tx-test.hex', 'bin/health_check.php', 'admin/views/layout/header.php',
