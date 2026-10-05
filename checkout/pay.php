@@ -100,10 +100,10 @@ if ($requestMethod === 'HEAD') {
 }
 
 if (!$urlManager instanceof UrlManager) {
-    $stylesheetUrl = '../assets/checkout.css';
+    $stylesheetUrl = '../assets/checkout.css?v=' . substr(hash_file('sha256', __DIR__ . '/../assets/checkout.css'), 0, 12);
     $homeUrl = '../';
 } else {
-    $stylesheetUrl = $urlManager->url('/assets/checkout.css');
+    $stylesheetUrl = $urlManager->url('/assets/checkout.css', ['v' => substr(hash_file('sha256', __DIR__ . '/../assets/checkout.css'), 0, 12)]);
     $homeUrl = $urlManager->url('/');
 }
 
@@ -127,7 +127,7 @@ $statusUrl = $urlManager->url('/pay', [
     'id' => (string) ($checkout['id'] ?? ''),
     'action' => 'check',
 ]);
-$scriptUrl = $urlManager->url('/assets/checkout.js');
+$scriptUrl = $urlManager->url('/assets/checkout.js', ['v' => substr(hash_file('sha256', __DIR__ . '/../assets/checkout.js'), 0, 12)]);
 $qrCodeDataUri = null;
 try {
     $qrCodeDataUri = (new CheckoutQrCodeGenerator())->generateDataUri(

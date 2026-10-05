@@ -20,24 +20,23 @@ $statusLabels = [
     'expired' => 'Platnost vypršela',
 ];
 $statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
+$assetUrl = static fn (string $name): string => $assetBaseUrl . '/assets/' . $name . '?v='
+    . substr(hash_file('sha256', __DIR__ . '/../../assets/' . $name), 0, 12);
 ?>
 <!doctype html>
 <html lang="cs">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f5f8f3">
   <title><?= $escape($checkout['description']) ?> · Bitcoin platba</title>
-  <link rel="stylesheet" href="<?= $escape($assetBaseUrl) ?>/assets/stateless-checkout.css">
-  <script src="<?= $escape($assetBaseUrl) ?>/assets/stateless-checkout.js" defer></script>
+  <link rel="stylesheet" href="<?= $escape($assetUrl('checkout.css')) ?>">
+  <link rel="stylesheet" href="<?= $escape($assetUrl('stateless-checkout.css')) ?>">
+  <script src="<?= $escape($assetUrl('stateless-checkout.js')) ?>" defer></script>
 </head>
 <body>
   <main class="invoice-shell">
-    <header class="invoice-brand">
-      <span class="invoice-brand__name"><span class="invoice-brand__mark">₿</span> BTCPayLite</span>
-      <span>Podepsaná stateless faktura</span>
-    </header>
-
     <article
       class="invoice-card"
       data-stateless-checkout
@@ -46,20 +45,30 @@ $statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
       data-seconds-remaining="<?= (int) $checkout['seconds_remaining'] ?>"
       data-status-url="<?= $escape($statusUrl) ?>"
     >
+      <header class="checkout-header">
+        <div class="checkout-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h6a3.5 3.5 0 0 1 0 7H8m0 0h7a3.5 3.5 0 0 1 0 7H8M8 5v14M11 2v3m4-3v3M11 19v3m4-3v3"/></svg></span><span><strong>BTCPay Lite</strong><small>Platba bitcoinem</small></span></div>
+        <div class="secure-pill"><span class="secure-dot" aria-hidden="true"></span>Bitcoin · on-chain</div>
+      </header>
       <header class="invoice-card__header">
         <div>
-          <p class="invoice-kicker">Bitcoin invoice</p>
+          <p class="invoice-kicker">Platební požadavek</p>
           <h1 class="invoice-title"><?= $escape($checkout['description']) ?></h1>
           <p class="invoice-order">
             <?= $checkout['order_id'] !== ''
               ? 'Objednávka ' . $escape($checkout['order_id'])
-              : 'Bez databázového záznamu faktury' ?>
+              : 'Platba v bitcoinové síti' ?>
           </p>
         </div>
         <span class="status-pill" data-status-pill data-status="<?= $escape($checkout['status']) ?>">
           <?= $escape($statusLabel) ?>
         </span>
       </header>
+
+      <div class="amount-section">
+        <span>Částka k úhradě</span>
+        <div><strong><?= $escape($checkout['amount']) ?></strong> <small>BTC</small></div>
+        <button class="text-button" type="button" data-copy-value="<?= $escape($checkout['amount']) ?>">Kopírovat částku</button>
+      </div>
 
       <div class="invoice-card__body">
         <section class="invoice-qr-panel" aria-label="Bitcoin QR platba">
@@ -78,15 +87,14 @@ $statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
         </section>
 
         <section class="invoice-detail-panel">
-          <span class="amount-label">Částka k úhradě</span>
-          <div class="invoice-amount"><?= $escape($checkout['amount']) ?> <span class="invoice-unit">BTC</span></div>
-          <div class="invoice-timer" data-invoice-timer aria-live="polite">
+          <div class="expiry-section"><div><span>Uhraďte do</span><time data-invoice-deadline datetime="<?= $escape(gmdate('c', (int) $checkout['expires_at'])) ?>"><?= $escape(date('d. m. Y H:i T', (int) $checkout['expires_at'])) ?></time></div>
+          <div class="invoice-timer" data-invoice-timer>
             <?= $checkout['status'] === 'paid'
               ? 'Platba byla úspěšně přijata.'
               : ($checkout['status'] === 'expired'
                 ? 'Čas pro úhradu vypršel.'
                 : 'Zbývá ' . (int) $checkout['seconds_remaining'] . ' sekund') ?>
-          </div>
+          </div></div>
 
           <dl class="invoice-details">
             <div class="detail-row">
@@ -95,23 +103,6 @@ $statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
                 <dd class="detail-value"><?= $escape($checkout['address']) ?></dd>
               </div>
               <button class="copy-button" type="button" data-copy-value="<?= $escape($checkout['address']) ?>">Kopírovat</button>
-            </div>
-            <div class="detail-row">
-              <div>
-                <dt class="detail-label">Přesná částka</dt>
-                <dd class="detail-value"><?= $escape($checkout['amount']) ?> BTC</dd>
-              </div>
-              <button class="copy-button" type="button" data-copy-value="<?= $escape($checkout['amount']) ?>">Kopírovat</button>
-            </div>
-            <div class="detail-row">
-              <div>
-                <dt class="detail-label">Platnost do</dt>
-                <dd class="detail-value">
-                  <time datetime="<?= $escape(gmdate('c', (int) $checkout['expires_at'])) ?>">
-                    <?= $escape(date('d.m.Y H:i', (int) $checkout['expires_at'])) ?>
-                  </time>
-                </dd>
-              </div>
             </div>
           </dl>
 
@@ -129,8 +120,8 @@ $statusLabel = $statusLabels[$checkout['status']] ?? 'Čeká na platbu';
       </div>
 
       <footer class="invoice-footer">
-        <span>Částka a adresa jsou chráněné HMAC podpisem.</span>
-        <span>Faktura se neukládá do databáze.</span>
+        <span>Odesílejte pouze BTC v bitcoinové síti.</span>
+        <span>Částka v BTC zůstává po dobu platnosti stejná.</span>
       </footer>
     </article>
   </main>

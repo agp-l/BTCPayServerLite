@@ -16,7 +16,8 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Faktura není dostupná</title>
-  <link rel="stylesheet" href="<?= $escape($assetBaseUrl) ?>/assets/stateless-checkout.css">
+  <link rel="stylesheet" href="<?= $escape($assetBaseUrl) ?>/assets/checkout.css?v=<?= substr(hash_file('sha256', __DIR__ . '/../../assets/checkout.css'), 0, 12) ?>">
+  <link rel="stylesheet" href="<?= $escape($assetBaseUrl) ?>/assets/stateless-checkout.css?v=<?= substr(hash_file('sha256', __DIR__ . '/../../assets/stateless-checkout.css'), 0, 12) ?>">
 </head>
 <body>
   <main class="invoice-error" role="alert">

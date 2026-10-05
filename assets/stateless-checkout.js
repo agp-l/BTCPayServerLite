@@ -44,33 +44,57 @@
     const minutes = Math.floor((safe % 3600) / 60);
     const secs = safe % 60;
     const clock = [hours, minutes, secs].map((part) => String(part).padStart(2, '0')).join(':');
-    return days > 0 ? `${days} d ${clock}` : clock;
+    return days > 0 ? `${days} ${days === 1 ? 'den' : (days < 5 ? 'dny' : 'dní')} ${clock}` : clock;
   };
 
   const renderTimer = () => {
     if (!(timer instanceof HTMLElement)) return;
     if (status === 'paid') {
       timer.textContent = 'Platba byla úspěšně přijata.';
+    } else if (status === 'pending_mempool') {
+      timer.textContent = 'Platba byla přijata; čekáme na potvrzení sítě.';
     } else if (status === 'expired' || seconds <= 0) {
       timer.textContent = 'Čas pro úhradu vypršel.';
-      if (status !== 'paid') renderStatus('expired');
     } else {
       timer.textContent = `Zbývající čas: ${formatDuration(seconds)}`;
     }
   };
+
+  const deadline = card.querySelector('[data-invoice-deadline]');
+  if (deadline) {
+    const date = new Date(deadline.getAttribute('datetime'));
+    if (!Number.isNaN(date.getTime())) {
+      deadline.textContent = new Intl.DateTimeFormat('cs-CZ', {
+        day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      }).format(date);
+    }
+  }
 
   card.querySelectorAll('[data-copy-value]').forEach((button) => {
     if (!(button instanceof HTMLButtonElement)) return;
     button.addEventListener('click', async () => {
       const value = button.dataset.copyValue || '';
       if (!value) return;
-      try {
-        await navigator.clipboard.writeText(value);
-        button.textContent = 'Zkopírováno';
-      } catch (_error) {
-        button.textContent = 'Nelze kopírovat';
+      const label = button.textContent;
+      let copied = false;
+      if (window.isSecureContext && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(value);
+          copied = true;
+        } catch (_error) { copied = false; }
       }
-      window.setTimeout(() => { button.textContent = 'Kopírovat'; }, 1800);
+      if (!copied) {
+        const input = document.createElement('textarea');
+        input.value = value;
+        input.readOnly = true;
+        input.style.cssText = 'position:fixed;opacity:0;';
+        document.body.appendChild(input);
+        input.select();
+        try { copied = document.execCommand('copy'); } catch (_error) { copied = false; }
+        input.remove();
+      }
+      button.textContent = copied ? 'Zkopírováno' : 'Nelze kopírovat';
+      window.setTimeout(() => { button.textContent = label; }, 1800);
     });
   });
 

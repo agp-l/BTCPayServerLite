@@ -94,6 +94,8 @@ Observation ukládá integer satoshi jako **aktuální confirmed balance a podep
 
 Greenfield API implementuje podmnožinu pro BTC-CHAIN faktury, checkout a webhooky. Podporuje `Authorization: token …` i `Bearer …`. Idempotency tvorby faktury používá trvalou rezervaci resource; stejný klíč s jiným obsahem vrátí 409. Přehled endpointů a samostatný PHP tester jsou v [API dokumentaci](docs/API.md).
 
+Nové on-chain faktury mají výchozí platnost **48 hodin**; vlastní lhůtu lze zadat přes API nebo při tvorbě URL faktury. Existující faktury se zpětně neprodlužují. Běžný i URL checkout používají světlou zelenou kartu na výšku s lokálním QR, přesnou BTC částkou a datem splatnosti. Při zadání ceny ve fiat měně zůstává vypočtená BTC částka po dobu platnosti stejná.
+
 Volitelný payout modul je ve výchozím stavu vypnutý. `InProgress` znamená přijetí broadcastu, nikoli potvrzení transakce. Potvrzovací worker, refundace, pull payments a Lightning nejsou dokončené součásti tohoto systému. Příprava budoucí směnárny má vlastní body v plánu; současný stav není její hotové jádro.
 
 ## Vývoj a ověření

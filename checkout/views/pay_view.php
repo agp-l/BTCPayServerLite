@@ -29,7 +29,8 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#f5f8f3">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title><?= htmlspecialchars((string) $checkout['title'], ENT_QUOTES, 'UTF-8') ?> · Bitcoin platba</title>
     <link rel="stylesheet" href="<?= htmlspecialchars($stylesheetUrl, ENT_QUOTES, 'UTF-8') ?>">
@@ -46,15 +47,15 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
     <section class="checkout-card" aria-labelledby="checkout-title">
         <header class="checkout-header">
             <div class="checkout-brand">
-                <span class="brand-mark" aria-hidden="true">₿</span>
+                <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h6a3.5 3.5 0 0 1 0 7H8m0 0h7a3.5 3.5 0 0 1 0 7H8M8 5v14M11 2v3m4-3v3M11 19v3m4-3v3"/></svg></span>
                 <span>
                     <strong>BTCPay Lite</strong>
-                    <small>Bezpečný Bitcoin checkout</small>
+                    <small>Platba bitcoinem</small>
                 </span>
             </div>
             <div class="secure-pill">
                 <span class="secure-dot" aria-hidden="true"></span>
-                Lokální QR · bez trackerů
+                Bitcoin · on-chain
             </div>
         </header>
 
@@ -90,6 +91,11 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
         </section>
 
         <section id="payment-panel" class="payment-panel<?= $isSettled ? ' is-hidden' : '' ?>">
+            <div class="amount-section">
+                <span>Částka k úhradě</span>
+                <div><strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?></strong> <small>BTC</small></div>
+                <button class="text-button" type="button" data-copy-value="<?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?>">Kopírovat částku</button>
+            </div>
             <div class="payment-grid">
                 <div class="qr-column">
                     <p class="section-label">Naskenujte v peněžence</p>
@@ -108,7 +114,7 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
                         </a>
                     <?php else: ?>
                         <div class="qr-placeholder">
-                            <span aria-hidden="true">₿</span>
+                            <span aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h6a3.5 3.5 0 0 1 0 7H8m0 0h7a3.5 3.5 0 0 1 0 7H8M8 5v14M11 2v3m4-3v3M11 19v3m4-3v3"/></svg></span>
                             <strong>QR kód není dostupný</strong>
                             <small>Použijte tlačítko pro otevření peněženky.</small>
                         </div>
@@ -117,18 +123,10 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
                 </div>
 
                 <div class="payment-details">
-                    <div class="amount-section">
-                        <span>Částka k úhradě</span>
-                        <strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?></strong>
-                        <small>BTC</small>
-                        <button class="text-button" type="button" data-copy-value="<?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?>">
-                            Kopírovat částku
-                        </button>
+                    <div class="expiry-section">
+                        <div><span>Uhraďte do</span><time id="payment-deadline" datetime="<?= htmlspecialchars(gmdate('c', (int) $checkout['expires_at']), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(date('d. m. Y H:i T', (int) $checkout['expires_at']), ENT_QUOTES, 'UTF-8') ?></time></div>
+                        <p id="checkout-timer" class="checkout-timer"><?= $isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' ?></p>
                     </div>
-
-                    <p id="checkout-timer" class="checkout-timer" aria-live="polite">
-                        <?= $isExpired ? 'Čas pro platbu vypršel.' : 'Načítáme zbývající čas…' ?>
-                    </p>
 
                     <div id="partial-notice" class="notice notice-warning<?= $isPartial ? ' is-visible' : '' ?>" role="alert">
                         Dorazila pouze část platby. Zbývá doplatit
@@ -147,7 +145,7 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
                        class="wallet-button<?= $isExpired ? ' is-disabled' : '' ?>"
                        href="<?= $isExpired ? '#' : htmlspecialchars((string) $checkout['bip21_uri'], ENT_QUOTES, 'UTF-8') ?>"
                        <?= $isExpired ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
-                        <span aria-hidden="true">₿</span>
+                        <span aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h6a3.5 3.5 0 0 1 0 7H8m0 0h7a3.5 3.5 0 0 1 0 7H8M8 5v14M11 2v3m4-3v3M11 19v3m4-3v3"/></svg></span>
                         Otevřít Bitcoin peněženku
                     </a>
                 </div>
@@ -163,7 +161,7 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
             <p>Odesílejte pouze BTC v bitcoinové síti. Stav se obnovuje automaticky.</p>
             <div class="privacy-note">
                 <span aria-hidden="true">◆</span>
-                QR kód vzniká přímo na serveru. Platební údaje neopouštějí aplikaci.
+                Částka v BTC zůstává po dobu platnosti stejná.
             </div>
         </footer>
 

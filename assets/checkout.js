@@ -46,15 +46,23 @@
     let redirectScheduled = false;
 
     const formatTime = (seconds) => {
-        const hours = Math.floor(seconds / 3600);
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const remainder = seconds % 60;
-        if (hours > 0) {
-            return hours + ':' + String(minutes).padStart(2, '0')
-                + ':' + String(remainder).padStart(2, '0');
-        }
-        return minutes + ':' + String(remainder).padStart(2, '0');
+        const clock = [hours, minutes, remainder].map((part) => String(part).padStart(2, '0')).join(':');
+        return days > 0 ? days + (days === 1 ? ' den ' : (days < 5 ? ' dny ' : ' dní ')) + clock : clock;
     };
+
+    const deadline = document.getElementById('payment-deadline');
+    if (deadline) {
+        const date = new Date(deadline.getAttribute('datetime'));
+        if (!Number.isNaN(date.getTime())) {
+            deadline.textContent = new Intl.DateTimeFormat('cs-CZ', {
+                day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            }).format(date);
+        }
+    }
 
     const renderTimer = () => {
         if (!timer) {
