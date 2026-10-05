@@ -85,10 +85,13 @@ není součástí publikovaných změn.
 | simple-store: cílené BTCPay testy | Klient, podpis webhooku, checkout nastavení/dostupnost/render i skutečný DB test prošly; simulovaný HTTP transport v této sadě |
 | Lite checkout v DB testu e-shopu | `/i/{id}` i `/lite/pay?id={id}`, opakované zahájení, store-scoped status a settlement prošly; cizí/nesouhlasící odkazy odmítnuty |
 | Test původního pádu CI simple-store | Aktualizovaný `catalog-render.php` prošel; změněná pouze zastaralá testová očekávání |
-| simple-store: první kompletní CI job lokálně | **43/43 příkazů prošlo**: 36 PHP testů, dva HTTP session/cookie/CSRF skripty a pět JS sad; bez přeskočení. PHP 8.3.6, Node 24.19.0; nepotvrzuje jinou PHP verzi v CI matici |
+| simple-store: první kompletní CI job lokálně | **43/43 příkazů prošlo**: 36 PHP testů, dva HTTP session/cookie/CSRF skripty a pět JS sad; bez přeskočení. PHP 8.3.6, Node 24.19.0 |
 | Syntaxe simple-store | **236** PHP souborů tehdejšího workflow prošlo; nový společný harness má navíc vlastní kontrolu syntaxe |
 | Společný `btcpay-lite-integration.php` | Všech **pět skupin scénářů prošlo**: skutečné lokální HTTP a oddělené MariaDB, XPUB derivace, API, callback/return, worker/outbox/HMAC, objednávka/sklad/doklad a zachycený mail |
 | Kopírování UI | **12/12** DOM/source kontrol prošlo; skutečný `admin.js`, simulované Clipboard API/execCommand, focus a výběr obnoveny |
+| GitHub CI BTC Pay Lite, kód `7e75725` | [PHP checks prošlo](https://github.com/agp-l/BTCPayServerLite/actions/runs/37290081559) v PR #14 |
+| GitHub CI simple-store, kód `ee97a8a` | [PHP checkout prošlo](https://github.com/agp-l/simple-store/actions/runs/37290111960): PHP 8.1 i 8.4, MySQL DB a MariaDB upgrade job |
+| GitHub CI společného testu | [BTCPay Lite integration prošlo](https://github.com/agp-l/simple-store/actions/runs/37290111846): PHP 8.2, MariaDB 10.11, aktuální Lite `main` |
 
 Společný test vytvořil objednávku za **1 079 Kč** a při testovacím kurzu
 1 000 000 Kč/BTC fakturu na **0,00107900 BTC**. Nepotvrzená i poloviční
@@ -102,8 +105,8 @@ v testu používá skutečný Greenfield controller s testovacími závislostmi,
 webhook transport odesílá skutečné loopback HTTP místo produkčního DNS/TLS
 transportu. Veřejné HTTPS, Apache rewrite/Authorization, Electrum a skutečný
 SMTP tedy tento test neověřuje. Do simple-store přibyl samostatný GitHub
-workflow pro opakovatelné spuštění proti Lite `main`; jeho konfigurace byla
-ověřená, první GitHub běh se kontroluje v PR. Test lze spustit také lokálně
+workflow pro opakovatelné spuštění proti Lite `main`; jeho první GitHub běh
+prošel. Test lze spustit také lokálně
 podle [návodu e-shopu](https://github.com/agp-l/simple-store/blob/codex/btcpay-lite-integration-20261005/docs/btcpay.md).
 
 UI ověření bylo deterministické bez funkčního prohlížeče. Nativní schránka,
@@ -212,6 +215,10 @@ Místa pro další vývoj: `ElectrumBlockchainProvider`, `InvoiceStateMachine`,
 
 Při ověření zaznamenat verzi PHP/Electra, commit obou projektů, invoice ID,
 číslo testovací objednávky, časy/stavy a výsledek delivery; tajné klíče odstranit.
+Změny jsou k revizi v [BTC Pay Lite PR #14](https://github.com/agp-l/BTCPayServerLite/pull/14)
+a [simple-store PR #1](https://github.com/agp-l/simple-store/pull/1).
+V době dokončení revize nebyly sloučené ani nasazené na uživatelův server.
+
 Aktuální návody: [API](API.md), [TESTING](TESTING.md),
 [PAYMENT_MONITORING](PAYMENT_MONITORING.md) a
 [simple-store BTCPay](https://github.com/agp-l/simple-store/blob/main/docs/btcpay.md).
