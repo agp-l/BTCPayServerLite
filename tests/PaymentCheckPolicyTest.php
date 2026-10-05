@@ -104,5 +104,25 @@ try {
     coreSame('Settled', $pdo->query('SELECT status FROM invoices')->fetchColumn(), 'Slow monitoring lost settlement');
     coreSame(null, $pdo->query('SELECT next_check_at FROM invoices')->fetchColumn(), 'Settled invoice scheduled again');
     coreSame(0, $worker->run()['scanned'], 'Settled invoice queried again');
+    // Local endpoint admission is not an observation and must not postpone the
+    // invoice by its hourly cadence or spin across the rest of the due queue.
+    $pdo->prepare("INSERT INTO invoices (id,store_id,btc_address,amount,created_at,expires_at) VALUES ('deferred','cadence','deferred-address','0.00000002',?,?)")->execute([$now - 22000, $now + 86400]);
+    $limited = new class implements BlockchainProviderInterface {
+        public int $calls = 0;
+        public function maxObservationDurationSeconds(): int { return 1; }
+        public function observeAddress(string $address, int $expectedSatoshis = 0): AddressPaymentObservation {
+            ++$this->calls;
+            throw new BlockchainProviderException('Budget exhausted', 'observe_address', 503, null, 'observation_budget');
+        }
+    };
+    $result = (new PaymentWorker($db, $limited, new WebhookDeliveryRepository($db), $clock))->run(100);
+    coreSame(1, $result['failed'], 'Admission pressure hidden');
+    coreSame(1, $limited->calls, 'Budget pressure spun through queue');
+    $deferred = $pdo->query("SELECT last_checked_at,next_check_at,payment_processing_token FROM invoices WHERE id='deferred'")->fetch(PDO::FETCH_ASSOC);
+    coreSame(null, $deferred['last_checked_at'], 'Admission failure invented an observation');
+    coreSame($now + 60, (int) $deferred['next_check_at'], 'Admission failure delayed invoice for an hour');
+    coreSame(null, $deferred['payment_processing_token'], 'Deferred invoice retained lease');
+    $snapshot = (new BtcPayLite\PaymentWorkerMonitor($pdo))->snapshot();
+    coreCheck(isset($snapshot['oldest_due_age_seconds']), 'Queue lag not exposed');
     echo "[PASS] Real DB minimum guard, 10/30/60-minute scans, partial/settled state and bounded retry\n";
 } finally { $admin->exec('DROP DATABASE `' . $name . '`'); }

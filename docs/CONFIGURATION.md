@@ -87,3 +87,11 @@ Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Elec
 `config.php` musí přečíst webové PHP i účet CLI workerů. Pro sdílené runtime adresáře nastavte stejné `BTCPAY_WALLET_LOCK_DIR` a `BTCPAY_BLOCKCHAIN_CACHE_DIR` ve všech procesech; výchozí jsou `var/locks` a `var/blockchain`. Postup ACL je v návodu nasazení.
 
 Zapamatování přihlášení a jeho limity popisuje [správa relací](SESSION_LOGIN.md).
+
+## Společný limit blockchain kontrol
+
+`BTCPAY_BLOCKCHAIN_OBSERVATIONS_PER_MINUTE` omezuje dohromady worker a
+stateless cache misses téhož endpointu. Výchozí hodnota je 60, povolený rozsah
+1–600; současně běží nejvýše dvě observations. Nastavení patří do prostředí
+PHP/CLI, nikoli do config.php. Všichni observers musí sdílet cache i tuto hodnotu.
+Podrobnosti a rozdíl mezi scheduler tickem a kontrolou faktury: [CAPACITY](CAPACITY.md).

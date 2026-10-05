@@ -24,10 +24,13 @@ require __DIR__ . '/layout/header.php';
   <div class="alert alert-warning"><?= $html(\BtcPayLite\PaymentFailureDiagnostics::hint($snapshot['runs']['cli']['error_type'])) ?></div>
   <?php endif; ?>
   <p>Prázdný běh potvrzuje spuštění programu, nikoli úspěšnou kontrolu plateb. Předchozí chyba zůstává viditelná do další neprázdné úspěšné dávky.</p>
-  <p>Worker se plánuje každých 10 minut. Jednotlivé faktury kontroluje po 10, 30 nebo 60 minutách podle stáří. Za opožděný považujeme CLI běh starší než 30 minut.</p>
+  <p>Výchozí plánovač spouští dávku každých 10 minut. Pro větší frontu lze spouštět dávky každou minutu; jedna faktura se dál kontroluje nejdříve za 10, 30 nebo 60 minut. Za opožděný považujeme CLI běh starší než 30 minut.</p>
   <p>Kontrola právě běží: <strong><?= $snapshot['running'] ? 'Ano' : 'Ne' ?></strong>.</p>
   <p>Faktury čekající na kontrolu: <strong><?= $snapshot['due'] ?></strong>. Propadlé rezervace po přerušeném běhu: <strong><?= $snapshot['stale_leases'] ?></strong>.</p>
-  <p>Nejstarší plánovaná kontrola ve frontě: <?= $html($formatTime($snapshot['oldest_due_at'])) ?>. Nové faktury mohou čekat bez naplánovaného času.</p>
+  <p>Nejstarší čekající kontrola: <?= $html($formatTime($snapshot['oldest_due_at'])) ?>. Zpoždění: <strong><?= (int) ceil($snapshot['oldest_due_age_seconds'] / 60) ?> min</strong>. U první kontroly se počítá od vytvoření faktury.</p>
+  <?php if ($snapshot['oldest_due_age_seconds'] >= 3600): ?>
+  <div class="alert alert-warning">Fronta čeká přes hodinu. Ověřte chyby Electra a frekvenci dávkového plánovače podle provozního návodu; zvyšování limitu bez měření může přetížit daemon.</div>
+  <?php endif; ?>
 </section>
 <section class="card">
   <h2 class="card-title">Zkontrolovat platby nyní</h2>

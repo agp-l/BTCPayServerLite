@@ -47,7 +47,7 @@ final class PaymentWorkerMonitor
         $stmt = $this->pdo->prepare('SELECT IS_FREE_LOCK(?)');
         $stmt->execute([$this->lockName()]);
         $running = (int) $stmt->fetchColumn() === 0;
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS due, MIN(next_check_at) AS oldest_due_at FROM invoices WHERE '
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) AS due, MIN(COALESCE(next_check_at, created_at)) AS oldest_due_at FROM invoices WHERE '
             . PaymentWorker::ELIGIBLE_SQL . ' AND (next_check_at IS NULL OR next_check_at <= ?)
             AND (last_checked_at IS NULL OR last_checked_at <= ?)
             AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())');
@@ -55,7 +55,9 @@ final class PaymentWorkerMonitor
         $queue = $stmt->fetch(PDO::FETCH_ASSOC);
         $stale = (int) $this->pdo->query('SELECT COUNT(*) FROM invoices WHERE payment_processing_token IS NOT NULL AND payment_processing_until <= UNIX_TIMESTAMP()')->fetchColumn();
         return ['now'=>$now, 'running'=>$running, 'runs'=>$runs, 'due'=>(int)$queue['due'],
-            'oldest_due_at'=>$queue['oldest_due_at'], 'stale_leases'=>$stale];
+            'oldest_due_at'=>$queue['oldest_due_at'],
+            'oldest_due_age_seconds'=>$queue['oldest_due_at'] === null ? 0 : max(0, $now - (int) $queue['oldest_due_at']),
+            'stale_leases'=>$stale];
     }
 
     public static function automaticState(array $snapshot): string

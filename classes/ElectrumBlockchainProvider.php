@@ -82,13 +82,23 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
                 return $this->staleOrFail($key, $address, null, 'upstream_backoff');
             }
             try {
-                // Persist the cooldown before RPC: even a killed process must not retry immediately.
-                if (@file_put_contents($this->path($key, 'retry'), (string) (time() + $interval)) === false) {
-                    throw $this->busy(null, 'cache_write');
+                $budget = BlockchainObservationBudget::fromEnvironment($this->cacheDir, $this->rpc->getEndpoint());
+                $admission = $budget->acquire($this->maxObservationDurationSeconds());
+                $upstreamError = null;
+                try {
+                    // Persist the cooldown before RPC: even a killed process must not retry immediately.
+                    if (@file_put_contents($this->path($key, 'retry'), (string) (time() + $interval)) === false) {
+                        throw $this->busy(null, 'cache_write');
+                    }
+                    $observation = $this->queryElectrum($address);
+                    $this->writeCache($key, $observation);
+                    return $this->remember($key, $observation);
+                } catch (Throwable $exception) {
+                    $upstreamError = $exception;
+                    throw $exception;
+                } finally {
+                    $budget->release($admission, $upstreamError);
                 }
-                $observation = $this->queryElectrum($address);
-                $this->writeCache($key, $observation);
-                return $this->remember($key, $observation);
             } catch (Throwable $exception) {
                 // Back off across processes on upstream failure, too.
                 return $this->staleOrFail($key, $address, $exception);

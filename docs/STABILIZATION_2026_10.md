@@ -40,9 +40,8 @@ Pořadí práce:
 
 ## Ověření
 
-Probíhá příprava PHP a izolované MariaDB. Dosavadní závěry jsou revize zdrojů,
-nikoli výsledky zátěžového testu nebo test skutečné platby na cílovém serveru.
-Záznam bude doplněn po jednotlivých ověřených krocích.
+Ověření probíhá v PHP 8.3.6 a izolované MariaDB 10.11.14. Skutečný Electrum
+a skutečná platba na cílovém serveru nejsou součástí lokálního testu.
 
 ## Checkpoint: webhooky
 
@@ -56,3 +55,23 @@ pokrývá pomalou dávku přes 300 s, zotavení lease a odmítnutí starého vla
 První úplný lokální průchod: 68/72 souborů prošlo; čtyři chyby souvisejí
 s nepřipraveným testovacím PHP session adresářem, který je nyní opraven.
 Testovací MariaDB 10.11.14 je izolovaná, skutečný Electrum není připojen.
+
+## Checkpoint: společná ochrana blockchain observation
+
+Přidán endpoint budget 60 zahájení v rolling 60 s a nejvýše 2 současně, sdílený
+mezi procesy. Transport/auth/HTTP/protocol chyby pozastaví nové kontroly na 60 s.
+Cache hit nic nespotřebovává; per-address 10/30/60 minut zůstává. Worker při
+lokálním limitu ukončí dávku, uvolní lease a odloží pokus o minutu bez zápisu
+last_checked_at. Přibyla queue age v adminu a volitelný minutový scheduler tick
+pro vyšší provoz; výchozí tick 10 minut se nemění.
+
+Ověření: rolling hranice, sdílení procesu, pád observeru, circuit recovery;
+1000 různých cold požadavků → 60 řízených RPC, 940 deferrals (fixture 0,08 s);
+100 souběžných PHP procesů → nejvýše dva aktivní observers. DB cadence test
+prošel včetně odložení bez smyšlené observation. Generator a monitor testy prošly.
+Instalátorový HTTP test po opravě testovací session cesty prošel. Kapacita není
+změřená proti skutečnému Electru: limity a plánovací příklady jsou v CAPACITY.
+
+Úplná sada po obou opravách: **74 testovacích souborů prošlo, 0 selhalo**,
+včetně reálné DB, HTTP hranic, více procesů a všech migrací. Opravené nastavení
+session adresáře bylo pouze v izolovaném testovacím prostředí.

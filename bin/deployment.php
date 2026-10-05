@@ -12,15 +12,18 @@ spl_autoload_register(static function (string $class) use ($root): void {
     }
 });
 try {
-    $options = getopt('', ['help', 'check', 'permissions', 'web-user:', 'worker-user:', 'electrum-user:', 'payment-systemd:', 'php-binary:']);
+    $options = getopt('', ['help', 'check', 'permissions', 'web-user:', 'worker-user:', 'electrum-user:', 'payment-systemd:', 'php-binary:', 'payment-tick:']);
     if (isset($options['help'])) {
         echo "php bin/deployment.php --check\nphp bin/deployment.php --permissions --web-user=daemon --worker-user=ag --electrum-user=ag > /tmp/btcpay-permissions.sh\n";
         echo "php bin/deployment.php --payment-systemd=service --worker-user=ag --php-binary=/usr/bin/php8.3\nphp bin/deployment.php --payment-systemd=timer\n";
+        echo "For a larger due queue: --payment-systemd=timer --payment-tick=60 (invoice checks stay at 10–60 minutes).\n";
         exit;
     }
     if (isset($options['payment-systemd'])) {
+        $tick = $options['payment-tick'] ?? '600';
+        if (!is_string($tick) || !ctype_digit($tick)) { throw new InvalidArgumentException('Invalid payment tick.'); }
         echo \BtcPayLite\PaymentWorkerSchedule::render((string)$options['payment-systemd'], $root,
-            (string)($options['php-binary'] ?? PHP_BINARY), (string)($options['worker-user'] ?? ''));
+            (string)($options['php-binary'] ?? PHP_BINARY), (string)($options['worker-user'] ?? ''), (int) $tick);
         exit;
     }
     $config = is_file($root . '/config.php') ? require $root . '/config.php' : [];

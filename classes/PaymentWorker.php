@@ -66,10 +66,14 @@ class PaymentWorker
                 $stats['deliveries_queued'] += $result['deliveries_queued'];
             } catch (Throwable $exception) {
                 ++$stats['failed'];
-                $this->releaseFailedLease((string) $invoice['id'], $token, $interval);
                 $code = PaymentFailureDiagnostics::code($exception);
+                $deferred = in_array($code, ['observation_budget', 'observation_concurrency', 'upstream_circuit_open'], true);
+                $this->releaseFailedLease((string) $invoice['id'], $token, $interval, $deferred);
                 $this->failureCodes[$code] = ($this->failureCodes[$code] ?? 0) + 1;
                 error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . json_encode(PaymentFailureDiagnostics::details($exception)));
+                // Do not spin through the rest of the queue while the whole endpoint
+                // is limited. Local admission did not observe this invoice.
+                if ($deferred) { break; }
             }
         }
         return $stats;
@@ -144,15 +148,18 @@ class PaymentWorker
         });
     }
 
-    private function releaseFailedLease(string $invoiceId, string $token, int $interval): void
+    private function releaseFailedLease(string $invoiceId, string $token, int $interval, bool $deferred = false): void
     {
         try {
-            $stmt = $this->database->getPdo()->prepare(
+            $stmt = $this->database->getPdo()->prepare($deferred
+                ? 'UPDATE invoices SET payment_processing_token = NULL, payment_processing_until = NULL,
+                    next_check_at = ? WHERE id = ? AND payment_processing_token = ?'
+                :
                 'UPDATE invoices SET payment_processing_token = NULL, payment_processing_until = NULL,
                     last_checked_at = ?, next_check_at = ? WHERE id = ? AND payment_processing_token = ?'
             );
             $now = ($this->clock)();
-            $stmt->execute([$now, $now + $interval, $invoiceId, $token]);
+            $stmt->execute($deferred ? [$now + 60, $invoiceId, $token] : [$now, $now + $interval, $invoiceId, $token]);
         } catch (Throwable) {
             // A dead connection/process leaves a bounded persistent lease.
         }

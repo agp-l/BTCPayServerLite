@@ -193,3 +193,14 @@ neodstraňujte zámky za běhu. Pro jiné kódy postupujte podle vysvětlení v 
 History provider navíc rozlišuje `invalid_history`, `invalid_transaction`,
 `invalid_address` a `history_incomplete`. Poslední stav znamená další omezený
 krok načítání historie, ne důkaz nezaplacené faktury.
+
+## Větší počet faktur
+
+Výchozí cadence faktury 10/30/60 minut zůstává. Pro odčerpávání větší due fronty
+lze generovat timer s `--payment-tick=60`; ten zahájí omezenou dávku každou minutu,
+nikoli novou kontrolu každé adresy. Společný endpoint budget dovolí defaultně
+60 observations/min a nejvýše dvě současně. Při dosažení limitu dávka skončí,
+lokálně odložená faktura nemá smyšlený čas observation. Přehled ukazuje i stáří
+první čekající kontroly. [Kapacita](CAPACITY.md) uvádí přesné limity a aritmetiku
+pro stovky/tisíce aktivních faktur. `observation_budget`, `observation_concurrency`
+a `upstream_circuit_open` jsou provozní backpressure, nikoli potvrzení platby.

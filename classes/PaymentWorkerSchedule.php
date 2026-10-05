@@ -8,10 +8,14 @@ use InvalidArgumentException;
 /** Emits reviewable units only. Never installs or starts a scheduler. */
 final class PaymentWorkerSchedule
 {
-    public static function render(string $kind, string $root, string $php, string $user): string
+    public static function render(string $kind, string $root, string $php, string $user, int $tickSeconds = 600): string
     {
+        if ($tickSeconds < 60 || $tickSeconds > 600 || $tickSeconds % 60 !== 0) {
+            throw new InvalidArgumentException('Payment tick must be 60–600 seconds in whole minutes. Invoice observations remain at least 600 seconds apart.');
+        }
         if ($kind === 'timer') {
-            return "[Unit]\nDescription=BTCPay Lite payment monitoring timer\n\n[Timer]\nOnBootSec=10min\nOnUnitActiveSec=10min\nAccuracySec=1s\nUnit=btcpay-lite-payment-worker.service\n\n[Install]\nWantedBy=timers.target\n";
+            $minutes = intdiv($tickSeconds, 60);
+            return "[Unit]\nDescription=BTCPay Lite payment monitoring timer\n\n[Timer]\nOnBootSec={$minutes}min\nOnUnitActiveSec={$minutes}min\nAccuracySec=1s\nUnit=btcpay-lite-payment-worker.service\n\n[Install]\nWantedBy=timers.target\n";
         }
         if ($kind !== 'service' || !preg_match('/\A[a-z_][a-z0-9_-]*\z/i', $user) || $user === 'root') {
             throw new InvalidArgumentException('Use --payment-systemd=service|timer and a non-root --worker-user for the service.');
