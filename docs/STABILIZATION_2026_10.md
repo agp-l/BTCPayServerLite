@@ -75,3 +75,18 @@ změřená proti skutečnému Electru: limity a plánovací příklady jsou v CA
 Úplná sada po obou opravách: **74 testovacích souborů prošlo, 0 selhalo**,
 včetně reálné DB, HTTP hranic, více procesů a všech migrací. Opravené nastavení
 session adresáře bylo pouze v izolovaném testovacím prostředí.
+
+## Checkpoint: API a diagnostika
+
+HTTP health a server info vracejí neznámou synchronizaci jako null, bez RPC.
+Payment-methods a additionalStatus používají uloženou payment presentation:
+partial, receipts i doplatek; rate vychází z původní uložené ceny. Nejsou
+vymyšleny jednotlivé transaction rows. Základní monitoringTime zahrnuje 24 h
+po expiraci. CLI health je nepřístupný přes HTTP, ověřuje existenci core tabulek,
+správné Retry/Processing/Dead stavy a getinfo síť místo nepodporovaného
+daemon_status. Raw chyby nejsou ve výstupu diagnostiky.
+
+Ověření: **75 testovacích souborů prošlo, 0 selhalo** s izolovanou MariaDB.
+Nové případy pokrývají partial receipt, utracený příjem, přeplatek, legacy Settled,
+uložený fiat kurz, nulová RPC čtení health a HTTP zákaz CLI diagnostiky.
+Synchronizace skutečného Electra ani kompatibilita všech CMS tím nejsou prokázány.

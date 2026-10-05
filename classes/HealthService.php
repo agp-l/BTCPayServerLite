@@ -45,7 +45,7 @@ class HealthService
         $queuesHealth = $this->checkQueues();
         $systemHealth = $this->checkSystem();
 
-        $overallStatus = ($dbHealth['healthy'] && $cryptoHealth['healthy'])
+        $overallStatus = ($dbHealth['healthy'] && $cryptoHealth['healthy'] && !isset($queuesHealth['error']))
             ? ($electrumHealth['healthy'] ? 'healthy' : 'degraded')
             : 'unhealthy';
 
@@ -66,32 +66,30 @@ class HealthService
         try {
             $pdo = $this->database->getPdo();
             $stmt = $pdo->query('SELECT 1');
-            $ok = $stmt !== false && $stmt->fetchColumn() === 1;
+            $ok = $stmt !== false && (int) $stmt->fetchColumn() === 1;
 
             // Check core tables
             $tables = ['stores', 'invoices', 'users', 'webhooks', 'webhook_deliveries', 'api_idempotency_keys'];
             $existing = [];
             foreach ($tables as $table) {
                 try {
-                    $countStmt = $pdo->query("SELECT COUNT(*) FROM `{$table}`");
-                    if ($countStmt !== false) {
-                        $existing[$table] = (int) $countStmt->fetchColumn();
-                    }
+                    // Existence/readability, not a full table count on every probe.
+                    $existing[$table] = $pdo->query("SELECT 1 FROM `{$table}` LIMIT 1") !== false;
                 } catch (Throwable) {
                     $existing[$table] = false;
                 }
             }
 
             return [
-                'healthy' => $ok,
+                'healthy' => $ok && !in_array(false, $existing, true),
                 'driver' => (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME),
                 'server_version' => (string) $pdo->getAttribute(PDO::ATTR_SERVER_VERSION),
                 'tables' => $existing,
             ];
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             return [
                 'healthy' => false,
-                'error' => $e->getMessage(),
+                'error' => 'database_unavailable',
             ];
         }
     }
@@ -101,26 +99,38 @@ class HealthService
     {
         try {
             $version = $this->rpc->callDaemon('version');
-            $isDaemonSynced = true;
+            $connected = null;
+            $localHeight = null;
+            $serverHeight = null;
             try {
-                $status = $this->rpc->callDaemon('daemon_status');
-                if (is_array($status) && isset($status['blockchainInfo']['synced'])) {
-                    $isDaemonSynced = (bool) $status['blockchainInfo']['synced'];
+                $info = $this->rpc->callNetwork('getinfo');
+                if (is_array($info)) {
+                    $connected = is_bool($info['connected'] ?? null) ? $info['connected'] : null;
+                    $localHeight = is_int($info['blockchain_height'] ?? null) ? $info['blockchain_height'] : null;
+                    $serverHeight = is_int($info['server_height'] ?? null) ? $info['server_height'] : null;
                 }
-            } catch (Throwable) {
-                // Not all electrum versions expose daemon_status
+            } catch (ElectrumRPCException $error) {
+                // Older/custom daemons may lack getinfo. Unknown is not synchronized.
+                if ($error->getType() !== ElectrumRPCException::TYPE_REMOTE || $error->getRpcCode() !== -32601) {
+                    throw $error;
+                }
             }
 
             return [
-                'healthy' => true,
+                'healthy' => $connected !== false,
                 'version' => is_scalar($version) ? (string) $version : 'connected',
-                'synced' => $isDaemonSynced,
+                'synced' => null,
+                'network_connected' => $connected,
+                'local_height' => $localHeight,
+                'server_height' => $serverHeight,
+                'error' => $connected === false ? 'electrum_network_disconnected' : null,
                 'endpoint' => $this->rpc->getEndpoint(),
             ];
         } catch (Throwable $e) {
             return [
                 'healthy' => false,
-                'error' => $e->getMessage(),
+                'error' => $e instanceof ElectrumRPCException ? 'electrum_' . $e->getType() : 'electrum_unavailable',
+                'synced' => null,
                 'endpoint' => $this->rpc->getEndpoint(),
             ];
         }
@@ -163,10 +173,10 @@ class HealthService
             $stmt = $pdo->query("SELECT status, COUNT(*) as cnt FROM webhook_deliveries GROUP BY status");
             if ($stmt !== false) {
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    if ($row['status'] === 'Pending') {
-                        $pendingDeliveries = (int) $row['cnt'];
-                    } elseif ($row['status'] === 'Failed') {
-                        $failedDeliveries = (int) $row['cnt'];
+                    if (in_array($row['status'], ['Pending', 'Retry', 'Processing'], true)) {
+                        $pendingDeliveries += (int) $row['cnt'];
+                    } elseif ($row['status'] === 'Dead') {
+                        $failedDeliveries += (int) $row['cnt'];
                     }
                 }
             }
@@ -182,8 +192,8 @@ class HealthService
                 'failed_webhook_deliveries' => $failedDeliveries,
                 'active_monitored_invoices' => $activeInvoices,
             ];
-        } catch (Throwable $e) {
-            return ['error' => $e->getMessage()];
+        } catch (Throwable) {
+            return ['error' => 'queue_unavailable'];
         }
     }
 

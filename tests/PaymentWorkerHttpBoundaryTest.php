@@ -22,7 +22,7 @@ try {
         usleep(20000);
     }
     coreCheck($ready, 'HTTP test server did not start: ' . file_get_contents($log));
-    foreach (['payment_worker.php','wallet_receive_sync.php','repair_store_xpub.php'] as $entrypoint) {
+    foreach (['payment_worker.php','wallet_receive_sync.php','repair_store_xpub.php','bin/health_check.php'] as $entrypoint) {
     $body = file_get_contents('http://127.0.0.1:' . $port . '/' . $entrypoint, false,
         stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 2]]));
     coreCheck(str_contains($http_response_header[0] ?? '', '404'), 'Payment worker is publicly runnable');

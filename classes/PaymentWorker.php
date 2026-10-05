@@ -93,7 +93,7 @@ class PaymentWorker
            ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"
         );
         $now = ($this->clock)();
-        $update->execute([$token, $this->leaseSeconds, $now - 86400, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
+        $update->execute([$token, $this->leaseSeconds, $now - PaymentCheckPolicy::EXPIRED_MONITORING_SECONDS, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
         if ($update->rowCount() !== 1) {
             return null;
         }

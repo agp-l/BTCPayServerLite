@@ -36,6 +36,25 @@ Cílem není vydávat aplikaci za celý BTCPay Server, ale implementovat stabiln
 
 Primární autentizace kompatibilní s oficiálním klientem je `Authorization: token <api-key>`; kvůli starším klientům zůstává podporované také `Authorization: Bearer <api-key>`. Odpověď aktuálního API klíče záměrně deklaruje pouze skutečně implementovaná oprávnění, takže plugin nemá nabýt dojmu, že jsou dostupné refundace nebo pull payments.
 
+`health` potvrzuje pouze dosažitelnost HTTP (`status: reachable`). Pole
+`synchronized`, `server/info.fullySynched` a `syncStatus.blockchainInfo` obsahují
+`null` pro neznámé hodnoty; žádné z těchto čtení nevolá Electrum. Je to vědomá
+odchylka od klientů očekávajících povinný boolean: integrace musí přijmout stav
+„neověřeno“, nikoli jej zaměnit za synchronizovaný blockchain. Pro cílenou RPC
+diagnostiku slouží CLI `php bin/health_check.php --json`; reportuje připojení
+a dostupné výšky z `getinfo`, nikoli důkaz synchronizace. Chybějící tabulka nebo
+odpojená síť nesmějí projít jako zdravý stav; degraded/unhealthy mají exit code 1.
+
+Invoice payment-methods čte jen DB. `amount`, `paymentMethodPaid`, `totalPaid`
+a `due` jsou v BTC; `rate` je efektivní původní invoice měna/BTC odvozená
+z uložené ceny a zaokrouhlené BTC částky, nikoli nový kurz. Částečné příjmy
+zahrnují potvrzené i nepotvrzené výstupy a invoice má `additionalStatus: PaidPartial`.
+U staré Settled faktury bez observation se zachová známá uhrazená částka.
+`payments` zůstává prázdné: agregátní snapshot není trvalý seznam tx/vout.
+`monitoringTime` označuje konec základního okna expirace + 24 h; faktury se známou
+částečnou platbou se sledují i déle. Settled je terminální stav. Meze a reorg
+politika jsou popsány v [architektuře](CORE_PAYMENT_ARCHITECTURE.md).
+
 Pro pojmenovaný přehled integrací může e-shop posílat `X-BTCPay-Plugin-Name`, `X-BTCPay-Plugin-Version` a `X-BTCPay-Shop-URL`. Z URL se ukládá pouze origin (schéma, host a volitelný port). Bez těchto hlaviček se stále zaznamená metoda, cesta, HTTP stav, trvání, čas a příslušný obchod; nikdy autorizační hlavička ani tělo požadavku.
 
 Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency`. Pro `BTC` a `SAT` probíhá převod bez `float`; podporované fiat měny se převádějí přes nakonfigurovaný tržní provider. Výchozí platnost nové on-chain faktury je **48 hodin (2 880 minut)**. `checkout.expirationMinutes` může nastavit jinou lhůtu v rozsahu 1 až 43 200 minut. BTC částka vypočtená při vzniku se během platnosti nepřepočítává podle kurzu. Existující faktury si zachovávají svou původní expiraci. Volby `checkout.redirectURL`, `checkout.redirectAutomatically` a `checkout.expirationMinutes` jsou zachované. Výsledná odpověď obsahuje BTCPay kompatibilní `checkoutLink`, stav, metadata a on-chain payment method `BTC-CHAIN`.

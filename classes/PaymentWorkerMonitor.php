@@ -51,7 +51,7 @@ final class PaymentWorkerMonitor
             . PaymentWorker::ELIGIBLE_SQL . ' AND (next_check_at IS NULL OR next_check_at <= ?)
             AND (last_checked_at IS NULL OR last_checked_at <= ?)
             AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())');
-        $stmt->execute([$now - 86400, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
+        $stmt->execute([$now - PaymentCheckPolicy::EXPIRED_MONITORING_SECONDS, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
         $queue = $stmt->fetch(PDO::FETCH_ASSOC);
         $stale = (int) $this->pdo->query('SELECT COUNT(*) FROM invoices WHERE payment_processing_token IS NOT NULL AND payment_processing_until <= UNIX_TIMESTAMP()')->fetchColumn();
         return ['now'=>$now, 'running'=>$running, 'runs'=>$runs, 'due'=>(int)$queue['due'],

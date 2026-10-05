@@ -77,9 +77,9 @@ class GreenfieldApiService
         return [
             'version' => '2.0.0-btcpaylite',
             'onion' => '',
-            'fullySynched' => true,
+            'fullySynched' => null,
             'supportedPaymentMethods' => ['BTC-CHAIN'],
-            'syncStatus' => ['blockchainInfo' => ['available' => true, 'synced' => true]],
+            'syncStatus' => ['blockchainInfo' => ['available' => null, 'synced' => null]],
         ];
     }
 
@@ -212,19 +212,25 @@ class GreenfieldApiService
     {
         $store = $this->authenticateStore($storeId, $apiKey);
         $invoice = $this->loadStoreInvoice($store['id'], $invoiceId);
-        $settled = ($invoice['status'] ?? null) === 'Settled';
-        $btcAmount = (string) $invoice['amount'];
+        $presentation = InvoicePaymentPresentation::fromInvoice($invoice);
+        $btcAmount = $presentation['invoice']['amount'];
+        $paid = $presentation['payment']['total_received'];
+        // Legacy settled invoices may predate persisted observation evidence.
+        // Keep their known paid amount without pretending to have transaction rows.
+        if ($invoice['status'] === 'Settled' && ($invoice['payment_observed_at'] ?? null) === null) {
+            $paid = $btcAmount;
+        }
         return [[
             'paymentMethodId' => 'BTC-CHAIN',
             'paymentMethod' => 'BTC',
             'cryptoCode' => 'BTC',
             'currency' => 'BTC',
             'destination' => (string) $invoice['btc_address'],
-            'paymentLink' => (string) $invoice['bip21_uri'],
-            'rate' => '1',
-            'paymentMethodPaid' => $settled ? $btcAmount : '0.00000000',
-            'totalPaid' => $settled ? $btcAmount : '0.00000000',
-            'due' => $settled ? '0.00000000' : $btcAmount,
+            'paymentLink' => $presentation['invoice']['bip21_uri'],
+            'rate' => $this->invoicePaymentRate($presentation['invoice']),
+            'paymentMethodPaid' => $paid,
+            'totalPaid' => $paid,
+            'due' => $presentation['payment']['missing_amount'],
             'amount' => $btcAmount,
             'paymentMethodFee' => '0.00000000',
             'networkFee' => '0.00000000',
@@ -433,7 +439,8 @@ class GreenfieldApiService
     /** @param array<string,mixed> $invoice @return array<string,mixed> */
     private function invoiceResponse(array $invoice, string $storeId): array
     {
-        $metadata = is_array($invoice['metadata'] ?? null) ? $invoice['metadata'] : [];
+        $presentation = InvoicePaymentPresentation::fromInvoice($invoice);
+        $metadata = $presentation['invoice']['metadata'];
         $amount = is_string($metadata[self::META_AMOUNT] ?? null) ? $metadata[self::META_AMOUNT] : (string) $invoice['amount'];
         $currency = is_string($metadata[self::META_CURRENCY] ?? null) ? $metadata[self::META_CURRENCY] : 'BTC';
         unset($metadata[self::META_AMOUNT], $metadata[self::META_CURRENCY], $metadata[self::META_REDIRECT_URL], $metadata[self::META_REDIRECT_AUTO]);
@@ -448,13 +455,29 @@ class GreenfieldApiService
             'checkoutLink' => $this->checkoutBaseUrl . '/pay?id=' . rawurlencode((string) $invoice['id']),
             'createdTime' => $created,
             'expirationTime' => $expires,
-            'monitoringTime' => $expires,
+            'monitoringTime' => $expires + PaymentCheckPolicy::EXPIRED_MONITORING_SECONDS,
             'archived' => false,
             'status' => (string) ($invoice['status'] ?? 'New'),
-            'additionalStatus' => 'None',
+            'additionalStatus' => $presentation['additional_status'],
             'availableStatusesForManualMarking' => [],
             'metadata' => $metadata,
         ];
+    }
+
+    /** Effective invoice-currency/BTC rate from the stored invoice, never a fresh market quote. */
+    private function invoicePaymentRate(array $invoice): string
+    {
+        $metadata = $invoice['metadata'];
+        $currency = $metadata[self::META_CURRENCY] ?? 'BTC';
+        if ($currency === 'BTC') { return '1'; }
+        if (in_array($currency, ['SAT', 'SATS'], true)) { return '100000000'; }
+        $amount = (string) ($metadata[self::META_AMOUNT] ?? $invoice['amount']);
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '');
+        $denominator = gmp_mul(gmp_pow(10, strlen($fraction)), BitcoinAmount::fromBtc($invoice['amount'])->satoshis());
+        $numerator = gmp_mul(gmp_init($whole . $fraction, 10), gmp_pow(10, 16));
+        $scaled = gmp_strval(gmp_div_q(gmp_add($numerator, gmp_div_q($denominator, 2)), $denominator));
+        $scaled = str_pad($scaled, 9, '0', STR_PAD_LEFT);
+        return substr($scaled, 0, -8) . '.' . substr($scaled, -8);
     }
 
     /** @param array{id:string,url:string,secret:string} $webhook @return array<string,mixed> */

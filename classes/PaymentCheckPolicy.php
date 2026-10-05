@@ -10,6 +10,7 @@ final class PaymentCheckPolicy
     public const MIN_INTERVAL = 600;
     public const MAX_INTERVAL = 3600;
     public const CLI_STALE_AFTER = 1800;
+    public const EXPIRED_MONITORING_SECONDS = 86400;
 
     public static function interval(int $createdAt, int $now, string $status = 'New'): int
     {

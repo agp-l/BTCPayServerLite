@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace BtcPayLite;
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 $config = require __DIR__ . '/../config.php';
@@ -25,7 +30,7 @@ $isJson = in_array('--json', $argv, true);
 
 if ($isJson) {
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-    exit($report['status'] === 'unhealthy' ? 1 : 0);
+    exit($report['status'] === 'healthy' ? 0 : 1);
 }
 
 echo "========================================\n";
@@ -47,9 +52,9 @@ echo "  Connected   : " . ($report['electrum']['healthy'] ? 'YES' : 'NO') . "\n"
 echo "  Endpoint    : " . $report['electrum']['endpoint'] . "\n";
 if ($report['electrum']['healthy']) {
     echo "  Version     : " . $report['electrum']['version'] . "\n";
-    echo "  Synced      : " . ($report['electrum']['synced'] ? 'YES' : 'NO') . "\n";
+    echo "  Synced      : " . ($report['electrum']['synced'] === null ? 'UNKNOWN' : ($report['electrum']['synced'] ? 'YES' : 'NO')) . "\n";
 } else {
-    echo "  Notice      : " . ($report['electrum']['error'] ?? 'Unreachable') . " (XPUB stores remain operational)\n";
+    echo "  Notice      : " . ($report['electrum']['error'] ?? 'Unreachable') . " (local XPUB derivation works; payment observation requires Electrum)\n";
 }
 
 echo "\n[Cryptography & Derivation]\n";
@@ -68,4 +73,4 @@ if (isset($report['queues']['error'])) {
 
 echo "========================================\n";
 
-exit($report['status'] === 'unhealthy' ? 1 : 0);
+exit($report['status'] === 'healthy' ? 0 : 1);

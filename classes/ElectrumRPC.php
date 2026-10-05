@@ -32,7 +32,7 @@ class ElectrumRPC
     ];
 
     private const NETWORK_COMMANDS = [
-        'getaddressbalance', 'getaddresshistory', 'getaddressunspent', 'gettransaction', 'broadcast',
+        'getinfo', 'getaddressbalance', 'getaddresshistory', 'getaddressunspent', 'gettransaction', 'broadcast',
         'validateaddress', 'deserialize', 'getfeerate', 'server.version', 'blockchain.estimatefee'
     ];
 

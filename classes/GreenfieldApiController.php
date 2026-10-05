@@ -82,7 +82,8 @@ class GreenfieldApiController
 
         if ($path === '/api/v1/health') {
             $this->requireMethod($method, 'GET');
-            return ['status_code' => 200, 'body' => ['synchronized' => true]];
+            // Reachability only. Polling this endpoint must not contact Electrum.
+            return ['status_code' => 200, 'body' => ['synchronized' => null, 'status' => 'reachable']];
         }
 
         $apiKey = $this->extractApiToken($authorizationHeader);

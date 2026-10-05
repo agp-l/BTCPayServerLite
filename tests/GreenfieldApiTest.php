@@ -131,6 +131,7 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
 
         return [
             'id' => 'inv_test',
+            'btc_address' => 'bc1qtestaddress',
             'amount' => (string) $amountBtc,
             'status' => 'New',
             'created_at' => 1_700_000_000,
@@ -286,6 +287,53 @@ register_shutdown_function(static function () use ($walletPath, $walletDirectory
 });
 
 $tests = [];
+
+$tests['health reports reachability without inventing synchronization or consulting the service'] = static function (): void {
+    $service = new GreenfieldControllerTestService();
+    $result = (new GreenfieldApiController($service))->handleRequest('GET', '/api/v1/health', '', '');
+    greenfieldAssertSame(200, $result['status_code'], 'Reachability probe failed.');
+    greenfieldAssertSame(['synchronized' => null, 'status' => 'reachable'], $result['body'], 'Unknown sync was reported as measured.');
+    greenfieldAssertSame([], $service->calls, 'Health probe invoked the application.');
+};
+
+$tests['server info does not claim unmeasured blockchain availability'] = static function () use ($walletPath): void {
+    [$service] = newGreenfieldTestService($walletPath);
+    $info = $service->getServerInfo('store-api-key');
+    greenfieldAssertSame(null, $info['fullySynched'], 'Server claims synchronization without evidence.');
+    greenfieldAssertSame(['available' => null, 'synced' => null], $info['syncStatus']['blockchainInfo'], 'Server invents blockchain availability.');
+};
+
+$tests['projects partial receipts and stored fiat rate without observing a wallet'] = static function () use ($walletPath): void {
+    [$service, , , $wallet, $manager] = newGreenfieldTestService($walletPath);
+    $manager->storedInvoice = [
+        'id' => 'inv_test', 'store_id' => 'store_test', 'amount' => '0.00100000',
+        'btc_address' => 'bc1qtestaddress', 'status' => 'Processing',
+        'metadata' => ['_btcpaylite_original_amount' => '2500', '_btcpaylite_original_currency' => 'CZK', 'orderId' => 'order1'],
+        'payment_observed_at' => 1700000100, 'confirmed_balance_sats' => 0, 'mempool_delta_sats' => 0,
+        'confirmed_output_sats' => 1, 'unconfirmed_output_sats' => 39999,
+        'created_at' => 1700000000, 'expires_at' => 1700000600,
+    ];
+    $method = $service->getInvoicePaymentMethods('store_test', 'inv_test', 'store-api-key')[0];
+    greenfieldAssertSame('0.00040000', $method['paymentMethodPaid'], 'Spent receipts or mempool outputs were lost.');
+    greenfieldAssertSame('0.00040000', $method['totalPaid'], 'BTC paid total differs.');
+    greenfieldAssertSame('0.00060000', $method['due'], 'Remaining amount differs.');
+    greenfieldAssertSame('2500000.00000000', $method['rate'], 'Rate was not derived from persisted invoice.');
+    greenfieldAssertSame([], $method['payments'], 'Aggregate evidence invented transaction details.');
+    $invoice = $service->getInvoice('store_test', 'inv_test', 'store-api-key');
+    greenfieldAssertSame('PaidPartial', $invoice['additionalStatus'], 'Partial payment was hidden.');
+    greenfieldAssertSame(1700000600 + 86400, $invoice['monitoringTime'], 'Late monitoring window differs.');
+    greenfieldAssertSame(['orderId' => 'order1'], $invoice['metadata'], 'Reserved metadata leaked.');
+    greenfieldAssertSame([], $wallet->loadedWalletPaths, 'Read loaded a wallet.');
+    $manager->storedInvoice['confirmed_output_sats'] = 120000;
+    $manager->storedInvoice['unconfirmed_output_sats'] = 0;
+    $manager->storedInvoice['status'] = 'Settled';
+    $method = $service->getInvoicePaymentMethods('store_test', 'inv_test', 'store-api-key')[0];
+    greenfieldAssertSame('0.00120000', $method['paymentMethodPaid'], 'Overpayment was clipped.');
+    greenfieldAssertSame('0.00000000', $method['due'], 'Settled invoice still has a due amount.');
+    $manager->storedInvoice['payment_observed_at'] = null;
+    $method = $service->getInvoicePaymentMethods('store_test', 'inv_test', 'store-api-key')[0];
+    greenfieldAssertSame('0.00100000', $method['paymentMethodPaid'], 'Legacy settled invoice lost its known payment.');
+};
 
 $tests['uses two days by default but preserves explicit expiration'] = static function () use ($walletPath): void {
     [$service, , , , $manager] = newGreenfieldTestService($walletPath);
