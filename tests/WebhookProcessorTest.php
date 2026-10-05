@@ -17,6 +17,7 @@ final class WebhookProcessorTestRepository extends WebhookDeliveryRepository
     public array $delivered = [];
     /** @var list<array<string, mixed>> */
     public array $failed = [];
+    public array $claims = [];
 
     public function __construct()
     {
@@ -24,7 +25,8 @@ final class WebhookProcessorTestRepository extends WebhookDeliveryRepository
 
     public function claimDueDeliveries(int $now, int $limit, int $staleAfterSeconds = 300): array
     {
-        return $this->dueDeliveries;
+        $this->claims[] = [$now, $limit];
+        return array_splice($this->dueDeliveries, 0, $limit);
     }
 
     public function markDelivered(
@@ -206,6 +208,32 @@ $tests['stops retrying after the maximum attempt count'] = static function (): v
 
     webhookProcessorAssertSame(1, $report['deliveries_dead'], 'Eighth failed attempt should be final.');
     webhookProcessorAssertSame(false, $repository->failed[0]['retry'], 'Attempt limit must disable retries.');
+};
+
+$tests['slow deliveries receive fresh individual leases instead of a waiting batch'] = static function (): void {
+    $repository = new WebhookProcessorTestRepository();
+    for ($i = 0; $i < 40; ++$i) {
+        $delivery = webhookProcessorDelivery();
+        $delivery['id'] = 'wd_' . $i;
+        $repository->dueDeliveries[] = $delivery;
+    }
+    $now = 1_700_000_000;
+    $transport = new class($repository, $now) implements WebhookTransport {
+        private int $now;
+        public function __construct(private WebhookProcessorTestRepository $repository, int &$now) { $this->now =& $now; }
+        public function deliver(string $url, string $payload, string $signature): array {
+            $claim = end($this->repository->claims);
+            webhookProcessorAssertSame(1, $claim[1], 'Waiting deliveries were claimed early.');
+            webhookProcessorAssertSame($this->now, $claim[0], 'Lease was consumed by an earlier request.');
+            $this->now += 10; // More than the 300s stale timeout across the complete batch.
+            return ['http_status' => 204, 'primary_ip' => '8.8.8.8'];
+        }
+    };
+    $processor = new WebhookProcessor($repository, $transport, static function () use (&$now): int { return $now; });
+    $report = $processor->run(100, 40);
+    webhookProcessorAssertSame(40, $report['deliveries_delivered'], 'Slow batch lost a delivery.');
+    webhookProcessorAssertSame(1_700_000_400, $now, 'Slow fixture did not cross the stale boundary.');
+    webhookProcessorAssertSame([], $repository->dueDeliveries, 'Batch was not drained.');
 };
 
 $passed = 0;

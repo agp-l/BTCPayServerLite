@@ -43,3 +43,16 @@ Pořadí práce:
 Probíhá příprava PHP a izolované MariaDB. Dosavadní závěry jsou revize zdrojů,
 nikoli výsledky zátěžového testu nebo test skutečné platby na cílovém serveru.
 Záznam bude doplněn po jednotlivých ověřených krocích.
+
+## Checkpoint: webhooky
+
+Processor nyní rezervuje jednu událost až bezprostředně před HTTP. Zpoždění
+předchozích požadavků nespotřebovává lease dalších záznamů. Cron používá
+45sekundový rozpočet pro zahajování doručení; probíhající request a DB/DNS
+práce mohou doběhnout později. Payload, HMAC, delivery ID i retry lhůty zůstávají.
+
+Ověření: 6 processor testů a 5 controller testů prošlo. Nový DB scénář
+pokrývá pomalou dávku přes 300 s, zotavení lease a odmítnutí starého vlastníka.
+První úplný lokální průchod: 68/72 souborů prošlo; čtyři chyby souvisejí
+s nepřipraveným testovacím PHP session adresářem, který je nyní opraven.
+Testovací MariaDB 10.11.14 je izolovaná, skutečný Electrum není připojen.

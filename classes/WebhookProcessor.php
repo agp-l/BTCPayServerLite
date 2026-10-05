@@ -76,22 +76,30 @@ class WebhookProcessor
      *   errors: list<array{scope: string, id: string, message: string}>
      * }
      */
-    public function run(int $invoiceLimit = 100, int $deliveryLimit = 100): array
+    public function run(int $invoiceLimit = 100, int $deliveryLimit = 100, ?int $maxSeconds = null): array
     {
         $limit = ($deliveryLimit > 0) ? $deliveryLimit : $invoiceLimit;
         $report = $this->newReport();
-
-        try {
-            $deliveries = $this->repository->claimDueDeliveries($this->now(), $limit);
-            $report['deliveries_claimed'] = count($deliveries);
-        } catch (Throwable $exception) {
-            $this->recordError($report, 'delivery_claim', '-', $exception);
-
+        $deadline = $maxSeconds === null ? null : hrtime(true) / 1e9 + max(1, $maxSeconds);
+        if ($limit < 1 || $limit > 500) {
+            $this->recordError($report, 'delivery_claim', '-', new WebhookDeliveryException(
+                'Delivery batch limit is invalid.', 'claim_deliveries'
+            ));
             return $report;
         }
-
-        foreach ($deliveries as $delivery) {
-            $this->deliver($delivery, $report);
+        for ($i = 0; $i < $limit; ++$i) {
+            if ($deadline !== null && hrtime(true) / 1e9 >= $deadline) { break; }
+            try {
+                // Claim immediately before HTTP. A slow earlier request must not
+                // consume the lease of an entire waiting batch.
+                $deliveries = $this->repository->claimDueDeliveries($this->now(), 1);
+            } catch (Throwable $exception) {
+                $this->recordError($report, 'delivery_claim', '-', $exception);
+                break;
+            }
+            if ($deliveries === []) { break; }
+            ++$report['deliveries_claimed'];
+            $this->deliver($deliveries[0], $report);
         }
 
         return $report;

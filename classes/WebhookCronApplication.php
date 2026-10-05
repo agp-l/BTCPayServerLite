@@ -56,7 +56,7 @@ class WebhookCronApplication
             $transport
         );
 
-        return $processor->run($invoiceLimit, $deliveryLimit);
+        return $processor->run($invoiceLimit, $deliveryLimit, 45);
     }
 
     private function stringConfig(string $key, bool $allowEmpty = false): string

@@ -40,7 +40,7 @@ Pro pojmenovaný přehled integrací může e-shop posílat `X-BTCPay-Plugin-Nam
 
 Vytvoření faktury přijímá přesnou částku jako JSON řetězec a `currency`. Pro `BTC` a `SAT` probíhá převod bez `float`; podporované fiat měny se převádějí přes nakonfigurovaný tržní provider. Výchozí platnost nové on-chain faktury je **48 hodin (2 880 minut)**. `checkout.expirationMinutes` může nastavit jinou lhůtu v rozsahu 1 až 43 200 minut. BTC částka vypočtená při vzniku se během platnosti nepřepočítává podle kurzu. Existující faktury si zachovávají svou původní expiraci. Volby `checkout.redirectURL`, `checkout.redirectAutomatically` a `checkout.expirationMinutes` jsou zachované. Výsledná odpověď obsahuje BTCPay kompatibilní `checkoutLink`, stav, metadata a on-chain payment method `BTC-CHAIN`.
 
-Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
+Webhooky používají události `InvoiceProcessing`, `InvoiceSettled` a `InvoiceExpired`. Webhook worker rezervuje vždy jen jednu delivery těsně před HTTP požadavkem. Dávka má nejvýše 100 doručení (konfigurovatelně do 500) a časový rozpočet 45 s; poslední probíhající request a DB/DNS mohou běh prodloužit. Při pádu se stejný delivery ID obnoví po 300 s; receiver musí zvládnout opakované doručení. Raw JSON tělo je podepsané HMAC-SHA256 v hlavičce `BTCPay-Sig: sha256=...`; payload obsahuje `deliveryId`, `webhookId`, `storeId`, `invoiceId`, `type` a `timestamp`.
 
 ### Samostatný API tester a základ CMS pluginu
 
