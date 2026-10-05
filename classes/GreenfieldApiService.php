@@ -11,7 +11,7 @@ use Throwable;
 /** Application layer for the BTCPay Greenfield-compatible subset. */
 class GreenfieldApiService
 {
-    private const DEFAULT_EXPIRATION_MINUTES = 15;
+    private const DEFAULT_EXPIRATION_MINUTES = 2880;
     private const MAX_EXPIRATION_MINUTES = 43_200;
     private const META_AMOUNT = '_btcpaylite_original_amount';
     private const META_CURRENCY = '_btcpaylite_original_currency';

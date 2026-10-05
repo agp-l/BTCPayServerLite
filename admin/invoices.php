@@ -72,7 +72,7 @@ try {
             $wallet = new ElectrumWallet($rpc);
             $manager = new BtcInvoiceManager($wallet, $config['secret_key'], $database);
 
-            return $manager->createDatabaseInvoice($store['id'], $amount, $metadata, 15);
+            return $manager->createDatabaseInvoice($store['id'], $amount, $metadata);
         }
     );
 } catch (Throwable $exception) {

@@ -22,7 +22,7 @@ interface BtcStatelessInvoiceGateway
         int|float|string $amountBtc,
         string $description,
         array $customData = [],
-        int $expirationMinutes = 15,
+        int $expirationMinutes = 2880,
         ?string $walletPath = null
     ): array;
 

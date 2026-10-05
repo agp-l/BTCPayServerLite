@@ -11,7 +11,7 @@ use InvalidArgumentException;
  */
 class BtcStatelessService
 {
-    private const DEFAULT_EXPIRATION_MINUTES = 15;
+    private const DEFAULT_EXPIRATION_MINUTES = 2880;
     private const MIN_EXPIRATION_MINUTES = 10;
     private const MAX_EXPIRATION_MINUTES = 43_200;
     private const MAX_ORDER_ID_BYTES = 255;

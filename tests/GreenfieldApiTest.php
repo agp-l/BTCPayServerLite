@@ -287,6 +287,15 @@ register_shutdown_function(static function () use ($walletPath, $walletDirectory
 
 $tests = [];
 
+$tests['uses two days by default but preserves explicit expiration'] = static function () use ($walletPath): void {
+    [$service, , , , $manager] = newGreenfieldTestService($walletPath);
+    $service->createInvoice('store_test', ['amount' => '0.001'], 'store-api-key');
+    greenfieldAssertSame(2880, $manager->createdInvoices[0]['expiration'], 'Default must be two days.');
+    greenfieldAssertSame(2880, $service->getStore('store_test', 'store-api-key')['invoiceExpiration'], 'Store expiration differs.');
+    $service->createInvoice('store_test', ['amount' => '0.001', 'checkout' => ['expirationMinutes' => 60]], 'store-api-key');
+    greenfieldAssertSame(60, $manager->createdInvoices[1]['expiration'], 'Explicit expiration was overridden.');
+};
+
 $tests['authenticates each store before exposing it'] = static function () use ($walletPath): void {
     [$service] = newGreenfieldTestService($walletPath);
 

@@ -72,6 +72,20 @@ function kernelAssertTrue(bool $condition, string $message): void
 
 $tests = [];
 
+$tests['default invoice remains payable for two days'] = static function (): void {
+    $wallet = new StatelessKernelTestWallet();
+    $now = 1_700_000_000;
+    $manager = new BtcStatelessInvoiceManager($wallet, str_repeat('s', 32), static function () use (&$now): int { return $now; });
+    $created = $manager->createStatelessInvoice('0.001', 'Two day invoice', walletPath: '/wallets/test');
+    $invoice = $manager->decodeStatelessToken($created['token']);
+    kernelAssertSame($now + 172800, $invoice['e'], 'Default expiration must be two days.');
+    kernelAssertSame(172800, $wallet->created[0]['expiry'], 'Electrum received a shorter expiry.');
+    $now += 86400;
+    kernelAssertSame('unpaid', $manager->checkStatelessPaymentStatus($created['token'], '/wallets/test')['status'], 'Invoice expired after one day.');
+    $now += 86401;
+    kernelAssertSame('expired', $manager->checkStatelessPaymentStatus($created['token'], '/wallets/test')['status'], 'Invoice did not expire after two days.');
+};
+
 $tests['creates a database-free signed invoice'] = static function (): void {
     $wallet = new StatelessKernelTestWallet();
     $manager = new BtcStatelessInvoiceManager(

@@ -58,7 +58,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         string $storeId,
         int|float|string $amountBtc,
         array $metadata = [],
-        int $expirationMinutes = 15,
+        int $expirationMinutes = 2880,
         ?AddressGeneratorInterface $addressGenerator = null,
         ?IdempotencyReservation $reservation = null
     ): array {
@@ -250,7 +250,7 @@ class BtcInvoiceManager implements BtcStatelessInvoiceGateway
         int|float|string $amountBtc,
         string $description,
         array $customData = [],
-        int $expirationMinutes = 15,
+        int $expirationMinutes = 2880,
         ?string $walletPath = null
     ): array {
         return $this->requireStatelessManager()->createStatelessInvoice(

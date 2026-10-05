@@ -69,9 +69,10 @@ require __DIR__ . '/layout/header.php';
                 <label for="expiration_minutes">Expirace platby</label>
                 <div class="input-wrap">
                     <select id="expiration_minutes">
-                        <option value="15">15 minut (E-shopy)</option>
+                        <option value="15">15 minut</option>
                         <option value="60">1 hodina</option>
                         <option value="1440">1 den (24 hodin)</option>
+                        <option value="2880" selected>2 dny (48 hodin)</option>
                         <option value="10080">1 týden (7 dní)</option>
                         <option value="43200">1 měsíc (30 dní)</option>
                     </select>

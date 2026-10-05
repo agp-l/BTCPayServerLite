@@ -1178,7 +1178,7 @@ Accept: application/json</code></pre>
                         </div>
                         <div class="param">
                             <dt>checkout.expirationMinutes</dt>
-                            <dd>Platnost 1 až 43 200 minut. Výchozí hodnota je 15 minut.</dd>
+                            <dd>Platnost 1 až 43 200 minut. Výchozí hodnota je 2 880 minut (48 hodin).</dd>
                         </div>
                         <div class="param">
                             <dt>checkout.redirectURL</dt>

@@ -302,7 +302,7 @@
             amount: document.getElementById('amount')?.value || '',
             description: document.getElementById('desc')?.value || '',
             order_id: document.getElementById('order_id')?.value || '',
-            expiration_minutes: document.getElementById('expiration_minutes')?.value || '15'
+            expiration_minutes: document.getElementById('expiration_minutes')?.value || '2880'
         });
         try {
             const data = await apiCall('create', formData);

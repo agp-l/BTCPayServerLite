@@ -165,6 +165,13 @@ register_shutdown_function(static function () use ($walletDirectory): void {
 
 $tests = [];
 
+$tests['uses two day expiration when not specified'] = static function () use ($walletDirectory): void {
+    [$service, , $manager] = newStatelessTestService($walletDirectory);
+    $result = $service->createInvoiceFromApi(['amount' => '0.001', 'description' => 'Two day invoice'], 'api-key');
+    statelessAssertSame(2880, $manager->createdInvoices[0]['expiration'], 'Service default is not two days.');
+    statelessAssertSame(2880, $result['expires_in_minutes'], 'API reports a different expiration.');
+};
+
 $tests['preserves one satoshi across the API service boundary'] = static function () use ($walletDirectory): void {
     [$service, $wallet, $manager] = newStatelessTestService($walletDirectory);
 
