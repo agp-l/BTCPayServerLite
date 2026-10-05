@@ -439,6 +439,9 @@ class GreenfieldApiService
     /** @param array<string,mixed> $invoice @return array<string,mixed> */
     private function invoiceResponse(array $invoice, string $storeId): array
     {
+        // Durable creation/retry snapshots use `address`; loaded DB rows use
+        // `btc_address`. Project both without a new DB read or RPC.
+        $invoice['btc_address'] ??= $invoice['address'];
         $presentation = InvoicePaymentPresentation::fromInvoice($invoice);
         $metadata = $presentation['invoice']['metadata'];
         $amount = is_string($metadata[self::META_AMOUNT] ?? null) ? $metadata[self::META_AMOUNT] : (string) $invoice['amount'];

@@ -12,6 +12,14 @@ if (!getenv('BTCPAY_TEST_MYSQL_HOST')) {
     echo "[SKIP] Set BTCPAY_TEST_MYSQL_HOST to run mandatory real-DB core concurrency tests (enabled in CI).\n";
     return;
 }
+// An HTTP response containing PHP warnings/notices is a failed contract even when
+// the callback returns normally. Forked creation/replay scenarios inherit this.
+set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+    if (($severity & (E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE)) && (error_reporting() & $severity)) {
+        throw new ErrorException($message, 0, $severity, $file, $line);
+    }
+    return false;
+});
 $testDatabase = 'btcpay_core_test_' . bin2hex(random_bytes(5));
 putenv('BTCPAY_TEST_MYSQL_DATABASE=' . $testDatabase);
 function coreDbConfig(): array

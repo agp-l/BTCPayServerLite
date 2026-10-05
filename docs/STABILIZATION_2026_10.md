@@ -153,3 +153,17 @@ První 76-file běh odhalil jediný zastaralý source-string test očekávajíc�
 Apache pattern. Byl nahrazen skutečným Apache pokrytím config/temp/backup cest;
 finální úplný běh již prošel. Reálná cílová platba, host capacity, Nginx/HTTPS
 ani payout service/crash audit nejsou tímto výsledkem prokázány.
+
+## Kontrola logů CI a kontraktu nové faktury
+
+[GitHub CI nad d4ce34b](https://github.com/agp-l/BTCPayServerLite/actions/runs/37380096456)
+prošel na PHP 8.2 i 8.3, se skutečnou MariaDB a Apache, bez přeskočených scénářů.
+Čtení logu přesto odhalilo PHP warning v nově rozšířené invoice response:
+durable creation/retry snapshot má `address`, načtený DB řádek `btc_address`.
+API nyní před společnou projekcí sjednotí oba existující kontrakty, bez dalšího
+DB čtení, RPC nebo změny uloženého idempotency response. Test double odpovídá
+skutečnému manageru; tvorba faktury i reálné souběžné creation/replay/crash testy
+nyní považují PHP warnings/notices za selhání. Cílená sada prošla.
+
+Deprecations zachovaných starých Bitcoin knihoven nejsou vydávány za opravené;
+jejich náhrada je samostatná ověřovaná práce v DEPENDENCIES a ROADMAP.

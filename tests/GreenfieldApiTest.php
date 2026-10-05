@@ -131,7 +131,7 @@ final class GreenfieldTestInvoiceManager extends BtcInvoiceManager
 
         return [
             'id' => 'inv_test',
-            'btc_address' => 'bc1qtestaddress',
+            'address' => 'bc1qtestaddress',
             'amount' => (string) $amountBtc,
             'status' => 'New',
             'created_at' => 1_700_000_000,
@@ -409,11 +409,21 @@ $tests['keeps invoices scoped to their authenticated store'] = static function (
 $tests['delegates exact invoice creation without an outer wallet lock'] = static function () use ($walletPath): void {
     [$service, , $database, $wallet, $manager] = newGreenfieldTestService($walletPath);
 
-    $invoice = $service->createInvoice('store_test', [
-        'amount' => '0.00000001',
-        'metadata' => ['orderId' => 'one-sat'],
-        'expirationMinutes' => '10',
-    ], 'store-api-key');
+    set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+        if (error_reporting() & $severity) {
+            throw new ErrorException($message, 0, $severity, $file, $line);
+        }
+        return false;
+    });
+    try {
+        $invoice = $service->createInvoice('store_test', [
+            'amount' => '0.00000001',
+            'metadata' => ['orderId' => 'one-sat'],
+            'expirationMinutes' => '10',
+        ], 'store-api-key');
+    } finally {
+        restore_error_handler();
+    }
 
     greenfieldAssertSame('0.00000001', $invoice['amount'], 'The API response changed the exact amount.');
     greenfieldAssertSame('0.00000001', $manager->createdInvoices[0]['amount'], 'The manager received an imprecise amount.');
