@@ -159,10 +159,6 @@ $statusClasses = [
     window.setTimeout(() => toast.classList.remove('show'), 3000);
   };
   showToast(<?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
-  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(button.dataset.copy || ''); showToast('Odkaz byl zkopírován.'); }
-    catch (error) { showToast('Kopírování se nepodařilo.'); }
-  }));
   document.querySelectorAll('[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
     if (!window.confirm(form.dataset.confirm || 'Potvrdit operaci?')) event.preventDefault();
   }));

@@ -2,7 +2,7 @@
 
 PHP aplikace pro Bitcoin on-chain faktury, obchody a platební odkazy nad Electrem a MySQL/MariaDB. Obsahuje administraci, klientskou část, DB checkout, podmnožinu Greenfield API a podepsané webhooky.
 
-**Stav k 10. září 2026:** platební jádro má oddělenou tvorbu adres, pozorování blockchainu, změny stavů a doručování webhooků. XPUB faktury rezervují index v DB a odvozují adresu lokálně. Další práce a konkrétní hranice ověření jsou v [plánu vývoje](docs/ROADMAP.md); projekt není označen jako kompletně auditovaný.
+**Stav k 5. říjnu 2026:** platební jádro má oddělenou tvorbu adres, pozorování blockchainu, změny stavů a doručování webhooků. XPUB faktury rezervují index v DB a odvozují adresu lokálně. [Kompletní přehled a propojení se simple-store](docs/PROJECT_STATUS_2026_10.md) uvádí současné funkce, opravy kompatibility, ověření a zbývající práci. Konkrétní hranice jádra zůstávají v [plánu vývoje](docs/ROADMAP.md); projekt není označen jako kompletně auditovaný.
 
 ## Kde začít
 
@@ -13,6 +13,7 @@ PHP aplikace pro Bitcoin on-chain faktury, obchody a platební odkazy nad Electr
 | Zapnout nebo ověřit kontrolu plateb | Admin **Nástroje → Kontrola plateb**, [systemd / cron](docs/PAYMENT_MONITORING.md) |
 | Vyřešit chybu vytvoření obchodu | [Diagnostika provisioningu](docs/STORE_CREATION_TROUBLESHOOTING.md) |
 | Připojit e-shop nebo API klienta | [API a příklady](docs/API.md) |
+| Připojit náš simple-store a ověřit platbu | [Stav projektu a přesný integrační postup](docs/PROJECT_STATUS_2026_10.md) |
 | Zkontrolovat konfiguraci a oprávnění | [Konfigurace](docs/CONFIGURATION.md), `php bin/deployment.php --check` |
 | Pochopit rezervace adres a obnovu XPUB | [Koordinace adres](docs/RECEIVE_COORDINATION.md) |
 | Zůstat přihlášený | Volba **Zůstat přihlášený na tomto zařízení 30 dní**, [relace](docs/SESSION_LOGIN.md) |

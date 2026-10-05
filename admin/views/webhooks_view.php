@@ -65,7 +65,7 @@ $webhooksUrl = $routeUrl('/admin/webhooks');
           <strong><?php echo htmlspecialchars($webhook['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
           <span class="muted"><?php echo htmlspecialchars((string) $webhook['client_email'], ENT_QUOTES, 'UTF-8'); ?></span>
           <code title="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?></code>
-          <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Webhook secret"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div></div>
+          <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Webhook secret"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><button type="button" class="ghost-btn" data-copy-input aria-label="Kopírovat tajný klíč webhooku"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div></div>
           <span class="muted code">ID: <?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?></span>
           <span class="muted">Poslední doručení: <?php echo $webhook['last_delivery_at'] === null ? '—' : date('d.m.Y H:i:s', (int) $webhook['last_delivery_at']); ?></span>
         </div>

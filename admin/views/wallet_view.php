@@ -251,17 +251,6 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
   const serverMessage = <?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
   showToast(serverMessage);
 
-  document.querySelectorAll('[data-copy]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(button.dataset.copy || '');
-        showToast('Zkopírováno do schránky.');
-      } catch (error) {
-        showToast('Kopírování se nepodařilo.');
-      }
-    });
-  });
-
   const balance = document.getElementById('balanceValue');
   const fiat = document.getElementById('fiatValue');
   const toggle = document.getElementById('toggleBalance');
