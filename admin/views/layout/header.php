@@ -35,8 +35,8 @@ $menuContext = [
     'users' => ['label' => 'Klienti', 'icon' => 'fa-users'],
 ];
 $currentContext = $menuContext[$activeMenu] ?? ['label' => 'Administrace', 'icon' => 'fa-shield-halved'];
-$routeUrl = static fn (string $path): string => htmlspecialchars(
-    $urlManager->url($path),
+$routeUrl = static fn (string $path, array $query = []): string => htmlspecialchars(
+    $urlManager->url($path, $query),
     ENT_QUOTES,
     'UTF-8'
 );
@@ -70,7 +70,7 @@ $navItem = static function (
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="<?php echo $routeUrl('/assets/admin.css'); ?>">
+  <link rel="stylesheet" href="<?php echo $routeUrl('/assets/admin.css', ['v' => substr(hash_file('sha256', __DIR__ . '/../../../assets/admin.css'), 0, 12)]); ?>">
 </head>
 <body>
 <div class="admin-shell">

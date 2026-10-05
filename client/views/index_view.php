@@ -103,7 +103,10 @@ $statusClasses = [
         <div class="store-card-head"><h3><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></h3><span class="badge s-paid">Aktivní</span></div>
         <div class="credential">
           <span class="credential-label">Store ID</span>
-          <div class="credential-value"><code><?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?></code><button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div>
+          <div class="credential-value">
+            <input type="text" readonly data-copy-select value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Store ID">
+            <button type="button" class="ghost-btn" data-copy-input aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+          </div>
         </div>
         <div class="credential">
           <span class="credential-label">API klíč</span>

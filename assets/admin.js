@@ -48,6 +48,10 @@
     return copied;
   };
 
+  document.querySelectorAll('[data-copy-select]').forEach((input) => {
+    input.addEventListener('click', () => input.select());
+  });
+
   document.querySelectorAll('[data-copy], [data-copy-input]').forEach((button) => {
     button.addEventListener('click', async () => {
       const input = button.hasAttribute('data-copy-input')
@@ -68,6 +72,12 @@
         }
       }
       if (!copied) copied = fallbackCopy(value);
+      if (!copied && input && input.hasAttribute('data-copy-select')) {
+        input.focus({ preventScroll: true });
+        input.select();
+        showCopyMessage('Text je označený. Zkopírujte jej pomocí Ctrl+C nebo nabídky prohlížeče.');
+        return;
+      }
       showCopyMessage(copied
         ? 'Zkopírováno do schránky.'
         : 'Kopírování se nepodařilo. Zobrazte text a zkopírujte jej ručně.');

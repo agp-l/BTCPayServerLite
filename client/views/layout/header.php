@@ -6,8 +6,8 @@ $pageTitle = isset($pageTitle) && is_string($pageTitle) ? $pageTitle : 'Klientsk
 $clientEmail = is_string($_SESSION['email'] ?? null) ? $_SESSION['email'] : 'Klient';
 $clientInitial = strtoupper(substr($clientEmail, 0, 1));
 $activeMenu = isset($activeMenu) && is_string($activeMenu) ? $activeMenu : 'client';
-$routeUrl = static fn (string $path): string => htmlspecialchars(
-    $urlManager->url($path),
+$routeUrl = static fn (string $path, array $query = []): string => htmlspecialchars(
+    $urlManager->url($path, $query),
     ENT_QUOTES,
     'UTF-8'
 );
@@ -31,7 +31,7 @@ $sectionUrl = static fn (string $section): string => htmlspecialchars(
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="<?php echo $routeUrl('/assets/admin.css'); ?>">
+  <link rel="stylesheet" href="<?php echo $routeUrl('/assets/admin.css', ['v' => substr(hash_file('sha256', __DIR__ . '/../../../assets/admin.css'), 0, 12)]); ?>">
 </head>
 <body>
 <div class="admin-shell">

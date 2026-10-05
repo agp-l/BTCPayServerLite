@@ -62,8 +62,8 @@ $storesUrl = $routeUrl('/admin/stores');
           <div class="credential">
             <span class="credential-label">Store ID</span>
             <div class="credential-value">
-              <code><?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?></code>
-              <button type="button" class="ghost-btn" data-copy="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
+              <input type="text" readonly data-copy-select value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Store ID">
+              <button type="button" class="ghost-btn" data-copy-input aria-label="Kopírovat Store ID"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
             </div>
           </div>
           <div class="credential">
