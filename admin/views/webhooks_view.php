@@ -40,7 +40,7 @@ $webhooksUrl = $routeUrl('/admin/webhooks');
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="action" value="create">
         <div class="field"><label for="webhookStore">Obchod</label><div class="input-wrap"><select id="webhookStore" name="store_id" required><option value="">Vyberte obchod</option><?php foreach ($stores as $store): ?><option value="<?php echo htmlspecialchars($store['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></option><?php endforeach; ?></select></div></div>
-        <div class="field"><label for="webhookUrl">HTTPS URL</label><div class="input-wrap"><input id="webhookUrl" type="url" name="url" maxlength="2048" placeholder="https://shop.example/webhook" required></div></div>
+        <div class="field"><label for="webhookUrl">URL webhooku</label><div class="input-wrap"><input id="webhookUrl" type="url" name="url" maxlength="2048" placeholder="https://shop.example/webhook" required></div></div>
         <div class="form-actions"><button type="submit" class="primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Uložit webhook</button></div>
       </form>
     <?php endif; ?>
@@ -49,7 +49,8 @@ $webhooksUrl = $routeUrl('/admin/webhooks');
   <section class="card security-card">
     <div class="card-title"><span class="card-title-group"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Bezpečné doručování</span></div>
     <p class="card-subtitle">Webhook secret ověřuje HMAC podpis. Neodesílejte jej v URL ani jej nezveřejňujte ve zdrojovém kódu.</p>
-    <div class="alert alert-warning"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Lokální HTTP endpointy povolujte jen při vývoji pomocí explicitní konfigurace.</span></div>
+    <p class="card-subtitle">Pro e-shop na stejném počítači lze použít <code>http://localhost/simple-store/btcpay-callback.php</code>. V <code>config.php</code> nastavte <code>'allow_local_webhooks' =&gt; true</code>.</p>
+    <div class="surface-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>Místní HTTP webhooky: <strong><?php echo ($config['allow_local_webhooks'] ?? false) === true ? 'povoleny' : 'vypnuty'; ?></strong>. Výjimka platí pro localhost, 127.0.0.1 a ::1.</span></div>
   </section>
 </div>
 
@@ -74,7 +75,7 @@ $webhooksUrl = $routeUrl('/admin/webhooks');
           <div class="disclosure-body form-stack">
             <form method="post" action="<?php echo $webhooksUrl; ?>" class="form-stack">
               <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="update"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars((string) $webhook['id'], ENT_QUOTES, 'UTF-8'); ?>">
-              <div class="field"><label>HTTPS URL</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<?php echo htmlspecialchars((string) $webhook['url'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div>
+              <div class="field"><label>URL webhooku</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<?php echo htmlspecialchars((string) $webhook['url'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div>
               <button type="submit" class="ghost-btn"><i class="fa-solid fa-floppy-disk"></i> Uložit URL</button>
             </form>
             <form method="post" action="<?php echo $webhooksUrl; ?>" data-confirm="Vyměnit webhook secret? Příjemce musí okamžitě dostat nový secret.">

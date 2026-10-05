@@ -51,6 +51,34 @@ return [
 
 `app_url` nastavte explicitně ve všech nasazeních; nesmí obsahovat credentials, query ani fragment. Pro wallet nástroje jsou podporované nové klíče `electrum_cli_path`, `electrum_data_dir`, `store_wallets_dir` i kompatibilní starší názvy `electrum_cli`, `electrum_data_directory`, `wallet_directory`. Volitelný `allow_local_webhooks => true` je určen pouze pro lokální vývoj. V produkci jej vynechte nebo ponechte `false`.
 
+## Propojení simple-store na localhostu bez HTTPS
+
+V existujícím `config.php` upravte jen tyto dvě položky; ostatní nastavení a klíče zachovejte:
+
+```php
+'app_url' => 'http://localhost/BTCPayLite',
+'allow_local_webhooks' => true,
+```
+
+V administraci **simple-store → Nastavení obchodu → BTCPay Server** nastavte:
+
+| Pole | Příklad pro XAMPP |
+|---|---|
+| Adresa instance BTCPay | `http://localhost/BTCPayLite` |
+| Adresa tohoto obchodu | `http://localhost/simple-store` |
+| URL webhooku vytvořeného v Lite | `http://localhost/simple-store/btcpay-callback.php` |
+
+Použijte skutečné názvy vašich instalačních složek a případně port, například `http://localhost:8080/BTCPayLite`. Adresa instance v e-shopu a `app_url` v Lite musí být stejné. Pro test lze také použít `127.0.0.1` nebo IPv6 `http://[::1]`; certifikát není potřeba. Podpis webhooku i ověřování API klíče zůstávají aktivní.
+
+Webhook vytvořte před objednávkou, jeho tajný klíč vložte do e-shopu a spusťte také `webhook_cron.php`; kontrola platby pomocí `payment_worker.php` sama webhook neodesílá. Na XAMPP lze jednorázově doručit připravené události:
+
+```bash
+cd /opt/lampp/htdocs/BTCPayLite
+/opt/lampp/bin/php webhook_cron.php
+```
+
+Obě aplikace musí běžet na stejném počítači jako Lite a jeho webhook worker. `localhost` z jiného serveru ukazuje na ten jiný server. HTTP výjimka se nevztahuje na veřejné domény ani adresy v LAN. Při přesunu na hosting nastavte HTTPS a `allow_local_webhooks` vraťte na `false`. Samotná aktualizace z Gitu vaši místní volbu v ignorovaném `config.php` nezmění.
+
 `password_reset_from` musí být platná adresa odesílatele a server musí mít funkční PHP `mail()`/MTA. Resetovací token se do databáze ukládá pouze jako SHA-256, platí 30 minut, je jednorázový a po změně hesla zvýší verzi relace.
 
 Peněženky musí být mimo web root, například v `/opt/btcpay_wallets/`. Electrum RPC port nemá být veřejně dostupný.

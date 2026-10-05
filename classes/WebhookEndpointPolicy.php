@@ -62,7 +62,7 @@ class WebhookEndpointPolicy
 
         $isLoopbackHost = $this->isLoopback($host);
         if ($isLoopbackHost && !$this->allowLoopback) {
-            throw $this->invalidEndpoint('Loopback webhook destinations are not enabled.');
+            throw $this->invalidEndpoint('Localhost webhook destinations are disabled. For local HTTP testing, set allow_local_webhooks to true in config.php.');
         }
         if (
             $scheme !== 'https'

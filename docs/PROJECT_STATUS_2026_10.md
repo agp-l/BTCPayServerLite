@@ -87,7 +87,7 @@ není součástí publikovaných změn.
 | Test původního pádu CI simple-store | Aktualizovaný `catalog-render.php` prošel; změněná pouze zastaralá testová očekávání |
 | simple-store: první kompletní CI job lokálně | **43/43 příkazů prošlo**: 36 PHP testů, dva HTTP session/cookie/CSRF skripty a pět JS sad; bez přeskočení. PHP 8.3.6, Node 24.19.0 |
 | Syntaxe simple-store | **236** PHP souborů tehdejšího workflow prošlo; nový společný harness má navíc vlastní kontrolu syntaxe |
-| Společný `btcpay-lite-integration.php` | Všech **pět skupin scénářů prošlo**: skutečné lokální HTTP a oddělené MariaDB, XPUB derivace, API, callback/return, worker/outbox/HMAC, objednávka/sklad/doklad a zachycený mail |
+| Společný `btcpay-lite-integration.php` | Všech **šest skupin scénářů prošlo**: skutečné lokální HTTP a oddělené MariaDB, XPUB derivace, API, callback/return, worker/outbox/HMAC, objednávka/sklad/doklad a zachycený mail |
 | Kopírování UI | **12/12** DOM/source kontrol prošlo; skutečný `admin.js`, simulované Clipboard API/execCommand, focus a výběr obnoveny |
 | GitHub CI BTC Pay Lite, kód `7e75725` | [PHP checks prošlo](https://github.com/agp-l/BTCPayServerLite/actions/runs/37290081559) v PR #14 |
 | GitHub CI simple-store, kód `ee97a8a` | [PHP checkout prošlo](https://github.com/agp-l/simple-store/actions/runs/37290111960): PHP 8.1 i 8.4, MySQL DB a MariaDB upgrade job |
@@ -102,8 +102,9 @@ a následné simulované potvrzení bylo přijato jako pozdní úhrada.
 
 Fiat kurz a blockchain observations byly řízené testovací odpovědi. Lite router
 v testu používá skutečný Greenfield controller s testovacími závislostmi,
-webhook transport odesílá skutečné loopback HTTP místo produkčního DNS/TLS
-transportu. Veřejné HTTPS, Apache rewrite/Authorization, Electrum a skutečný
+webhook se registruje přes API s `allow_local_webhooks => true` a doručuje
+jej produkční `WebhookCronApplication` s `CurlWebhookTransport` přes HTTP,
+včetně připnutí localhostu na loopback. I návratová adresa e-shopu používá HTTP. Veřejné HTTPS, Apache rewrite/Authorization, Electrum a skutečný
 SMTP tedy tento test neověřuje. Do simple-store přibyl samostatný GitHub
 workflow pro opakovatelné spuštění proti Lite `main`; jeho první GitHub běh
 prošel. Test lze spustit také lokálně
@@ -167,10 +168,14 @@ Postup:
    invoice metadata musí obsahovat stejné číslo objednávky a cena zůstat v CZK.
 7. Projít níže uvedenou skutečnou testovací platbu a uložit výsledky.
 
-Pro běžnou konfiguraci e-shopu používat veřejné HTTPS i při ručním ověřování.
-Lite vývojová volba `allow_local_webhooks => true` povoluje jen explicitní
-loopback, ne libovolnou privátní LAN. Izolovaný automatický harness má vlastní
-testovací adaptér; tím se produkční pravidla neuvolňují.
+Pro běžnou konfiguraci e-shopu používat veřejné HTTPS. Místní test obou
+aplikací na stejném počítači může používat HTTP: v Lite nastavte například
+`app_url => http://localhost/BTCPayLite` a `allow_local_webhooks => true`,
+v e-shopu stejnou adresu instance a `http://localhost/simple-store` jako
+adresu obchodu. Webhook je `http://localhost/simple-store/btcpay-callback.php`.
+Tato volba povoluje jen localhost, 127.0.0.1 a ::1, nikoli privátní LAN.
+[Konkrétní místní konfigurace](CONFIGURATION.md#propojení-simple-store-na-localhostu-bez-https)
+nevyžaduje certifikát; API klíče a HMAC podpis se dál ověřují.
 
 ## Co zbývá udělat, podle priority
 

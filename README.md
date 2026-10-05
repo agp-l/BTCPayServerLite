@@ -13,6 +13,7 @@ PHP aplikace pro Bitcoin on-chain faktury, obchody a platební odkazy nad Electr
 | Zapnout nebo ověřit kontrolu plateb | Admin **Nástroje → Kontrola plateb**, [systemd / cron](docs/PAYMENT_MONITORING.md) |
 | Vyřešit chybu vytvoření obchodu | [Diagnostika provisioningu](docs/STORE_CREATION_TROUBLESHOOTING.md) |
 | Připojit e-shop nebo API klienta | [API a příklady](docs/API.md) |
+| Testovat simple-store na localhostu bez HTTPS | [Místní HTTP konfigurace](docs/CONFIGURATION.md#propojení-simple-store-na-localhostu-bez-https) |
 | Připojit náš simple-store a ověřit platbu | [Stav projektu a přesný integrační postup](docs/PROJECT_STATUS_2026_10.md) |
 | Zkontrolovat konfiguraci a oprávnění | [Konfigurace](docs/CONFIGURATION.md), `php bin/deployment.php --check` |
 | Pochopit rezervace adres a obnovu XPUB | [Koordinace adres](docs/RECEIVE_COORDINATION.md) |
