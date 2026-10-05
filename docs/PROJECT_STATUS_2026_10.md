@@ -107,7 +107,7 @@ transportu. Veřejné HTTPS, Apache rewrite/Authorization, Electrum a skutečný
 SMTP tedy tento test neověřuje. Do simple-store přibyl samostatný GitHub
 workflow pro opakovatelné spuštění proti Lite `main`; jeho první GitHub běh
 prošel. Test lze spustit také lokálně
-podle [návodu e-shopu](https://github.com/agp-l/simple-store/blob/codex/btcpay-lite-integration-20261005/docs/btcpay.md).
+podle [návodu e-shopu](https://github.com/agp-l/simple-store/blob/main/docs/btcpay.md).
 
 UI ověření bylo deterministické bez funkčního prohlížeče. Nativní schránka,
 výběr myší/dotykem a skutečné mobilní vykreslení nebyly tímto průchodem ověřeny.
@@ -215,9 +215,10 @@ Místa pro další vývoj: `ElectrumBlockchainProvider`, `InvoiceStateMachine`,
 
 Při ověření zaznamenat verzi PHP/Electra, commit obou projektů, invoice ID,
 číslo testovací objednávky, časy/stavy a výsledek delivery; tajné klíče odstranit.
-Změny jsou k revizi v [BTC Pay Lite PR #14](https://github.com/agp-l/BTCPayServerLite/pull/14)
-a [simple-store PR #1](https://github.com/agp-l/simple-store/pull/1).
-V době dokončení revize nebyly sloučené ani nasazené na uživatelův server.
+Změny z [BTC Pay Lite PR #14](https://github.com/agp-l/BTCPayServerLite/pull/14)
+a [simple-store PR #1](https://github.com/agp-l/simple-store/pull/1) byly po
+schválení vlastníka 5. října 2026 sloučené do `main` obou projektů.
+Nasazení na uživatelův server a skutečná platba přes Electrum zůstávají k ověření.
 
 Aktuální návody: [API](API.md), [TESTING](TESTING.md),
 [PAYMENT_MONITORING](PAYMENT_MONITORING.md) a
