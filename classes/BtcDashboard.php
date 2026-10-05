@@ -161,28 +161,36 @@ final class BtcDashboard
         $change = array_fill_keys($this->uniqueAddresses($this->wallet->listAddresses(false, true, $this->walletPath)), true);
         $transactions = [];
 
-        foreach ($this->wallet->listTransactions($this->walletPath) as $transaction) {
+        foreach ($this->wallet->listTransactions($this->walletPath) as $position => $transaction) {
             $txid = $transaction['txid'] ?? $transaction['tx_hash'] ?? null;
             if (!is_string($txid) || !preg_match('/\A[0-9a-fA-F]{64}\z/D', $txid)) {
                 continue;
             }
             $txid = strtolower($txid);
 
-            $rawAmount = $transaction['bc_value'] ?? $transaction['value'] ?? 0;
-            $signedAmount = BitcoinAmount::fromBtc($this->numericAmount($rawAmount));
+            // Recent Electrum versions expose the exact signed wallet delta in satoshis.
+            // Keep the decimal BTC fields for older history responses.
+            $signedAmount = array_key_exists('amount_sat', $transaction)
+                ? BitcoinAmount::fromSatoshis($this->signedInt($transaction['amount_sat']))
+                : BitcoinAmount::fromBtc($this->numericAmount($transaction['bc_value'] ?? $transaction['value'] ?? 0));
             $incoming = isset($transaction['incoming'])
                 ? (bool) $transaction['incoming']
                 : $signedAmount->satoshis() > 0;
             $amount = BitcoinAmount::fromSatoshis(abs($signedAmount->satoshis()));
+            $details = $this->transactionDetails($txid, $incoming, $receiving, $change);
+            // Moving coins between our own addresses only decreases the balance by the fee.
+            // Never infer this if output decoding failed or an output is unrecognized.
+            $internal = !$incoming && $details['all_outputs_owned'];
 
             $transactions[] = [
                 'txid' => $txid,
-                'direction' => $incoming ? 'incoming' : 'outgoing',
+                'direction' => $incoming ? 'incoming' : ($internal ? 'internal' : 'outgoing'),
                 'amount_btc' => $amount->toBtcString(),
                 'amount_sats' => $amount->satoshis(),
                 'confirmations' => $this->nonNegativeInt($transaction['confirmations'] ?? 0),
                 'timestamp' => $this->timestamp($transaction['timestamp'] ?? null),
-                'outputs' => $this->transactionOutputs($txid, $incoming, $receiving, $change),
+                'outputs' => $details['outputs'],
+                '_history_order' => $position,
             ];
         }
 
@@ -190,10 +198,16 @@ final class BtcDashboard
             $leftTime = $left['timestamp'] ?? 0;
             $rightTime = $right['timestamp'] ?? 0;
 
-            return ($rightTime <=> $leftTime) ?: strcmp($right['txid'], $left['txid']);
+            // Mempool entries have no block timestamp; they belong above older mined payments.
+            return (($right['confirmations'] === 0) <=> ($left['confirmations'] === 0))
+                ?: ($rightTime <=> $leftTime)
+                ?: ($right['_history_order'] <=> $left['_history_order']);
         });
 
-        return $transactions;
+        return array_map(static function (array $transaction): array {
+            unset($transaction['_history_order']);
+            return $transaction;
+        }, $transactions);
     }
 
     /** @return array{fees:array{economy:int,standard:int,priority:int},fiat_price:?float,fiat_currency:string} */
@@ -294,30 +308,34 @@ final class BtcDashboard
     /**
      * @param array<string,bool> $receiving
      * @param array<string,bool> $change
-     * @return list<array{address:string,amount_btc:string,amount_sats:int,ownership:string}>
+     * @return array{outputs:list<array{address:string,amount_btc:string,amount_sats:int,ownership:string}>,all_outputs_owned:bool}
      */
-    private function transactionOutputs(string $txid, bool $incoming, array $receiving, array $change): array
+    private function transactionDetails(string $txid, bool $incoming, array $receiving, array $change): array
     {
+        $unavailable = ['outputs' => [], 'all_outputs_owned' => false];
         try {
             $details = $this->wallet->getTransaction($txid, $this->walletPath);
             $hex = is_array($details) ? ($details['hex'] ?? null) : $details;
             if (!is_string($hex) || $hex === '') {
-                return [];
+                return $unavailable;
             }
 
             $decoded = $this->wallet->deserializeTransaction($hex);
             $rawOutputs = $decoded['outputs'] ?? [];
             if (!is_array($rawOutputs)) {
-                return [];
+                return $unavailable;
             }
 
             $outputs = [];
+            $allOutputsOwned = $rawOutputs !== [];
             foreach ($rawOutputs as $output) {
                 if (!is_array($output)) {
+                    $allOutputsOwned = false;
                     continue;
                 }
                 $address = $output['address'] ?? null;
                 if (!is_string($address) || $address === '') {
+                    $allOutputsOwned = false;
                     continue;
                 }
 
@@ -327,6 +345,9 @@ final class BtcDashboard
                 $ownership = isset($change[$address])
                     ? 'change'
                     : (isset($receiving[$address]) ? 'receiving' : ($incoming ? 'external' : 'recipient'));
+                if ($ownership === 'external' || $ownership === 'recipient') {
+                    $allOutputsOwned = false;
+                }
 
                 $outputs[] = [
                     'address' => $address,
@@ -336,12 +357,26 @@ final class BtcDashboard
                 ];
             }
 
-            return $outputs;
+            return ['outputs' => $outputs, 'all_outputs_owned' => $allOutputsOwned];
         } catch (Throwable $exception) {
             $this->logFailure('transaction output decoding', $exception);
 
-            return [];
+            return $unavailable;
         }
+    }
+
+    private function signedInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && preg_match('/\A-?(?:0|[1-9][0-9]*)\z/D', $value)) {
+            $number = filter_var($value, FILTER_VALIDATE_INT);
+            if ($number !== false) {
+                return $number;
+            }
+        }
+        throw new RuntimeException('Electrum returned an invalid satoshi amount.');
     }
 
     private function numericAmount(mixed $value): int|float|string
