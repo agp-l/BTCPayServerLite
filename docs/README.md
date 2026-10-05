@@ -17,6 +17,7 @@ stav při vzniku; nejsou náhradou aktuálního instalačního postupu.
 | [SESSION_LOGIN](SESSION_LOGIN.md) | Zapamatování přihlášení, limity a odvolání relací |
 | [API](API.md) | Endpointy, checkout, webhooky, příklad klienta a limity payoutů |
 | [TESTING](TESTING.md) | Testovací runtime, integrační DB a hranice důkazů |
+| [Stav říjen 2026](PROJECT_STATUS_2026_10.md) | Přehled projektu, opravy kopírování, integrace simple-store, výsledky a otevřené priority |
 
 ## Architektura a další práce
 
