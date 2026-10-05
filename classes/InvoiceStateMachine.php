@@ -24,12 +24,12 @@ final class InvoiceStateMachine
         if ($current === 'Settled') {
             return 'Settled';
         }
-        if ($observation->getConfirmedBalanceSatoshis() >= $expectedSats) {
+        if ($observation->getConfirmedPaymentSatoshis() >= $expectedSats) {
             return 'Settled';
         }
         // Preserve evidence of any earlier partial payment, even if it has since
         // left the mempool or been spent. Do not invent cumulative amounts.
-        if ($current === 'Processing' || $previousPaymentObserved || $observation->getCurrentBalanceSatoshis() > 0) {
+        if ($current === 'Processing' || $previousPaymentObserved || $observation->getReceivedPaymentSatoshis() > 0) {
             return 'Processing';
         }
         return $current === 'Expired' || $now >= $expiresAt ? 'Expired' : 'New';

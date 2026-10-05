@@ -26,7 +26,7 @@ try {
     $stmt = $pdo->prepare('INSERT INTO api_idempotency_keys (store_id,idempotency_key,request_hash,response_code,response_body,created_at) VALUES (\'old\', ?, ?, ?, ?, ?)');
     $stmt->execute(['completed', str_repeat('a',32),200,$body,$now]);
     $stmt->execute(['anonymous', str_repeat('b',32),0,'',$now]);
-    foreach (['004_core_payment_consistency.sql','005_idempotency_resource_reservation.sql'] as $migration) {
+    foreach (['004_core_payment_consistency.sql','005_idempotency_resource_reservation.sql','011_invoice_received_outputs.sql'] as $migration) {
         foreach (InstallationManager::splitSqlStatements(file_get_contents(dirname(__DIR__) . '/migrations/' . $migration)) as $sql) { $pdo->exec($sql); }
     }
     $row = $pdo->query("SELECT * FROM api_idempotency_keys WHERE idempotency_key='completed'")->fetch();

@@ -1,6 +1,6 @@
 # Další práce na jádru a provozu
 
-Stav revize: **10. září 2026**, výchozí kód `8191c32`.
+Stav revize: **5. října 2026**. Úsporné kontroly navazují na `7722727`.
 [README](../README.md) · [Architektura](CORE_PAYMENT_ARCHITECTURE.md)
 
 Toto je plán, nikoli seznam dokončených oprav. Zachováváme PHP, bitcoin-p8,
@@ -14,6 +14,11 @@ outbox. Jednotlivé kroky mají mít malý commit, vlastní ověření a provozn
 - Provider status je walletless a souběžné kontroly sdílejí cache/single-flight.
 - PaymentWorker zapisuje observation, stav, outbox a uvolnění lease transakčně.
 - Checkout čte DB; WebhookProcessor doručuje události vytvořené workerem.
+- Pro vlastní e-shop je doplněn režim 10/30/60 minut, checkout upozornění a
+  receipt provider s lokální kontrolou TXID/výstupů, immutable cache a omezeným
+  načítáním historie. Migrace 011 odděluje skutečné příjmy od zůstatku.
+  Testy pokrývají utracení před prvním skenem, vlastní change, dělené platby,
+  mempool/confirmed/reorg, migraci, persistenci a webhook outbox.
 - Instalátor, admin aktualizátor DB, zapamatování přihlášení a admin monitoring
   mají implementaci i cílené testy. Tyto oblasti rozšiřovat podle konkrétní chyby.
 
@@ -21,8 +26,10 @@ outbox. Jednotlivé kroky mají mít malý commit, vlastní ověření a provozn
 
 ### Celá platba a webhook na skutečné testovací síti
 
-**Důvod:** na serveru je doložen funkční timer a expirace dvou faktur, nikoli
-zaplacená faktura nebo doručený webhook. Automatické testy používají také fixtures.
+**Důvod:** majitel již potvrdil skutečnou platbu a automatické označení v e-shopu.
+Nový receipt provider je ověřen strukturálními transakcemi a skutečnou DB/HTTP
+integrací; po nasazení migrace 011 zbývá zopakovat průchod na jeho Electru.
+Výpadek/retry webhooku, pozdní platbu a restart ověřit i na cílové instalaci.
 
 **Hotovo, až:** vznikne XPUB faktura, částečná platba ji převede do Processing,
 plná potvrzená částka do Settled a testovací receiver ověří HMAC webhooku. Další
@@ -44,17 +51,17 @@ oba účty. Obnova nesmí snížit XPUB index ani zneplatnit původní tokeny.
 
 | Priorita | Otevřená věc a místo v kódu | Podmínka dokončení |
 |---|---|---|
-| Vysoká | `ElectrumBlockchainProvider` čte aktuální balance, ne kumulativní outputs. Přijetí a utracení před první observation může platbu skrýt. `Settled` chrání jen již uložený stav. | Navrhnout a proti konkrétní verzi Electra ověřit historii outputs, deduplikaci, potvrzení a reorg. Změřit RPC náklady a zachovat single-flight. Rozhodnout i omezenou persistenci stateless stavu; nepřejmenovat balance na received bez změny výpočtu. |
+| Vysoká před širším provozem | Receipt provider kontroluje raw TXID a výstupy, ale výška potvrzení pochází z walletless Electrum historie, nikoli vlastní SPV/Merkle kontroly. | Ověřit proti používané verzi daemonu a skutečné síti; při širším provozu zvážit vlastní Electrum server nebo Bitcoin Core/NBXplorer. Statelessem nenahrazovat durable DB stav e-shopu. |
 | Vysoká | `PaymentWorker::ELIGIBLE_SQL`: Expired bez platební indikace vypadá z pravidelných kontrol po 24 h. | Dokumentovaná obchodní politika a omezený explicitní rescan konkrétní faktury/adresy s autorizací a limity; bez neomezeného skenování celé historie. Partial Processing nikdy automaticky nevracet do New. |
 | Vysoká | Přerušení offline provisioningu může zanechat wallet soubor bez dokončeného obchodu. Viz cílená revize core. | Persistentní identita operace a bezpečná reconciliation/resume; pádové testy mezi vytvořením souboru a DB commitem. Existující peněženku nikdy nepřepsat či smazat jen podle chybějícího DB řádku. |
 | Střední | `PaymentWorkerMonitor` drží poslední CLI/manual běh; nehlídá webhook/receive worker. Empty success není payment observation. | Samostatně zobrazit aktivitu, neprázdnou úspěšnou observation a zdraví front všech tří workerů. Uchování historie musí mít limit/retenci a žádná tajemství. Neodvozovat zapnutý plánovač pouze z jednoho CLI běhu. |
 | Střední | Aktualizátor DB neporovnává defaults, FK, CHECK ani dokončení backfillů. | Rozšířit cíleně tam, kde chybějící invariant ohrožuje core, s testy na čistém importu i staré DB. Žádné automatické opravné SQL odhadnuté ze samotného diffu. |
 | Střední | `WalletBusyException` stále může směšovat provozní chybu a obsazený lock; některá admin čtení opakují RPC. | Typované příčiny bez raw tajemství; request-scoped read snapshot podle změřených opakovaných volání. Stejnou lock doménu a cache chování ponechat. |
 
-Observation z historie je předpoklad pro spolehlivé sledování při současném
-utrácení BTC, zvlášť pro budoucí směnárnu. Nejde jen o kosmetické názvy DTO.
-Do uzavření tohoto bodu neslibovat spolehlivé rozpoznání platby utracené před
-prvním pozorováním.
+Rozpoznání platby utracené před prvním pozorováním je doplněno přes historii
+transakcí, nikoli přejmenováním balance. Zůstává závislost na správné a úplné
+historii vybraného Electrum serveru a existující terminální politika Settled.
+To samo nedokončuje účetnictví nebo automatické výplaty budoucí směnárny.
 
 ## 3. Výplaty před budoucí směnárnou
 
@@ -93,8 +100,8 @@ pro případné obnovení slouží historie Gitu. Tento bod je uzavřený.
 
 ## Pořadí příštího vývojového průchodu
 
-Nejdřív dokončit provozní důkazy z bodu 1, současně připravit konkrétní návrh
-historických observations z bodu 2. Potom uzavřít provisioning crash recovery
+Nejdřív dokončit provozní důkazy z bodu 1, ověřit nový receipt provider
+na cílovém Electrum daemonu a použité síti. Potom uzavřít provisioning crash recovery
 a monitoring front. Payout reconciliation a potvrzení řešit jako samostatnou
 etapu před směnárnou. Úspěchy průběžně zapsat do historie a odkazovat na commit,
 scénář a prostředí; neoznačovat celý projekt jako auditovaný jednou sadou testů.

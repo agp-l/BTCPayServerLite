@@ -10,7 +10,8 @@ interface BlockchainProviderInterface
     public function maxObservationDurationSeconds(): int;
 
     /**
-     * Observes current address balance on the blockchain without loading or locking any wallet.
+     * Observes address payments/balance without loading or locking any wallet.
+     * Production receipt observers also expose amounts from transaction history.
      *
      * @param string $address Valid Bitcoin address
      * @param int $expectedSatoshis Expected amount in satoshis (must be >= 0)

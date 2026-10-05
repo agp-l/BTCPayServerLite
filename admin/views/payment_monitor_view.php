@@ -24,14 +24,14 @@ require __DIR__ . '/layout/header.php';
   <div class="alert alert-warning"><?= $html(\BtcPayLite\PaymentFailureDiagnostics::hint($snapshot['runs']['cli']['error_type'])) ?></div>
   <?php endif; ?>
   <p>Prázdný běh potvrzuje spuštění programu, nikoli úspěšnou kontrolu plateb. Předchozí chyba zůstává viditelná do další neprázdné úspěšné dávky.</p>
-  <p>Za opožděný považujeme CLI běh starší než 2 minuty. Prázdná úspěšná dávka také potvrzuje spuštění workeru.</p>
+  <p>Worker se plánuje každých 10 minut. Jednotlivé faktury kontroluje po 10, 30 nebo 60 minutách podle stáří. Za opožděný považujeme CLI běh starší než 30 minut.</p>
   <p>Kontrola právě běží: <strong><?= $snapshot['running'] ? 'Ano' : 'Ne' ?></strong>.</p>
   <p>Faktury čekající na kontrolu: <strong><?= $snapshot['due'] ?></strong>. Propadlé rezervace po přerušeném běhu: <strong><?= $snapshot['stale_leases'] ?></strong>.</p>
   <p>Nejstarší plánovaná kontrola ve frontě: <?= $html($formatTime($snapshot['oldest_due_at'])) ?>. Nové faktury mohou čekat bez naplánovaného času.</p>
 </section>
 <section class="card">
   <h2 class="card-title">Zkontrolovat platby nyní</h2>
-  <p>Spustí stejnou kontrolu jako automatický worker. Ověří nejvýše 20 aktuálně čekajících faktur v krátké dávce. Další kontrolu lze spustit po 15 sekundách; zbývající počet uvidíte v přehledu.</p>
+  <p>Spustí stejnou kontrolu jako automatický worker. Ověří nejvýše 20 aktuálně čekajících faktur v krátké dávce. Další kontrolu lze spustit po 10 minutách; zbývající počet uvidíte v přehledu.</p>
   <p class="card-subtitle">Zaplacené faktury a faktury, které ještě nejsou na řadě, znovu neskenuje. Tlačítko nezapíná automatické spouštění. Otevření této stránky žádnou blockchain kontrolu nespouští.</p>
   <form method="post" action="<?= $routeUrl('/admin/payment_monitor') ?>">
     <input type="hidden" name="csrf_token" value="<?= $html($csrfToken) ?>">

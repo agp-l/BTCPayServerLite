@@ -120,6 +120,8 @@ CREATE TABLE `invoices` (
     `confirmed_balance_sats` BIGINT UNSIGNED NOT NULL DEFAULT 0,
     `mempool_delta_sats` BIGINT NOT NULL DEFAULT 0,
     `payment_observed_at` INT UNSIGNED DEFAULT NULL,
+    `confirmed_output_sats` BIGINT UNSIGNED DEFAULT NULL,
+    `unconfirmed_output_sats` BIGINT UNSIGNED DEFAULT NULL,
     `created_at` BIGINT UNSIGNED NOT NULL,
     `expires_at` BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY (`id`),

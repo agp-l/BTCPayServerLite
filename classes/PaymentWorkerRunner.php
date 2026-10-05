@@ -19,13 +19,13 @@ final class PaymentWorkerRunner
     public static function fromConfig(Database $database, array $config, bool $manual = false): self
     {
         // The admin request has a short network bound, without changing the RPC dialect.
-        $config['rpc_timeout'] = min(30, max(1, (int) ($config['rpc_timeout'] ?? 30)));
+        $config['rpc_timeout'] = min(8, max(1, (int) ($config['rpc_timeout'] ?? 30)));
         if ($manual) {
-            $config['rpc_timeout'] = min(5, max(1, (int) ($config['rpc_timeout'] ?? 30)));
-            $config['rpc_connect_timeout'] = min(3, max(1, (int) ($config['rpc_connect_timeout'] ?? 5)));
+            $config['rpc_timeout'] = min(2, max(1, (int) ($config['rpc_timeout'] ?? 30)));
+            $config['rpc_connect_timeout'] = min(2, max(1, (int) ($config['rpc_connect_timeout'] ?? 5)));
         }
         return new self($database, static fn (): PaymentWorker => new PaymentWorker($database,
-            new ElectrumBlockchainProvider(ElectrumRPCFactory::fromConfig($config)),
+            new ElectrumReceiptBlockchainProvider(ElectrumRPCFactory::fromConfig($config)),
             new WebhookDeliveryRepository($database)));
     }
 

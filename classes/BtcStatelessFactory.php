@@ -42,7 +42,9 @@ final class BtcStatelessFactory
     public function blockchainProvider(): BlockchainProviderInterface
     {
         if ($this->blockchainProvider === null) {
-            $this->blockchainProvider = new ElectrumBlockchainProvider($this->rpc());
+            $config = $this->config;
+            $config['rpc_timeout'] = min(8, max(1, (int) ($config['rpc_timeout'] ?? 30)));
+            $this->blockchainProvider = new ElectrumReceiptBlockchainProvider(ElectrumRPCFactory::fromConfig($config));
         }
 
         return $this->blockchainProvider;

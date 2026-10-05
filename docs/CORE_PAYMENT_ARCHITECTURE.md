@@ -29,20 +29,23 @@ consistency. Admin presentation was not redesigned in this pass.
 
 ## Observation and state
 
-`AddressPaymentObservation` contains integer satoshis with honest balance semantics:
+`AddressPaymentObservation` contains integer satoshis with separate balance and receipt semantics:
 
 - `confirmedBalanceSatoshis`: current confirmed address balance, nonnegative.
 - `mempoolDeltaSatoshis`: signed current mempool delta. An outgoing unconfirmed
   spend can reduce the current balance.
 - `currentBalanceSatoshis`: confirmed balance plus mempool delta, nonnegative.
 - `observedAt`: time of the actual observation, preserved when stale cache is returned.
+- Optional confirmed/unconfirmed received amounts from locally decoded history transactions.
 
 The provider normalizes inconsistent negative totals. The DTO validates its
 contract; it does not silently clamp a value described as cumulative receipts.
 The database columns are `confirmed_balance_sats`, signed `mempool_delta_sats`,
-and `payment_observed_at`. Old HTTP amount aliases remain for presentation
-compatibility; `current_balance` is the accurate name. No cumulative history is
-claimed. Migrated old maxima remain payment evidence until refresh, but without
+and `payment_observed_at`. Migration 011 adds nullable `confirmed_output_sats`
+and `unconfirmed_output_sats`, populated only by a receipt observation. Production
+uses `ElectrumReceiptBlockchainProvider`; the original balance provider remains
+an explicit compatibility adapter. `current_balance` always presents balance,
+while `total_received` uses receipts when present. Migrated old maxima remain payment evidence until refresh, but without
 an observation timestamp checkout does not present them as current balance.
 
 | Current status | Allowed next status |
@@ -54,21 +57,27 @@ an observation timestamp checkout does not present them as current balance.
 
 A partial payment produces Processing, including after expiration. Processing
 retains the fact that payment was observed even if a mempool transaction disappears
-or funds are spent. A sufficient confirmed balance produces Settled. Settled is
+or funds are spent. A sufficient confirmed received amount produces Settled. Settled is
 terminal and excluded from further scans. The expiry of a checkout timer does not
 write or invent a status transition.
 
-The existing late-payment scan window is 24 hours after expiry, with a five-minute
-poll interval for unpaid Expired invoices. New and Processing invoices are due
-every 15 seconds. Persisted evidence of a partial payment is processed even outside
+The existing late-payment scan window is 24 hours after expiry. Unpaid Expired
+invoices are checked hourly. New and Processing invoices use 10 minutes during
+their first hour, 30 minutes until six hours old, then one hour. Persisted evidence of a partial payment is processed even outside
 the late-payment window, then remains Processing. Payments first arriving after
 that window require an explicit rescan/policy extension.
 
-Current balances cannot prove outputs spent before the first observation. Do not
-build a sweep/withdrawal accounting system on these balances. A future provider
-can account for historical outputs without changing the worker ownership boundary.
-Stateless tokens have no durable terminal-state memory: after funds are spent,
-current-balance status alone cannot reproduce an earlier settlement.
+The receipt provider reads walletless address history, verifies raw TXIDs and
+matches output scripts locally. It subtracts that address's own transaction inputs
+before crediting positive incoming amounts, so returning change is not another
+payment. This detects incoming payments spent before the first observation.
+Each check fetches at most two uncached transactions; known immutable raw data
+is reused. Incomplete history makes bounded progress without publishing a false
+snapshot. Confirmation heights still trust the Electrum server: this is not SPV
+or full-node verification. Details, limits and migration are in Payment monitoring.
+Stateless tokens have no durable terminal-state memory, although spending alone
+no longer removes history receipts. Use DB invoices and their durable state for
+e-commerce. Existing Settled invoices remain terminal even across later reorgs.
 
 ## Atomic worker commit
 

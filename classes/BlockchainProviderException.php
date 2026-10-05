@@ -22,7 +22,8 @@ class BlockchainProviderException extends RuntimeException
         parent::__construct($message, $code, $previous);
         $this->action = $action;
         $this->reason = in_array($reason, ['cache_directory','cache_lock_open','cache_lock_timeout',
-            'cache_write','upstream_backoff','invalid_balance'], true) ? $reason : null;
+            'cache_write','upstream_backoff','invalid_balance','invalid_history','invalid_transaction',
+            'invalid_address','history_incomplete'], true) ? $reason : null;
     }
 
     public function getReason(): ?string { return $this->reason; }

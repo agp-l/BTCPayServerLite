@@ -25,6 +25,8 @@ final class DatabaseMigrationManager
         '007_wallet_receive_ranges.sql'=>[['wallet_receive_ranges'],['xpub_address_sequences','stores']],
         '008_schema_migrations.sql'=>[['schema_migrations'],['users']],
         '010_payment_worker_runtime.sql'=>[['payment_worker_runtime'],['invoices.payment_processing_token','invoices.payment_observed_at','invoices.next_check_at']],
+        '011_invoice_received_outputs.sql'=>[['invoices.confirmed_output_sats','invoices.unconfirmed_output_sats'],
+            ['invoices.payment_observed_at','invoices.confirmed_balance_sats','invoices.mempool_delta_sats']],
         '009_remembered_logins.sql'=>[['remembered_logins'],['users.session_version']],
     ];
 

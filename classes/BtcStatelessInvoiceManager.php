@@ -151,8 +151,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             'seconds_remaining' => $isExpired ? 0 : ((int) $invoice['e'] - $now),
             'invoice' => $invoice,
             'payment' => [
-                'current_balance' => $observation['received']->toBtcString(),
-                // Historical HTTP aliases; provider observations represent current balances.
+                'current_balance' => $observation['current']->toBtcString(),
                 'received_total' => $observation['received']->toBtcString(),
                 'total_received' => $observation['received']->toBtcString(),
                 'missing_amount' => $missing->toBtcString(),
@@ -216,7 +215,8 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
                 ? $this->blockchainProvider->observeAddressAtInterval($address, $expected->satoshis(), $interval)
                 : $this->blockchainProvider->observeAddress($address, $expected->satoshis());
             $amounts = $observation->toAmountArray();
-            return ['electrum_status' => null, 'confirmed' => $amounts['confirmed'], 'received' => $amounts['received']];
+            return ['electrum_status' => null, 'confirmed' => $amounts['confirmed'], 'received' => $amounts['received'],
+                'current' => BitcoinAmount::fromSatoshis($observation->getCurrentBalanceSatoshis())];
         }
 
         // Explicit legacy fallback, available only when no provider is configured.
@@ -255,6 +255,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         $zero = BitcoinAmount::fromSatoshis(0);
         $confirmed = BitcoinAmount::max($zero, $confirmed);
         $received = BitcoinAmount::max($zero, $confirmed->add($unconfirmed));
+        $current = $received;
         if ($electrumStatus === self::ELECTRUM_STATUS_PAID) {
             $confirmed = BitcoinAmount::max($confirmed, $expected);
             $received = BitcoinAmount::max($received, $expected);
@@ -266,6 +267,7 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             'electrum_status' => $electrumStatus,
             'confirmed' => $confirmed,
             'received' => $received,
+            'current' => $current,
         ];
     }
 

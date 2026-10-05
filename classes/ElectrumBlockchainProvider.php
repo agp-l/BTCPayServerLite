@@ -11,10 +11,10 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
 {
     private const LOCK_WAIT_SECONDS = 1.5;
     private array $memoryCache = [];
-    private string $cacheDir;
+    protected string $cacheDir;
 
     public function __construct(
-        private ElectrumRPC $rpc,
+        protected ElectrumRPC $rpc,
         private int $ttlSeconds = PaymentCheckPolicy::MIN_INTERVAL,
         ?string $cacheDir = null,
         private int $staleSeconds = 30
@@ -43,7 +43,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             throw new BlockchainProviderException('Invalid observation request.', 'observe_address', 400);
         }
         // Namespace by endpoint as well as address: never mix different networks/daemons.
-        $key = hash('sha256', 'balance-v2|' . $this->rpc->getEndpoint() . '|' . $address);
+        $key = hash('sha256', $this->cacheNamespace() . '|' . $this->rpc->getEndpoint() . '|' . $address);
         $cached = $this->memoryCache[$key] ?? null;
         if ($cached !== null && time() - $cached->getObservedAt() < $interval) {
             return $cached;
@@ -101,7 +101,9 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
         }
     }
 
-    private function queryElectrum(string $address): AddressPaymentObservation
+    protected function cacheNamespace(): string { return 'balance-v2'; }
+
+    protected function queryElectrum(string $address): AddressPaymentObservation
     {
         $balance = $this->rpc->callNetwork('getaddressbalance', ['address' => $address]);
         if (!is_array($balance) || !isset($balance['confirmed'], $balance['unconfirmed'])) {
@@ -163,7 +165,8 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             return null;
         }
         try {
-            return new AddressPaymentObservation($address, $data['confirmed'], $data['delta'], $data['current'], $data['time']);
+            return new AddressPaymentObservation($address, $data['confirmed'], $data['delta'], $data['current'], $data['time'],
+                $data['received_confirmed'] ?? null, $data['received_unconfirmed'] ?? null);
         } catch (Throwable) {
             return null;
         }
@@ -177,6 +180,8 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
             'delta' => $observation->getMempoolDeltaSatoshis(),
             'current' => $observation->getCurrentBalanceSatoshis(),
             'time' => $observation->getObservedAt(),
+            'received_confirmed' => $observation->getConfirmedReceivedSatoshis(),
+            'received_unconfirmed' => $observation->getUnconfirmedReceivedSatoshis(),
         ], JSON_THROW_ON_ERROR);
         $path = $this->path($key, 'json');
         $temp = $path . '.' . bin2hex(random_bytes(8));

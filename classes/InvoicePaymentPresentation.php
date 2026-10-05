@@ -16,8 +16,11 @@ final class InvoicePaymentPresentation
             : max(0, (int) ($invoice['confirmed_balance_sats'] ?? 0) + (int) ($invoice['mempool_delta_sats'] ?? 0));
         $status = (string) $invoice['status'];
         InvoiceStateMachine::assertTransition($status, $status);
-        $received = BitcoinAmount::fromSatoshis($current);
-        $missing = $status === 'Settled' ? 0 : max(0, $expected->satoshis() - $current);
+        $hasOutputs = ($invoice['payment_observed_at'] ?? null) !== null
+            && ($invoice['confirmed_output_sats'] ?? null) !== null && ($invoice['unconfirmed_output_sats'] ?? null) !== null;
+        $receivedSats = $hasOutputs ? (int) $invoice['confirmed_output_sats'] + (int) $invoice['unconfirmed_output_sats'] : $current;
+        $received = BitcoinAmount::fromSatoshis($receivedSats);
+        $missing = $status === 'Settled' ? 0 : max(0, $expected->satoshis() - $receivedSats);
         $metadata = $invoice['metadata'] ?? [];
         if (is_string($metadata)) {
             $metadata = json_decode($metadata, true, 32, JSON_THROW_ON_ERROR);
@@ -31,12 +34,12 @@ final class InvoicePaymentPresentation
         return [
             'id' => $invoice['id'],
             'status' => $status,
-            'additional_status' => $status !== 'Settled' && $current > 0 && $current < $expected->satoshis() ? 'PaidPartial' : 'None',
+            'additional_status' => $status !== 'Settled' && $receivedSats > 0 && $receivedSats < $expected->satoshis() ? 'PaidPartial' : 'None',
             'invoice' => $invoice,
             'payment' => [
                 'observed_at' => $invoice['payment_observed_at'] ?? null,
-                'current_balance' => $received->toBtcString(),
-                // Existing HTTP field retained as a presentation alias, not cumulative receipts.
+                'current_balance' => BitcoinAmount::fromSatoshis($current)->toBtcString(),
+                'observation_kind' => $hasOutputs ? 'received_outputs' : 'current_balance',
                 'total_received' => $received->toBtcString(),
                 'missing_amount' => BitcoinAmount::fromSatoshis($missing)->toBtcString(),
             ],

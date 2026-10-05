@@ -24,7 +24,7 @@ try {
         $result = PaymentWorkerRunner::fromConfig($database, $config, true)->run('manual');
         if ($result['busy']) {
             $notice = $result['reason'] === 'cooldown'
-                ? 'Další ruční kontrolu lze spustit po 15 sekundách.'
+                ? 'Další ruční kontrolu lze spustit po 10 minutách.'
                 : 'Kontrola právě běží v jiném procesu. Obnovte přehled za chvíli.';
         } else {
             $stats = $result['stats'];
@@ -38,7 +38,7 @@ try {
 } catch (Throwable $exception) {
     http_response_code(400);
     if ($exception instanceof PDOException && in_array((string)$exception->getCode(), ['42S02','42S22'], true)) {
-        $pageError = 'Chybí databázová migrace. V Aktualizaci systému dokončete migrace včetně 010_payment_worker_runtime.sql.';
+        $pageError = 'Chybí databázová migrace. V Aktualizaci systému dokončete migrace včetně 010_payment_worker_runtime.sql a 011_invoice_received_outputs.sql.';
     } elseif ($exception instanceof \BtcPayLite\AuthException) {
         $pageError = $exception->getMessage();
     } else {

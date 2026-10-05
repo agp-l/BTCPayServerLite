@@ -12,7 +12,8 @@ use Throwable;
 class PaymentWorker
 {
     public const ELIGIBLE_SQL = "(status IN ('New', 'Processing') OR (status = 'Expired'
-        AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0)))";
+        AND (expires_at >= ? OR confirmed_balance_sats > 0 OR mempool_delta_sats > 0
+             OR confirmed_output_sats > 0 OR unconfirmed_output_sats > 0)))";
     private array $failureCodes = [];
     public function getFailureCodes(): array { return $this->failureCodes; }
 
@@ -118,15 +119,18 @@ class PaymentWorker
             $status = InvoiceStateMachine::next($current,
                 BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis(),
                 $observation, (int) $invoice['expires_at'], $now,
-                (int) $invoice['confirmed_balance_sats'] > 0 || (int) $invoice['mempool_delta_sats'] > 0);
+                (int) $invoice['confirmed_balance_sats'] > 0 || (int) $invoice['mempool_delta_sats'] > 0
+                    || (int) $invoice['confirmed_output_sats'] > 0 || (int) $invoice['unconfirmed_output_sats'] > 0);
             InvoiceStateMachine::assertTransition($current, $status);
             $next = PaymentCheckPolicy::nextCheck((int) $invoice['created_at'], $now, $status);
             $update = $pdo->prepare(
                 'UPDATE invoices SET status = ?, confirmed_balance_sats = ?, mempool_delta_sats = ?,
-                    payment_observed_at = ?, last_checked_at = ?, next_check_at = ? WHERE id = ?'
+                    payment_observed_at = ?, last_checked_at = ?, next_check_at = ?,
+                    confirmed_output_sats = ?, unconfirmed_output_sats = ? WHERE id = ?'
             );
             $update->execute([$status, $observation->getConfirmedBalanceSatoshis(),
-                $observation->getMempoolDeltaSatoshis(), $observation->getObservedAt(), $now, $next, $invoiceId]);
+                $observation->getMempoolDeltaSatoshis(), $observation->getObservedAt(), $now, $next,
+                $observation->getConfirmedReceivedSatoshis(), $observation->getUnconfirmedReceivedSatoshis(), $invoiceId]);
             $changed = $status !== $current;
             $event = $changed ? InvoiceStateMachine::eventFor($status) : null;
             $queued = $event === null ? 0 : $this->webhookRepository->enqueueInTransaction(

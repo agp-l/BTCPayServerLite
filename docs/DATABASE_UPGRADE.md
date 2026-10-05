@@ -28,7 +28,9 @@ Dodatečné tabulky či sloupce nemaže a nevytváří odhadnuté opravné ALTER
 4. Po dokončení se znovu zkontroluje schéma a aktualizuje nabídka dalších kroků.
    Spouštějte je postupně v závislostním pořadí. Poté obnovte provoz aplikace.
 
-Automatický katalog zahrnuje 001–010. Částečně přítomné změny automatické spuštění
+Automatický katalog zahrnuje 001–011. Migrace 011 přidává oddělené částky přijatých
+výstupů pro nové sledování plateb z historie. Staré zůstatky ani stavy nemění.
+Částečně přítomné změny automatické spuštění
 blokují. Starší historické soubory a neznámé nové migrace mají ruční postup podle
 komentářů a preflightu souboru; abecední pořadí souborů není migrační plán.
 Budoucí automatická migrace potřebuje výslovný záznam předpokladů a strukturálních
