@@ -70,6 +70,8 @@ Tyto kontroly čtou DB bez blockchain RPC. `wallets: []` s `no_registered_wallet
 
 Automatické spouštění plateb nastavte podle [systemd návodu](docs/PAYMENT_MONITORING.md). Admin tlačítko provede omezenou dávku stejným workerem. Informace o nedávném CLI běhu není přímou kontrolou zapnutého systemd/cron. **`success: true` a `scanned: 0` potvrzuje pouze dokončení prázdné dávky, nikoli funkční blockchain RPC.** Chyby jsou rozlišené bezpečnými kódy, například `cache_directory` nebo `rpc_authentication`.
 
+Peněženka zobrazuje nepotvrzené příjmy nahoře, samostatný nepotvrzený zůstatek a převody mezi vlastními adresami. Historii obnovuje otevření stránky / **Obnovit**; faktury dál sleduje serverový worker. Pokud je XPUB faktura zaplacená, ale v peněžence chybí příjem, ověřte také samostatný receive sync worker. Viz [historie peněženky](docs/WALLET_HISTORY.md).
+
 Na uživatelské instalaci bylo 10. září potvrzeno automatické zpracování dvou neuhrazených faktur: `scanned: 2`, `expired: 2`, `failed: 0`. Po opravě sdílené cache tedy běží časovač, observation i zápis stavu. Tento výsledek ještě neověřuje příjem skutečné platby ani doručení webhooku.
 
 ## Vlastníci platebních operací

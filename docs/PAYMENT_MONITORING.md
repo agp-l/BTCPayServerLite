@@ -10,6 +10,33 @@ DB práce může přidat dobu čekání na DB. Další ruční běh je možný p
 Zbytek fronty vyřídí další kliknutí nebo plánovač. GET pouze načítá diagnostiku.
 Otevření checkoutu ani vytvoření XPUB faktury worker nespouští.
 
+## Jak se platba z e-shopu označí jako zaplacená
+
+1. E-shop vytvoří fakturu přes API. BTC Pay Lite uloží její částku a přijímací adresu.
+2. Plánovač serveru (systemd timer nebo cron) spustí `payment_worker.php`.
+   Worker se přes Electrum dotáže na stav adresy. Nepotvrzená či částečná platba
+   znamená `Processing`; celá potvrzená částka znamená `Settled`.
+3. Se změnou stavu se do databáze uloží událost pro webhook.
+   Samostatně plánovaný `webhook_cron.php` ji doručí e-shopu a při chybě ji zkusí znovu.
+4. Simple-store ověří podpis webhooku a aktuální fakturu si ještě načte přes API.
+   Teprve ověřený `Settled` se shodnou objednávkou, obchodem a částkou označí
+   objednávku jako zaplacenou. Ověření umí spustit také návrat z platební stránky
+   a načtení objednávky, takže samotné označení zaplaceno neprokazuje doručení webhooku.
+
+Otevřený běžný checkout obnovuje uložený stav přibližně každých 5 sekund
+(15 sekund v neaktivní kartě; při chybách pomaleji). Blockchain nekontroluje.
+Platba se proto kontroluje i po zavření prohlížeče, pokud běží serverový plánovač.
+Při nastavení timeru podle návodu níže se worker spouští přibližně 15 sekund
+po dokončení předchozí dávky. Skutečný čas závisí i na intervalu webhook workeru
+a na potvrzení transakce v bitcoinové síti.
+
+Historie administrátorské peněženky je samostatný pohled do Electra. Její data
+načítá otevření stránky nebo tlačítko **Obnovit**, nikoli checkout polling.
+U XPUB obchodů navíc samostatný `wallet_receive_sync.php` registruje přijímací
+adresy v Electru. Bez této synchronizace může worker vidět zaplacenou fakturu,
+zatímco Electrum ještě danou adresu nemá ve své historii či zůstatku.
+Podrobnosti a diagnostika jsou v [historii peněženky](WALLET_HISTORY.md).
+
 CLI běží jednorázově, nejvýše 100 kontrol / 45 sekund (RPC nejvýše 30 sekund).
 Bez plánovače se samo znovu nespustí. Instance má společný DB advisory lock pro
 CLI i admin dávku; další spuštění se vrátí jako busy. Faktury nadále používají

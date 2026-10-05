@@ -884,6 +884,20 @@ select:focus-visible, textarea:focus-visible {
 
 .wallet-balance span { color: var(--text-muted); font-size: 0.44em; letter-spacing: 0; }
 
+.wallet-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 12px;
+  padding: 7px 10px;
+  border-radius: var(--radius-control);
+  background: var(--status-warning-surface);
+  color: var(--status-warning);
+  font-size: 12px;
+}
+
 .wallet-fiat { margin-top: 8px; color: var(--text-muted); font-size: 13px; }
 
 .wallet-hero-meta {
@@ -964,6 +978,7 @@ select:focus-visible, textarea:focus-visible {
 
 .transaction-icon.incoming { background: var(--status-success); color: var(--status-success-contrast); }
 .transaction-icon.outgoing { background: var(--status-danger-surface); color: var(--status-danger); }
+.transaction-icon.internal { background: var(--surface-subtle); color: var(--text-secondary); }
 
 .transaction-main { min-width: 0; }
 .transaction-main strong { display: block; color: var(--text-primary); }
@@ -986,9 +1001,12 @@ select:focus-visible, textarea:focus-visible {
 
 .transaction-amount.incoming { color: var(--status-success); }
 .transaction-amount.outgoing { color: var(--status-danger); }
+.transaction-amount.internal { color: var(--text-secondary); }
+.transaction-amount small { display: block; margin-top: 3px; font-family: var(--font-ui); font-size: 11px; font-weight: 400; }
 
 .transaction-status { text-align: right; }
 .transaction-item.incoming .transaction-status { color: var(--status-success); }
+.transaction-item .transaction-status.is-pending { color: var(--status-warning); }
 
 .transaction-details {
   grid-column: 2 / -1;

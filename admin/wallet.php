@@ -55,6 +55,8 @@ $fiatText = 'Stav peněženky nebyl ověřen';
 $fiatValueStr = '';
 $balanceConfirmed = 0.0;
 $balanceFormatted = '0.00000000';
+$unconfirmedSats = 0;
+$unconfirmedFormatted = '0.00000000';
 $finalTxs = [];
 $finalAddresses = [];
 $receiveAddress = 'Žádná adresa není dostupná';
@@ -166,6 +168,8 @@ try {
     $balance = $dashboard->balance();
     $balanceFormatted = $balance['confirmed_btc'];
     $balanceConfirmed = $balance['confirmed_sats'] / 100000000;
+    $unconfirmedSats = $balance['unconfirmed_sats'];
+    $unconfirmedFormatted = $balance['unconfirmed_btc'];
     $addresses = $dashboard->addresses($hideEmpty);
     $transactions = $dashboard->transactions();
     $market = $dashboard->marketSnapshot('CZK');
@@ -208,11 +212,13 @@ try {
 
             return [
                 'txid' => $transaction['txid'],
+                'direction' => $transaction['direction'],
                 'isInc' => $incoming,
-                'valStr' => ($incoming ? '+' : '-') . $transaction['amount_btc'],
+                'isPending' => $transaction['confirmations'] === 0,
+                'valStr' => ($transaction['amount_sats'] === 0 ? '' : ($incoming ? '+' : '-')) . $transaction['amount_btc'],
                 'confText' => $transaction['confirmations'] > 0
                     ? $transaction['confirmations'] . '× potvrzeno'
-                    : 'Čeká v síti',
+                    : 'Nepotvrzeno · čeká na potvrzení',
                 'timeStr' => $transaction['timestamp'] === null
                     ? 'Čas není dostupný'
                     : date('j. n. Y H:i:s', $transaction['timestamp']),

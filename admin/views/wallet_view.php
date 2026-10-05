@@ -49,6 +49,12 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
   <div class="wallet-hero-copy">
     <div class="wallet-kicker"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i> Potvrzený zůstatek</div>
     <div class="wallet-balance" id="balanceValue"><?php echo htmlspecialchars($balanceFormatted, ENT_QUOTES, 'UTF-8'); ?> <span>BTC</span></div>
+    <?php if ($unconfirmedSats !== 0): ?>
+      <div class="wallet-pending" id="unconfirmedBalance">
+        <span>Nepotvrzený zůstatek</span>
+        <strong><?php echo htmlspecialchars($unconfirmedFormatted, ENT_QUOTES, 'UTF-8'); ?> BTC</strong>
+      </div>
+    <?php endif; ?>
     <div class="wallet-fiat" id="fiatValue">
       <?php echo htmlspecialchars($fiatText, ENT_QUOTES, 'UTF-8'); ?>
       <?php if ($fiatValueStr !== ''): ?> · <?php echo htmlspecialchars($fiatValueStr, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?>
@@ -137,22 +143,28 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
   <div class="card-title">
     <span class="card-title-group"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Historie transakcí</span>
   </div>
-  <p class="card-subtitle">Nejnovější transakce jsou řazené podle času a zobrazují stav potvrzení.</p>
+  <p class="card-subtitle">Příchozí i odchozí platby. Nepotvrzené transakce jsou nahoře; aktuální stav načtete tlačítkem Obnovit.</p>
 
   <?php if ($finalTxs === []): ?>
     <div class="empty-state"><div><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Peněženka zatím nemá žádné transakce.</p></div></div>
   <?php else: ?>
     <div class="transaction-list">
     <?php foreach ($finalTxs as $transaction): ?>
-      <?php $direction = $transaction['isInc'] ? 'incoming' : 'outgoing'; ?>
+      <?php
+        $direction = $transaction['direction'];
+        $internal = $direction === 'internal';
+      ?>
       <article class="transaction-item <?php echo $direction; ?>">
-        <span class="transaction-icon <?php echo $direction; ?>"><i class="fa-solid <?php echo $transaction['isInc'] ? 'fa-arrow-down' : 'fa-arrow-up'; ?>" aria-hidden="true"></i></span>
+        <span class="transaction-icon <?php echo $direction; ?>"><i class="fa-solid <?php echo $internal ? 'fa-right-left' : ($transaction['isInc'] ? 'fa-arrow-down' : 'fa-arrow-up'); ?>" aria-hidden="true"></i></span>
         <div class="transaction-main">
-          <strong><?php echo $transaction['isInc'] ? 'Přijatá platba' : 'Odeslaná platba'; ?></strong>
+          <strong><?php echo $internal ? 'Převod ve vlastní peněžence' : ($transaction['isInc'] ? 'Přijatá platba' : 'Odeslaná platba'); ?></strong>
           <small><?php echo htmlspecialchars($transaction['timeStr'], ENT_QUOTES, 'UTF-8'); ?></small>
         </div>
-        <div class="transaction-amount <?php echo $direction; ?>"><?php echo htmlspecialchars($transaction['valStr'], ENT_QUOTES, 'UTF-8'); ?> BTC</div>
-        <div class="transaction-status"><?php echo htmlspecialchars($transaction['confText'], ENT_QUOTES, 'UTF-8'); ?></div>
+        <div class="transaction-amount <?php echo $direction; ?>">
+          <?php echo htmlspecialchars($transaction['valStr'], ENT_QUOTES, 'UTF-8'); ?> BTC
+          <?php if ($internal): ?><small>Poplatek (změna zůstatku)</small><?php endif; ?>
+        </div>
+        <div class="transaction-status<?php echo $transaction['isPending'] ? ' is-pending' : ''; ?>"><?php echo htmlspecialchars($transaction['confText'], ENT_QUOTES, 'UTF-8'); ?></div>
         <details class="transaction-details">
           <summary>Zobrazit technické detaily</summary>
           <div class="transaction-output">
@@ -253,6 +265,8 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
 
   const balance = document.getElementById('balanceValue');
   const fiat = document.getElementById('fiatValue');
+  const pendingBalance = document.getElementById('unconfirmedBalance');
+  const pendingMarkup = pendingBalance ? pendingBalance.innerHTML : '';
   const toggle = document.getElementById('toggleBalance');
   if (balance && fiat && toggle) {
     const balanceMarkup = balance.innerHTML;
@@ -262,6 +276,7 @@ $copyPayload = static fn (string $value): string => htmlspecialchars($value, ENT
       hidden = !hidden;
       balance.innerHTML = hidden ? '•••••••• <span>BTC</span>' : balanceMarkup;
       fiat.textContent = hidden ? 'Zůstatek je skrytý' : fiatText;
+      if (pendingBalance) pendingBalance.innerHTML = hidden ? 'Nepotvrzený zůstatek je skrytý' : pendingMarkup;
       toggle.innerHTML = hidden
         ? '<i class="fa-solid fa-eye" aria-hidden="true"></i> Zobrazit zůstatek'
         : '<i class="fa-solid fa-eye-slash" aria-hidden="true"></i> Skrýt zůstatek';

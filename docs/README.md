@@ -12,6 +12,7 @@ stav při vzniku; nejsou náhradou aktuálního instalačního postupu.
 | [CONFIGURATION](CONFIGURATION.md) | Konfigurační volby a sdílené runtime cesty |
 | [DATABASE_UPGRADE](DATABASE_UPGRADE.md) | Admin aktualizátor, katalog migrací, rozsah porovnání a zotavení |
 | [PAYMENT_MONITORING](PAYMENT_MONITORING.md) | Admin kontrola plateb, systemd, diagnostika a platební politika |
+| [WALLET_HISTORY](WALLET_HISTORY.md) | Příchozí a nepotvrzené platby, vlastní převody a chybějící XPUB historie |
 | [RECEIVE_COORDINATION](RECEIVE_COORDINATION.md) | XPUB indexy napříč admin/stateless/API, synchronizace a obnova |
 | [STORE_CREATION_TROUBLESHOOTING](STORE_CREATION_TROUBLESHOOTING.md) | Chyby provisioningu, Python prostředí a oprávnění |
 | [SESSION_LOGIN](SESSION_LOGIN.md) | Zapamatování přihlášení, limity a odvolání relací |
