@@ -15,8 +15,9 @@ composer install --no-dev --prefer-dist
 ```
 
 Použijte existující composer.lock, nikoli composer update či ignorování platform
-requirements. Knihovny bitcoin-p8/ECC nejsou všechny uložené v Git repozitáři.
-Pouhé stažení PHP souborů nedoplňuje Composer závislosti.
+requirements. Současný repozitář obsahuje vendor, ale jeho přítomnost
+nepotvrzuje kompletní ani načitatelný runtime konkrétní instalace. Verze a platformu
+ověřte Composerem; soubory vendor ručně neopravujte. Viz [závislosti](DEPENDENCIES.md).
 
 Přihlaste se jako admin a otevřete `database_upgrade.php`, sekci **Prostředí pro
 vytváření obchodů**. Ukáže skutečné webové PHP, načtené php.ini, uživatele procesu,

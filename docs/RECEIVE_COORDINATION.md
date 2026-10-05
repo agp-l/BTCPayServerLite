@@ -1,9 +1,7 @@
 # Koordinace přijímacích adres a synchronizace Electra
 
-Aktuální navazující stav po `2915df0`, 8. září 2026.
-Tento dokument nahrazuje předchozí omezení, že admin a stateless tvorba nejsou
-napojené na DB XPUB sekvenci. Payout ledger, PaymentWorker, webhook outbox,
-BlockchainProvider a checkout zůstávají beze změn.
+Současný provozní kontrakt. Greenfield, admin i instalovaná stateless tvorba
+používají společnou DB XPUB sekvenci. [Architektura](CORE_PAYMENT_ARCHITECTURE.md).
 
 ## Jeden vlastník rezervací
 
@@ -15,7 +13,7 @@ BlockchainProvider a checkout zůstávají beze změn.
 | Synchronizace receive rozsahu | Již rezervované indexy pouze zpřístupní Electru | Omezená dávka |
 
 `wallet_receive_ranges` trvale váže kanonický wallet path na veřejný klíč a script
- type. `xpub_address_sequences` zůstává vlastníkem atomického high water stejného
+type. `xpub_address_sequences` zůstává vlastníkem atomického high water stejného
 klíče/chain code, i přes různé SLIP-0132 prefixy a více obchodů. Obě tabulky se musí
 zálohovat a nesmějí se mazat s obchodem. Konfliktní přiřazení klíče/scriptu selže.
 Generátor také ověří, že se konfigurace store nezměnila od načtení jeho snapshotu;
@@ -53,10 +51,10 @@ akce pro vytvoření adresy vrací skutečně rezervovanou adresu; rozložení U
 
 ## Upgrade a spuštění
 
-Při upgradu z `2915df0` aplikujte před nasazením kódu
-[`007_wallet_receive_ranges.sql`](../migrations/007_wallet_receive_ranges.sql).
-Pokud začínáte ze staršího main, je potřeba nejprve i migrace 006 a předchozí
-migrace odpovídající vašemu schématu. Nepřepisujte používanou DB celým `sql.sql`.
+Ověřte katalog a skutečné schéma v [aktualizátoru](DATABASE_UPGRADE.md).
+Receive koordinace vyžaduje migrace 006 a
+[`007_wallet_receive_ranges.sql`](../migrations/007_wallet_receive_ranges.sql),
+případně jejich předpoklady podle schématu původní DB. Nepřepisujte používanou DB celým `sql.sql`.
 Nová databáze může vzniknout z aktuálního `sql.sql` nebo přes instalátor.
 
 ### Chyba `Receive synchronization failed: PDOException`
@@ -111,7 +109,7 @@ kontrolu ihned. Automatický běh vybírá známé bindings s nedoplněným rozs
 dokončený rozsah preventivně znovu kontroluje nejpozději po pěti minutách při
 pravidelném spouštění. Nové registrace/faktury vytvářejí binding při použití DB
 rezervace. Pro starý Electrum store použijte nejprve explicitní repair postup
-z [XPUB auditu](XPUB_FIRST_MULTI_WALLET_AUDIT.md).
+z oddílu [Explicitní repair](#explicitní-repair-starého-obchodu).
 
 Worker je CLI-only a přes HTTP vrací 404 ještě před konfigurací. Cron v uživatelově
 prostředí nebyl automaticky vytvořen, jeho localhost DB ani daemon nebyly změněny.
@@ -135,25 +133,32 @@ wallet. Neznamená dokončenou blockchain synchronizaci, potvrzené platby nebo
 připravené UTXO k utracení. Tyto stavy nadále určuje Electrum/BlockchainProvider.
 Worker nevolá `close_wallet`, nemění gap limit, nevytváří faktury ani nepodepisuje.
 
+## Explicitní repair starého obchodu
+
+Nejprve aktualizujte potřebné schéma a zazálohujte DB/config/wallet. Pro jeden
+konkrétní historický obchod:
+
+```bash
+php repair_store_xpub.php --store=store_ID
+# Po pozastavení všech invoice/address writerů sdílejících danou wallet:
+php repair_store_xpub.php --store=store_ID --apply --maintenance
+```
+
+První příkaz načte veřejná metadata konkrétní wallet a vypíše plán. Druhý ověří
+nezměněný store, public key, script policy a první/poslední receive adresu;
+zachová store/invoice/receive i společný high water a atomicky uloží XPUB/binding.
+Odlišný již uložený klíč nebo policy se odmítne. `--maintenance` je prohlášení,
+že provozovatel skutečně pozastavil writers; skript je sám nezastavuje.
+Automaticky neopravujte všechny wallets a nikdy nenulujte existující sekvence.
+
 ## Ověření
 
-- 60 skutečně souběžných PHP procesů střídá Greenfield/admin/stateless: 60 různých
-  adres, jediná sekvence a žádné wallet RPC při jejich přidělení.
-- Původní 100-way XPUB a idempotency testy dál procházejí.
-- Tokeny v1/v2/v3 mají walletless status. Produkční factory zvládne status i při
-  záměrně neplatné DB konfiguraci, protože DB při statusu neotevírá.
-- Testy dávkového limitu, ztracené odpovědi po mutaci, obnovy starší wallet,
-  chybného klíče, soupeřícího workeru a persistence po smazání stores.
-- Test konfigurace změněné mezi načtením store a rezervací indexu.
-- HTTP 404 testy pro payment worker, receive sync a repair.
-- Celá sada: 58 souborů prošlo lokálně s MariaDB. Po posledním guardu znovu prošel
-  cílený integrační test a syntaxe všech 228 PHP souborů.
-- Poslední úplné [GitHub CI ab96acd](https://github.com/agp-l/BTCPayServerLite/actions/runs/34179267951)
-  prošlo. Předchozí CI odhalilo nespouštěný HTTP fixture server; test nyní rezervuje
-  volný port přes OS a kontroluje připravenost před první RPC operací.
-
-Commity: `a09f6fe` sdílení adres, `9ecf261` sync worker, `e381c5c` integrační testy,
-`0bc0e08` ochrana snapshotu a lazy status test, `ab96acd` oprava startu test serveru.
+ReceiveCoordinationTest pokrývá reálnou DB a 60 smíšených souběžných alokací,
+0 RPC pro XPUB, persistentní binding, stale store snapshot a lazy walletless
+status. Wallet sync fixtures pokrývají bounded dávku, ztracenou odpověď,
+obnovu starší wallet, chybné klíče a competing lock. LegacyRepairPolicyTest
+ověřuje CLI a zachování floor/policy. Aktuální úplné výsledky jsou v
+[checkpointu](STABILIZATION_2026_10.md); historické počty nejsou dnešní výsledek.
 
 ## Provozní hranice
 

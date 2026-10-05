@@ -290,7 +290,7 @@ final class PayoutService
         } catch (Throwable $exception) {
             $this->payouts->rememberBroadcastFailure((string) $payout['id'], 'Broadcast failed.', time());
             throw new PayoutException(
-                'Prepared transaction could not be broadcast. Retry with the same idempotency key.',
+                'Prepared transaction could not be broadcast. Read the payout and approve its current revision to retry the stored transaction.',
                 'broadcast_payout',
                 503,
                 $exception

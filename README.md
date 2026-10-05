@@ -1,111 +1,146 @@
 # BTCPay Server Lite
 
-PHP aplikace pro Bitcoin on-chain faktury, obchody a platební odkazy nad Electrem a MySQL/MariaDB. Obsahuje administraci, klientskou část, DB checkout, podmnožinu Greenfield API a podepsané webhooky.
+PHP platební brána pro Bitcoin on-chain faktury nad Electrem a MySQL/MariaDB.
+Obsahuje administraci, klientský portál, databázový checkout, podmnožinu
+Greenfield API a podepsané webhooky. Veřejná dokumentace běží na `/dokumentace`.
 
-**Stav k 5. říjnu 2026:** platební jádro má oddělenou tvorbu adres, pozorování blockchainu, změny stavů a doručování webhooků. XPUB faktury rezervují index v DB a odvozují adresu lokálně. [Kompletní přehled a propojení se simple-store](docs/PROJECT_STATUS_2026_10.md) uvádí současné funkce, opravy kompatibility, ověření a zbývající práci. Konkrétní hranice jádra zůstávají v [plánu vývoje](docs/ROADMAP.md); projekt není označen jako kompletně auditovaný.
+**Stav 5. října 2026:** hlavní tok přijímání plateb je implementovaný a má
+procesní, databázové a HTTP testy. XPUB faktura vzniká lokálně bez Electrum RPC;
+checkout a čtení invoice API používají DB. Blockchain sleduje omezený worker.
+Při vysoké návštěvnosti tedy každý návštěvník nespouští kontrolu v Electru.
+Souhrnný počet různých adres chrání společný budget a omezení souběhu.
+To je ochrana upstreamu, nikoli záruka neomezené kapacity nebo krátké fronty.
+
+[Současný stav a integrace](docs/PROJECT_STATUS_2026_10.md) ·
+[Kapacita a limity](docs/CAPACITY.md) ·
+[Další práce](docs/ROADMAP.md) ·
+[Ověření tohoto průchodu](docs/STABILIZATION_2026_10.md)
 
 ## Kde začít
 
 | Potřebuji | Návod / nástroj |
 |---|---|
-| Novou instalaci nebo přenos na jiný server | [Opakovatelné nasazení](docs/DEPLOYMENT.md) |
-| Aktualizovat existující databázi | Admin **Nástroje → Aktualizace systému**, [návod](docs/DATABASE_UPGRADE.md) |
-| Zapnout nebo ověřit kontrolu plateb | Admin **Nástroje → Kontrola plateb**, [systemd / cron](docs/PAYMENT_MONITORING.md) |
-| Vyřešit chybu vytvoření obchodu | [Diagnostika provisioningu](docs/STORE_CREATION_TROUBLESHOOTING.md) |
-| Připojit e-shop nebo API klienta | [API a příklady](docs/API.md) |
-| Testovat simple-store na localhostu bez HTTPS | [Místní HTTP konfigurace](docs/CONFIGURATION.md#propojení-simple-store-na-localhostu-bez-https) |
-| Připojit náš simple-store a ověřit platbu | [Stav projektu a přesný integrační postup](docs/PROJECT_STATUS_2026_10.md) |
-| Zkontrolovat konfiguraci a oprávnění | [Konfigurace](docs/CONFIGURATION.md), `php bin/deployment.php --check` |
-| Pochopit rezervace adres a obnovu XPUB | [Koordinace adres](docs/RECEIVE_COORDINATION.md) |
-| Zůstat přihlášený | Volba **Zůstat přihlášený na tomto zařízení 30 dní**, [relace](docs/SESSION_LOGIN.md) |
+| Instalovat, přenést nebo obnovit server | [Nasazení](docs/DEPLOYMENT.md) |
+| Aktualizovat existující DB | Admin **Nástroje → Aktualizace systému**, [migrace](docs/DATABASE_UPGRADE.md) |
+| Zapnout nebo zkontrolovat platby | Admin **Nástroje → Kontrola plateb**, [workery](docs/PAYMENT_MONITORING.md) |
+| Ověřit konkrétní pozdní platbu | Admin kontrola podle ID / `php payment_worker.php --invoice=inv_ID` |
+| Připojit e-shop | [API](docs/API.md), [simple-store](docs/PROJECT_STATUS_2026_10.md) |
+| Testovat obě aplikace na localhostu | [Místní HTTP konfigurace](docs/CONFIGURATION.md#propojení-simple-store-na-localhostu-bez-https) |
+| Opravit provisioning nebo oprávnění | [Diagnostika](docs/STORE_CREATION_TROUBLESHOOTING.md), `php bin/deployment.php --check` |
+| Opravit nebo synchronizovat XPUB wallet | [Koordinace adres](docs/RECEIVE_COORDINATION.md) |
+| Zůstat přihlášený | [Relace a 30denní zařízení](docs/SESSION_LOGIN.md) |
 
-## Instalace
+## Instalace a aktualizace
 
-Produkční aplikace používá PHP a Composer. PHP 8.0 je deklarované minimum kódu; ověřte rozšíření a závislosti v **CLI i webovém PHP**. Potřebujete PDO MySQL, cURL a GMP pro XPUB, databázi MySQL/MariaDB a pro wallet operace Electrum. Composer kontroluje zbývající požadavky zamčených knihoven. Na místním XAMPP bylo ověřeno webové PHP 8.0.30 a oddělené CLI PHP 8.3; nejde o doporučení těchto konkrétních verzí pro nový server.
+Aplikace používá PHP a Composer. Deklarované minimum je PHP 8.0; CI ověřuje
+PHP 8.2 a 8.3. Platformní požadavky ověřte zvlášť v CLI i webovém PHP: PDO MySQL,
+cURL, GMP a další rozšíření zamčených knihoven. Pro wallet operace a monitoring
+potřebujete Electrum; samotná XPUB derivace jej nevolá. MySQL/MariaDB musí
+používat InnoDB. [Závislosti a známá omezení](docs/DEPENDENCIES.md).
 
 ```bash
 composer install --no-dev --prefer-dist
 composer check-platform-reqs --no-dev
 ```
 
-1. Postupujte podle [nasazení](docs/DEPLOYMENT.md): připravte webserver, DB, PHP, Electrum a skutečné systémové účty.
-2. Bez `config.php` otevřete `install.php`. Instalátor přijímá prázdnou DB nebo čistý import současného [sql.sql](sql.sql). První admin vznikne z e-mailu a hesla, které zadáte; pevné výchozí heslo ani ukázkový obchod se nevytváří. Instalace sama nevyžaduje běžící Electrum.
-3. Pomocí `bin/deployment.php --permissions` vygenerujte a zkontrolujte oprávnění pro web, CLI a Electrum podle svého serveru. Web a CLI musí sdílet zámky i blockchain cache a mít přístup také k již existujícím souborům.
-4. Vytvořte obchod, ověřte adresu a fakturu. Zapněte samostatné workery níže; otevření checkoutu je nenahrazuje.
+1. Připravte prostředí podle [DEPLOYMENT](docs/DEPLOYMENT.md), včetně ochrany
+   interních souborů webserverem a skutečných účtů web/CLI/Electrum.
+2. Bez `config.php` otevřete `install.php`, přístupný jen správci. Instalátor
+   přijímá prázdnou DB nebo čistý současný import [sql.sql](sql.sql) a vytvoří
+   prvního admina z vámi zadaného e-mailu a hesla. Pevné výchozí heslo neexistuje.
+3. Vygenerujte a zkontrolujte oprávnění přes `bin/deployment.php --permissions`.
+   Web a CLI musí sdílet cache a zámky, včetně přístupu ke stávajícím souborům.
+4. Vytvořte obchod, adresu a fakturu; zapněte samostatně všechny tři workery.
 
-Instalátor zpřístupněte jen správci. Konfiguraci, původní podpisové klíče, databázi a wallet soubory zálohujte společně mimo veřejný web. Smazání `config.php` není upgrade ani obnova používané instalace. [Postup obnovy a oprávnění](docs/DEPLOYMENT.md) zahrnuje rozdílné účty Apache a workeru.
+Existující instalaci aktualizujte v plánované údržbě přes `git pull --ff-only`
+a `composer install` se stávajícím lockfilem. Před migrací zálohujte DB,
+zastavte zápisy a workery a vyčkejte běžící dávky. Admin aktualizátor podporuje
+katalog **001–011**. Pro receipt monitoring je nutná
+**011_invoice_received_outputs.sql**; samotný nový rescan další migraci nepotřebuje.
+Celé `sql.sql` neimportujte přes používanou DB. Podrobnosti a přerušené DDL:
+[DATABASE_UPGRADE](docs/DATABASE_UPGRADE.md).
 
-Aplikace nevyžaduje Node.js, npm ani Bun. Původní samostatné Node/EJS demo bylo odstraněno; obnovit je lze z historie Gitu. Šablony PHP zůstávají v adresářích příslušných modulů (`admin/views`, `client/views`, `checkout/views`) a prohlížečové CSS/JavaScript v `assets/`.
+Zálohujte společně původní config a podpisové klíče, DB sekvence a wallet soubory
+mimo veřejný web. Smazání configu není obnova. Runtime lock soubory za provozu
+nemažte. Git aktualizace sama nenastaví váš Linux timer ani nenasadí změny na server.
 
-## Aktualizace existující instance
+Node.js, npm ani Bun nejsou součástí aplikačního backendu. PHP šablony jsou
+v modulech a prohlížečové CSS/JavaScript v `assets/`. Verzovaný `vendor` zůstává
+pro současný způsob distribuce; zdrojem verzí je `composer.lock`.
 
-```bash
-git pull --ff-only
-composer install --no-dev --prefer-dist
-composer check-platform-reqs --no-dev
-```
+## Provoz a zatížení Electra
 
-Kód aktualizujte v plánované údržbě. Před DB migrací vytvořte obnovitelnou zálohu, zastavte zápisy a workery a vyčkejte dokončení běžících dávek. V adminu otevřete **Nástroje → Aktualizace systému** (`/admin/database_upgrade`). Starý odkaz `database_upgrade.php` zůstává přesměrováním.
-
-Nástroj porovnává podporované části schématu s `sql.sql` a nabízí jednotlivé známé migrace 001–010. Samotné otevření nic nemění. Historické migrace, částečně provedené změny a datové backfilly mohou vyžadovat ruční postup; podrobnosti jsou v [návodu aktualizace DB](docs/DATABASE_UPGRADE.md). Celé `sql.sql` neimportujte přes používanou DB. Aktualizátor DB nestahuje nový kód z GitHubu.
-
-Po aktualizaci zkontrolujte oprávnění a diagnostiku a obnovte workery. `config.php` není verzovaný; zachovejte svou konfiguraci a klíče.
-
-## Provoz workerů
-
-| Vstupní bod | Odpovědnost | Jak jej ověřit |
+| Vstupní bod | Úloha | Doporučené výchozí plánování |
 |---|---|---|
-| `payment_worker.php` | Blockchain observation, invoice stav a atomické zařazení webhooků | Admin Kontrola plateb, CLI `--check`, journal služby |
-| `webhook_cron.php` | Doručení již zařazených webhooků a retry | Výsledky doručení a log spouštění |
-| `wallet_receive_sync.php` | Postupné zpřístupnění rezervovaných XPUB adres Electru | CLI výsledek, `--check-db`, [receive průvodce](docs/RECEIVE_COORDINATION.md) |
+| `payment_worker.php` | Observation, invoice stav, atomický webhook outbox | Každých 10 minut; volitelný minutový tick pro větší frontu |
+| `webhook_cron.php` | Doručení outboxu, HMAC a retry | Každou minutu |
+| `wallet_receive_sync.php` | Zpřístupnění rezervovaných XPUB adres Electru | Každou minutu |
 
-Payment a receive worker jsou CLI-only. Webhook cron podporuje také autorizované HTTP POST s Bearer cron klíčem; pro běžný provoz použijte CLI. Každý worker potřebuje vlastní plánování. Systemd timer pro platby nevytváří plánování zbývajících dvou workerů.
+Payment a receive jsou CLI-only. Webhook cron podporuje také autorizovaný
+HTTP POST; běžný provoz používá CLI. Payment timer nespouští ostatní workery.
 
 ```bash
 php payment_worker.php --check
 php wallet_receive_sync.php --check-db
 ```
 
-Tyto kontroly čtou DB bez blockchain RPC. `wallets: []` s `no_registered_wallets` znamená, že receive worker nemá registrované rozsahy; nevyhledává všechny peněženky daemonu. Existující obchody připojte postupem v [koordinaci adres](docs/RECEIVE_COORDINATION.md).
+Tyto příkazy čtou DB bez blockchain RPC. `scanned: 0` potvrzuje prázdnou dávku,
+nikoli funkční Electrum. Admin sleduje poslední CLI/manual běh a stáří fronty;
+nehádá, zda je nainstalovaný timer. `health` HTTP potvrzuje dosažitelnost API,
+synchronizace je neznámá (`null`). Cílená CLI RPC diagnostika:
+`php bin/health_check.php --json`.
 
-Automatické spouštění plateb nastavte podle [systemd návodu](docs/PAYMENT_MONITORING.md). Admin tlačítko provede omezenou dávku stejným workerem. Informace o nedávném CLI běhu není přímou kontrolou zapnutého systemd/cron. **`success: true` a `scanned: 0` potvrzuje pouze dokončení prázdné dávky, nikoli funkční blockchain RPC.** Chyby jsou rozlišené bezpečnými kódy, například `cache_directory` nebo `rpc_authentication`.
+Kontrola jedné faktury má cadence **10 / 30 / 60 minut** podle stáří; po
+Settled končí. Provider sdílí per-address cache, single-flight a cooldown.
+Dále povolí nejvýše **60 nových observations za rolling 60 sekund a dvě současně**
+pro jeden endpoint a společnou cache. Jedna receipt observation má nejvýše
+čtyři RPC; transportní/auth chyby krátce pozastaví nové observations.
+Stejné cesty a prostředí musí používat všechny procesy. Admin wallet a receive
+sync mají vlastní RPC mimo tento invoice budget. [Výpočty a hranice](docs/CAPACITY.md).
 
-Peněženka zobrazuje nepotvrzené příjmy nahoře, samostatný nepotvrzený zůstatek a převody mezi vlastními adresami. Historii obnovuje otevření stránky / **Obnovit**; faktury dál sleduje serverový worker. Pokud je XPUB faktura zaplacená, ale v peněžence chybí příjem, ověřte také samostatný receive sync worker. Viz [historie peněženky](docs/WALLET_HISTORY.md).
+Checkout polling čte DB přibližně po 5 sekundách a neskenuje blockchain.
+Pro více návštěvníků dimenzujte také PHP/DB a omezte HTTP požadavky na webserveru.
+Tisíc nových faktur kontrolovaných po 10 minutách není totéž co tisíc otevřených
+checkoutů. Fronta může růst i tehdy, když budget správně chrání Electrum.
 
-Na uživatelské instalaci bylo 10. září potvrzeno automatické zpracování dvou neuhrazených faktur: `scanned: 2`, `expired: 2`, `failed: 0`. Po opravě sdílené cache tedy běží časovač, observation i zápis stavu. Tento výsledek ještě neověřuje příjem skutečné platby ani doručení webhooku.
+## Platební kontrakt
 
-## Vlastníci platebních operací
+XPUB indexy jsou společné pro stejný veřejný klíč i přes více obchodů a jeho
+prefixové aliasy. Index se po chybě nevrací. Wallet mutace mají explicitní cestu
+a per-wallet lock. Observation probíhá mimo DB transakci; worker pak atomicky
+ověří lease, uloží observation/stav/outbox a uvolní lease.
 
-| Operace | Vlastník |
-|---|---|
-| Tvorba adresy | `AddressGenerator` a sdílená DB rezervace XPUB indexu / receive koordinátor |
-| Blockchain observation | `BlockchainProvider`, per-address cache a single-flight |
-| Monitoring a stav faktury | `PaymentWorker` a `InvoiceStateMachine` |
-| Checkout | DB repository a presentation; žádné RPC ani změna stavu |
-| Stateless status | Ověřený token + provider/cache, bez loaded wallet |
-| Wallet mutace | Nejnižší mutation service, explicitní wallet path a společný per-wallet lock |
-| Webhook delivery | `WebhookProcessor`, odděleně od kontroly plateb |
+Receipt provider ověřuje raw TXID a výstupy adresy a rozpozná příjem i po
+utracení před prvním skenem. Vlastní vrácené drobné nejsou další úhrada.
+Potvrzené příjmy, nepotvrzené příjmy a aktuální balance jsou oddělené.
+Výšky potvrzení stále pocházejí z Electrum serveru: nejde o vlastní SPV důkaz.
 
-Blockchain RPC běží mimo DB transakci. Po observation worker v jedné krátké transakci ověří lease, znovu načte fakturu, uloží observation, provede povolený přechod, zařadí outbox a uvolní lease. XPUB tvorba faktury nevolá Electrum a nezískává wallet mutation lock. [Architektura](docs/CORE_PAYMENT_ARCHITECTURE.md) a [receive koordinace](docs/RECEIVE_COORDINATION.md) popisují provozní podmínky, včetně sdílených cest.
+`New` může přejít do `Processing`, `Expired` nebo `Settled`. Částečná či
+nepotvrzená platba vede do `Processing`, který se nevrací na New. Expired se
+může při pozdní platbě změnit. Settled je terminální; pozdější reorg se u něj
+nesleduje. Neuhrazený Expired se automaticky sleduje 24 h po expiraci, známá
+partial platba déle. Pro platbu za hranicí okna použijte konkrétní rescan.
+[Podrobná architektura](docs/CORE_PAYMENT_ARCHITECTURE.md).
 
-`New` může přejít na `Processing`, `Expired` nebo `Settled`. Jakákoli zjištěná částečná platba vede na `Processing`; ten se nevrací na `New`. `Expired` může při pozdní platbě přejít na `Processing` nebo `Settled`. `Settled` je terminální. Expired faktury se běžně kontrolují ještě 24 hodin, déle při platební indikaci.
+## Integrace a dokončení
 
-Produkční monitoring sleduje historii transakcí a skutečně přijaté částky v integer satoshi; současný zůstatek a podepsaná mempool delta zůstávají oddělené. Platbu rozpozná i po utracení BTC před první kontrolou; vrácené vlastní drobné nejsou další úhrada. Vyžaduje migraci **011_invoice_received_outputs.sql**. Kontroly běží po **10 → 30 → 60 minutách** podle stáří faktury, po `Settled` končí. Výšky potvrzení stále závisejí na Electrum serveru, nejde o vlastní full node ani SPV ověření walletless historie. [Kontrola plateb](docs/PAYMENT_MONITORING.md) popisuje přesné intervaly, limity, migraci a plánovač.
+Pro e-shop používejte databázové Greenfield faktury, ne stateless odkazy.
+Výchozí expirace je 48 hodin. API podporuje `token` i `Bearer`, přesné BTC
+řetězce a trvalou idempotency rezervaci. Webhook je oznámení: receiver ověří
+HMAC a načte důvěryhodný invoice detail, obchod, cenu, měnu a objednávku před
+idempotentním označením jako zaplaceno. HTTP/API health není tento důkaz.
 
-## Integrace a hranice podpory
-
-Greenfield API implementuje podmnožinu pro BTC-CHAIN faktury, checkout a webhooky. Podporuje `Authorization: token …` i `Bearer …`. Idempotency tvorby faktury používá trvalou rezervaci resource; stejný klíč s jiným obsahem vrátí 409. Přehled endpointů a samostatný PHP tester jsou v [API dokumentaci](docs/API.md).
-
-Nové on-chain faktury mají výchozí platnost **48 hodin**; vlastní lhůtu lze zadat přes API nebo při tvorbě URL faktury. Existující faktury se zpětně neprodlužují. Běžný i URL checkout používají světlou zelenou kartu na výšku s lokálním QR, přesnou BTC částkou a datem splatnosti. Při zadání ceny ve fiat měně zůstává vypočtená BTC částka po dobu platnosti stejná.
-
-Volitelný payout modul je ve výchozím stavu vypnutý. `InProgress` znamená přijetí broadcastu, nikoli potvrzení transakce. Potvrzovací worker, refundace, pull payments a Lightning nejsou dokončené součásti tohoto systému. Příprava budoucí směnárny má vlastní body v plánu; současný stav není její hotové jádro.
-
-## Vývoj a ověření
+Volitelný payout modul je výchozí **vypnutý**. InProgress znamená přijetí
+broadcastu, ne potvrzenou výplatu. Společné UTXO rezervace, úplná reconciliation
+payoutů, potvrzovací worker, Lightning, refundace a pull payments nejsou dokončené.
+Projekt proto není hotová automatická směnárna ani úplně auditovaný payment stack.
+Aktuální práce a podmínky dokončení jsou pouze v [ROADMAP](docs/ROADMAP.md).
 
 ```bash
 php tests/run_all.php
 ```
 
-[Průvodce testy](docs/TESTING.md) popisuje požadavky, izolované DB a rozdíl mezi mock testem, concurrency testem a ověřením proti Electru. Úspěšný běh bez nastavení integrační DB nemusí provést DB scénáře. Přesné historické výsledky jsou zachované v pracovních záznamech.
-
-[Dokumentace a historie](docs/README.md) · [Další práce podle priority](docs/ROADMAP.md) · [Licence](LICENSE)
+DB a Apache scénáře vyžadují vlastní testovací nastavení; bez něj se mohou
+přeskočit. [TESTING](docs/TESTING.md) a [aktuální checkpoint](docs/STABILIZATION_2026_10.md)
+rozlišují skutečné DB/procesy/HTTP, řízené RPC a neověřené cílové prostředí.
+[Dokumentace](docs/README.md) · [Historie dokončené práce](docs/HISTORY.md) · [Licence](LICENSE)

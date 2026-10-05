@@ -1,38 +1,33 @@
-# Dokumentace
+# Dokumentace projektu
 
-[Hlavní README](../README.md) obsahuje současné chování a cestu od instalace k provozu.
-Návody níže platí pro PHP aplikaci. Datované audity a pracovní záznamy zachycují
-stav při vzniku; nejsou náhradou aktuálního instalačního postupu.
+[Hlavní README](../README.md) · veřejná PHP stránka `/dokumentace`
 
-## Provoz a integrace
+## Aktuální návody a kontrakty
 
 | Dokument | Obsah |
 |---|---|
-| [DEPLOYMENT](DEPLOYMENT.md) | Opakovatelné nasazení, PHP/Composer, ACL, obnova, samostatné workery |
-| [CONFIGURATION](CONFIGURATION.md) | Konfigurační volby a sdílené runtime cesty |
-| [DATABASE_UPGRADE](DATABASE_UPGRADE.md) | Admin aktualizátor, katalog migrací, rozsah porovnání a zotavení |
-| [PAYMENT_MONITORING](PAYMENT_MONITORING.md) | Admin kontrola plateb, systemd, diagnostika a platební politika |
-| [WALLET_HISTORY](WALLET_HISTORY.md) | Příchozí a nepotvrzené platby, vlastní převody a chybějící XPUB historie |
-| [RECEIVE_COORDINATION](RECEIVE_COORDINATION.md) | XPUB indexy napříč admin/stateless/API, synchronizace a obnova |
-| [STORE_CREATION_TROUBLESHOOTING](STORE_CREATION_TROUBLESHOOTING.md) | Chyby provisioningu, Python prostředí a oprávnění |
-| [SESSION_LOGIN](SESSION_LOGIN.md) | Zapamatování přihlášení, limity a odvolání relací |
-| [API](API.md) | Endpointy, checkout, webhooky, příklad klienta a limity payoutů |
-| [TESTING](TESTING.md) | Testovací runtime, integrační DB a hranice důkazů |
-| [Stav říjen 2026](PROJECT_STATUS_2026_10.md) | Přehled projektu, opravy kopírování, integrace simple-store, výsledky a otevřené priority |
+| [DEPLOYMENT](DEPLOYMENT.md) | Nasazení, PHP/Composer, ACL, obnova, tři workery a ochrana webserveru |
+| [CONFIGURATION](CONFIGURATION.md) | Konfigurační volby, local HTTP, sdílené cesty a endpoint budget |
+| [DATABASE_UPGRADE](DATABASE_UPGRADE.md) | Katalog 001–011, rozsah kontroly a recovery přerušeného DDL |
+| [PAYMENT_MONITORING](PAYMENT_MONITORING.md) | Cadence, konkrétní late rescan, cron/systemd, fronta a diagnostika |
+| [CAPACITY](CAPACITY.md) | HTTP versus RPC, souhrnné limity a plánovací výpočty bez garance výkonu |
+| [CORE_PAYMENT_ARCHITECTURE](CORE_PAYMENT_ARCHITECTURE.md) | Vlastníci operací, transakční hranice, důvěra a platební politika |
+| [RECEIVE_COORDINATION](RECEIVE_COORDINATION.md) | Společné XPUB rezervace, receive sync, repair a obnova |
+| [WALLET_HISTORY](WALLET_HISTORY.md) | Příjmy, nepotvrzený zůstatek a vlastní převody |
+| [STORE_CREATION_TROUBLESHOOTING](STORE_CREATION_TROUBLESHOOTING.md) | Provisioning, PHP/Python, cesty a oprávnění |
+| [SESSION_LOGIN](SESSION_LOGIN.md) | Relace, 30denní zařízení a odvolání tokenů |
+| [API](API.md) | Implementované endpointy, nullable health, HMAC, stateless a payout hranice |
+| [DEPENDENCIES](DEPENDENCIES.md) | Zamčené balíčky, vendor a konkrétní známá bezpečnostní upozornění |
+| [TESTING](TESTING.md) | DB/Apache/procesní testy a meze důkazů |
 
-## Architektura a další práce
+## Stav a další práce
 
-- [Vlastníci core operací](CORE_PAYMENT_ARCHITECTURE.md)
-- [Aktuální plán a podmínky dokončení](ROADMAP.md)
+- [Současný stav a nastavení simple-store](PROJECT_STATUS_2026_10.md)
+- [Jediný aktuální plán](ROADMAP.md)
+- [Checkpoint současné stabilizace](STABILIZATION_2026_10.md)
+- [Stručná historie dokončené práce](HISTORY.md)
 
-## Historie
-
-- [Cílená revize core, září 2026](CORE_TARGETED_REVIEW_2026_09.md)
-- [Audit XPUB provisioningu](XPUB_FIRST_MULTI_WALLET_AUDIT.md)
-- [Průběh core stabilizace](CORE_STABILIZATION_PROGRESS.md)
-- [Průběh instalátoru, multi-wallet a provozních oprav](INSTALLER_MULTI_WALLET_PROGRESS.md)
-- [Původní plán refaktoru](archive/REFACTOR_PLAN.md)
-
-Při změně chování upravte příslušný aktuální návod a stručně README. Do pracovního
-záznamu přidejte nový checkpoint s provedenými kontrolami a otevřenými body;
-staré výsledky testů nepřepisujte výsledkem nového běhu.
+Při změně kódu upravit příslušný kontrakt, README a veřejnou PHP dokumentaci.
+Do checkpointu patří provedená kontrola a její prostředí; další úkoly pouze do
+ROADMAP. Historické výsledky nesmějí sloužit jako aktuální úkoly nebo důkaz
+nové produkční kapacity. Původní mezistavy jsou dohledatelné v Git historii.

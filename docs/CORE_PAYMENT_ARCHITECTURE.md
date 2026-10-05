@@ -1,217 +1,112 @@
-# Payment core
+# Současná architektura platebního jádra
 
-This document describes the stabilization of `main` from `cbeba360`. The core uses
-the existing PHP/PDO, Electrum, XPUB generator and `shanelic/bitcoin-p8` stack.
+Revize 5. října 2026. Tento dokument popisuje současný kód; další práce je
+pouze v [ROADMAP](ROADMAP.md). [README](../README.md) · [Kapacita](CAPACITY.md)
 
-For current installation and migration steps use [Deployment](DEPLOYMENT.md) and
-[Database upgrade](DATABASE_UPGRADE.md). [Payment monitoring](PAYMENT_MONITORING.md)
-describes the later bounded CLI/admin runner and heartbeat. Historical validation
-counts below belong to their checkpoint; open work is in [Roadmap](ROADMAP.md).
+## Vlastníci operací
 
-## Owners and boundaries
+| Operace | Vlastník a invariant |
+|---|---|
+| XPUB adresa | `DbAddressIndexStore` / `WalletReceiveCoordinator`: lokální derivace, sdílená sekvence, žádný Electrum RPC |
+| Legacy adresa | `ElectrumAddressGenerator`: explicitní wallet a per-wallet mutation lock |
+| Pozorování adresy | `ElectrumReceiptBlockchainProvider`: walletless síťové RPC, cache, single-flight a společný budget |
+| Invoice stav | `PaymentWorker` / `InvoiceStateMachine`: persistentní lease a atomický observation + status + outbox commit |
+| API a DB checkout | Repository / `InvoicePaymentPresentation`: pouze čtení uloženého stavu, žádný blockchain RPC |
+| Stateless status | Ověřený token + stejný provider; může obnovit cache, nemá DB invoice ani trvalé Settled |
+| Webhook | `WebhookProcessor`: samostatné doručení, claim až před HTTP, stálý delivery ID při retry |
+| Receive range | `WalletReceiveSyncWorker`: bounded doplnění již rezervovaných adres do konkrétní wallet |
+| Podpis / spend | Explicitní Electrum wallet služba; oddělené od invoice settlement |
 
-| Responsibility | Owner | External work |
-| --- | --- | --- |
-| Address creation | `AddressGeneratorInterface` implementations | XPUB: DB index reservation and local derivation; Electrum: explicit wallet mutation |
-| Invoice creation | `BtcInvoiceManager` | Persist immutable invoice creation data |
-| Create-invoice resource reservation and response replay | `IdempotencyService` / `IdempotencyReservation` | DB reservation and exact saved API response |
-| Blockchain observation | `BlockchainProviderInterface` | Walletless address query, cache and single-flight |
-| Persistent payment state | `PaymentWorker` / `InvoiceStateMachine` | Lease, observation, status and webhook outbox in one commit |
-| Database checkout | `CheckoutRepository` / `DatabaseCheckoutService` | One DB snapshot and pure presentation; no wallet or RPC configuration |
-| Stateless status | `BtcStatelessInvoiceManager` | Verified token address/amount/expiry plus provider; no loaded wallet |
-| Webhook delivery | `WebhookProcessor` | Existing persistent outbox, retries and HTTP transport |
-| Electrum wallet mutation serialization | Lowest mutation service with `WalletLockManager` | Shared per-wallet lock around ensure-loaded and mutating RPC only |
-| RPC transport and dialect | `ElectrumRPC` / `ElectrumRPCFactory` | Explicit network, daemon or wallet scope |
+## Tvorba a souběžnost
 
-`BtcInvoiceManager::checkDatabasePaymentStatus()` is deprecated and reads DB only.
-Manual admin status writes are disabled: they bypassed both state rules and outbox
-consistency. Admin presentation was not redesigned in this pass.
+XPUB identita vychází z public key a chain code, ne pouze z prefixu xpub/zpub.
+Stejný klíč sdílí high water přes všechny stores i instalované admin/stateless
+alokace. Generic xpub/tpub potřebuje explicitní script policy; její chybějící
+hodnota nesmí potichu změnit typ adresy. Konfliktní konfigurace nebo změněný
+store snapshot se odmítne před rezervací. Indexy se nevracejí ani po smazání store.
 
-## Observation and state
+API idempotency autentizuje store před replay. Pending/Completed/Failed a trvalá
+resource reservation zajišťují stejné invoice ID a adresu při opakování téhož
+klíče/payloadu; jiný obsah vrací 409. Invoice insert a dokončená response jsou
+v jedné DB transakci. Nejednoznačné legacy operace se automaticky neopakují.
 
-`AddressPaymentObservation` contains integer satoshis with separate balance and receipt semantics:
+Wallet mutace sdílejí flock podle kanonické explicitní cesty. Loaded read používá
+read-only fast path; load se pod lockem znovu ověří. Běžná faktura ani checkout
+nevolají close_wallet. Nezávislé wallet locky se nesmějí změnit na jeden globální
+mutation lock. Všichni writers musí sdílet filesystem s funkčním flock a DB
+sekvence. Externí GUI/CLI bez koordinátoru z téže receive větve adresy nevydává.
 
-- `confirmedBalanceSatoshis`: current confirmed address balance, nonnegative.
-- `mempoolDeltaSatoshis`: signed current mempool delta. An outgoing unconfirmed
-  spend can reduce the current balance.
-- `currentBalanceSatoshis`: confirmed balance plus mempool delta, nonnegative.
-- `observedAt`: time of the actual observation, preserved when stale cache is returned.
-- Optional confirmed/unconfirmed received amounts from locally decoded history transactions.
+## Observation a omezení upstreamu
 
-The provider normalizes inconsistent negative totals. The DTO validates its
-contract; it does not silently clamp a value described as cumulative receipts.
-The database columns are `confirmed_balance_sats`, signed `mempool_delta_sats`,
-and `payment_observed_at`. Migration 011 adds nullable `confirmed_output_sats`
-and `unconfirmed_output_sats`, populated only by a receipt observation. Production
-uses `ElectrumReceiptBlockchainProvider`; the original balance provider remains
-an explicit compatibility adapter. `current_balance` always presents balance,
-while `total_received` uses receipts when present. Migrated old maxima remain payment evidence until refresh, but without
-an observation timestamp checkout does not present them as current balance.
+Provider používá `getaddresshistory`, nejvýše dva nové `gettransaction` a u
+neprázdné historie `getaddressbalance`. Celkem nejvýše čtyři RPC na observation,
+historie nejvýše 100 TX, raw hex nejvýše 2 000 000 znaků (1 MB). Parsování lokálně
+ověří TXID, skript a částku. Cache raw transakcí dovolí postupný bounded progress;
+neúplná/neplatná historie nesmí vytvořit falešný nulový snapshot ani settlement.
 
-| Current status | Allowed next status |
-| --- | --- |
-| New | New, Processing, Expired, Settled |
-| Processing | Processing, Settled |
-| Expired | Expired, Processing, Settled |
-| Settled | Settled |
+Potvrzené/nepotvrzené received outputs zahrnují i již utracené příjmy. Vlastní
+change z invoice vstupů se znovu nepřičítá. Current balance a signed mempool
+delta mají oddělený význam. Žádný historický balance se migrací nepřejmenuje na
+received outputs. Agregátní snapshot není trvalý tx/vout účetní ledger.
 
-A partial payment produces Processing, including after expiration. Processing
-retains the fact that payment was observed even if a mempool transaction disappears
-or funds are spent. A sufficient confirmed received amount produces Settled. Settled is
-terminal and excluded from further scans. The expiry of a checkout timer does not
-write or invent a status transition.
+Per-address cache/cooldown a invoice schedule mají 10/30/60 minut. Stejná adresa
+se při souběhu neobnoví vícekrát. Endpoint budget ve stejné cache navíc omezuje
+různé adresy: default 60 starts / rolling 60 s, max dva observers, krátký admission
+flock bez síťového I/O uvnitř. Transport/auth/HTTP/protocol chyba otevře 60s pause.
+Admission limit odloží worker o minutu bez smyšleného last_checked_at a ukončí
+jeho dávku. Po pádu zůstane start započtený a active lease sám propadne.
 
-The existing late-payment scan window is 24 hours after expiry. Unpaid Expired
-invoices are checked hourly. New and Processing invoices use 10 minutes during
-their first hour, 30 minutes until six hours old, then one hour. Persisted evidence of a partial payment is processed even outside
-the late-payment window, then remains Processing. Payments first arriving after
-that window require an explicit rescan/policy extension.
+Výchozí CLI dávka má 100 invoices / 45 s; observation musí celá zapadat do
+zbývajícího rozpočtu (default max 35 s). Instance runner lock zabraňuje souběhu
+CLI/admin dávek téže DB. To není wallet mutation lock. DB transakce se otevře
+až po RPC, znovu ověří invoice token/lease a uloží observation, přechod i outbox.
+Pád před commitem neponechá settlement bez události. Při chybě/propadnutí lease
+nevlastnící proces nesmí změnu zapsat. [Cadence a provoz](PAYMENT_MONITORING.md).
 
-The receipt provider reads walletless address history, verifies raw TXIDs and
-matches output scripts locally. It subtracts that address's own transaction inputs
-before crediting positive incoming amounts, so returning change is not another
-payment. This detects incoming payments spent before the first observation.
-Each check fetches at most two uncached transactions; known immutable raw data
-is reused. Incomplete history makes bounded progress without publishing a false
-snapshot. Confirmation heights still trust the Electrum server: this is not SPV
-or full-node verification. Details, limits and migration are in Payment monitoring.
-Stateless tokens have no durable terminal-state memory, although spending alone
-no longer removes history receipts. Use DB invoices and their durable state for
-e-commerce. Existing Settled invoices remain terminal even across later reorgs.
+## Platební politika a důvěra
 
-## Atomic worker commit
+| Stav | Povolený vývoj |
+|---|---|
+| New | Processing při partial/mempool, Settled při plném confirmed receipt, Expired při nezaplacené expiraci |
+| Processing | Zůstává rozpracovaný, nebo Settled; nevrací se do New ani se nezruší ztrátou mempool platby |
+| Expired | Pozdní Processing/Settled; automaticky 24 h po expiraci nebo déle při platební indikaci |
+| Settled | Terminální; automaticky se znovu neskenuje |
 
-The worker claims one invoice immediately before its RPC. It never leases a batch
-that then waits behind earlier network calls. Each claim has a random token and a
-DB-clock deadline. Providers declare a maximum operation duration; lease duration
-is `max(60, provider maximum + 30)` seconds. Electrum's maximum includes its HTTP
-timeout and lock/cache overhead.
+Aktuálně stačí plná částka s kladnou výškou v Electrum historii. Nelze nastavit
+3/6 potvrzení a walletless provider neověřuje Merkle proof / chain tip. Lokální
+TXID kontrola dokazuje identitu transakce, ne její potvrzení v nejdelším chainu.
+Před settlement se receipt historie znovu vyhodnocuje; pozdější reorg Settled
+invoice současná politika neřeší. Tuto smlouvu neměnit zpětně bez návrhu politiky.
 
-Blockchain RPC runs outside a DB transaction. Afterwards one short transaction:
+Neuhrazený Expired za 24h oknem lze explicitně zkontrolovat přes admin nebo
+CLI `--invoice=ID`. Jen jeden řádek, stále lease/budget/min 10 min; chybějící ID
+nespustí jinou dávku. Potvrzený late příjem používá stejný outbox. Stateless
+nemá takový durable serverový stav; pro účetnictví e-shopu používejte DB invoices.
 
-1. Locks and reloads the invoice row; checks the exact lease token and deadline.
-2. Evaluates the current persisted status against the observation.
-3. Saves the integer observation and permitted state transition.
-4. Calls `WebhookDeliveryRepository::enqueueInTransaction()` on the same PDO.
-5. Clears the lease and commits.
+HTTP health / server info hlásí neznámou synchronizaci (`null`), bez RPC.
+Payment-methods zobrazuje persisted partial/received/due a efektivní původní rate.
+`payments: []` nevymýšlí jednotlivé transakce. Receiver ověří raw HMAC i aktuální
+invoice v API; události se mohou opakovat nebo dorazit opožděně.
 
-Outbox insertion failure or process death rolls back the observation and status.
-A killed process leaves a bounded lease; its successor observes again and creates
-the event in the same commit as the transition. Existing webhook registration
-cutover, event uniqueness and delivery retries are retained.
+## Webhooky, receive a obnova
 
-## Idempotent invoice creation
+Webhook událost vzniká se změnou invoice v transakci. Processor ji claimne až
+bezprostředně před HTTP, ne celou pomalou dávku najednou. Lease je 300 s, timeout
+transportu 10 s, soft start budget cron dávky 45 s. Po pádu se obnoví stejné ID
+a payload; receiver musí být idempotentní. Delivered/Dead a Retry nejsou invoice
+stavy. Doručení může přijít vícekrát i po úspěšném HTTP, pokud se výsledek nezapsal.
 
-Authenticate the store before replay. A store/key pair identifies a reservation;
-a different request hash is 409. A connection-owned DB named lock serializes that
-key, and is released by MySQL on connection death. Busy callers receive 503 and
-retry the same key. Different keys proceed independently.
+Receive sync řeší viditelnost adres v Electrum wallet, nikoli invoice settlement.
+Po restartu/timeoutu čte skutečný receive rozsah, DB progress je pouze vodítko.
+Registered neznamená synchronized. Zálohujte sekvence, bindings, původní config
+a wallet, ne jen seed. [Provoz a repair](RECEIVE_COORDINATION.md).
 
-`Pending` reserves an invoice ID before address allocation. XPUB index reservation
-and immutable creation snapshot commit together. Invoice INSERT and `Completed`
-response persistence then share a transaction. Response-write failure rolls back
-the invoice; a retry reuses its reserved ID, address, index, amount and timestamps.
-The exact saved successful response is replayed. Safe deterministic application
-4xx responses are saved as `Failed`; transient failures leave recoverable Pending
-data. Do not automatically purge unresolved reservations.
+Migrations a source se nasazují pod údržbou dle [DATABASE_UPGRADE](DATABASE_UPGRADE.md).
+Nová DB používá fresh sql.sql. Konfigurace, wallet, cache a zálohy nesmějí být
+veřejné. Rozdělené local cache na více hostech neposkytují společný budget ani
+single-flight; stejný název adresáře sám nic nesdílí.
 
-Electrum allocation occurs outside the DB transaction. A crash between its mutation
-and snapshot persistence can leave an unused address. It cannot create a second
-invoice under the reserved ID. XPUB avoids this RPC gap entirely. Historical file-generator
-index domains remain per store; do not configure the same XPUB/derivation branch in
-independent stores that have independent counters.
-
-## Electrum routing and shared directories
-
-Every entrypoint uses `ElectrumRPCFactory::fromConfig()`. Transport construction
-does not perform RPC. Configure:
-
-```php
-'rpc_wallet_param_key' => 'wallet_path', // upstream default; 'wallet' for an explicit adapter
-'rpc_timeout' => 30,
-'rpc_connect_timeout' => 5,
-'rpc_scheme' => 'http',
-```
-
-Wallet commands carry an explicit path. `load_wallet` and `close_wallet` always use
-their documented `wallet_path` argument, independently of wallet-command dialect.
-`activeWallet` and `loadWallet()` selection are deprecated admin compatibility.
-There is no mutation retry to guess a dialect. `callNetwork()` is used for address
-balance and broadcast; `callDaemon()` is reserved for daemon lifecycle commands.
-`ElectrumWallet::callWallet()` exposes explicit routing for additional upstream
-commands. A mutating caller must own the shared lock around ensure-loaded plus RPC.
-Payout preparation now follows that rule; this is not a completed exchange UTXO
-reservation, reconciliation or withdrawal-monitoring implementation.
-
-All PHP-FPM, API, stateless, worker and admin processes targeting the same wallets
-must use the **same flock-capable shared directory** and canonical absolute daemon
-wallet paths. The default is `<project>/var/locks`; production can set
-`BTCPAY_WALLET_LOCK_DIR` to a stable shared path outside release directories. Across
-hosts the shared mount must support cross-host flock. Independent local directories
-on different hosts are not a shared lock backend. Do not alias wallet paths through
-different symlinks/mount names across processes. There is no MySQL/file backend mix.
-
-Likewise set `BTCPAY_BLOCKCHAIN_CACHE_DIR` (default `<project>/var/blockchain`) to a
-shared directory for all observers. Cache keys include daemon endpoint and address.
-Defaults are two seconds fresh, up to 30 seconds stale, 1.5 seconds lock wait, and
-two seconds upstream-failure cooldown. A cache-miss leader makes one
-`getaddressbalance` network RPC; waiters reuse cache. On lock timeout they return
-bounded stale data or 503, never their own fallback query. Files/directories must
-be writable by all participating service users; keep lock files in place while
-processes run. No wallet lock is taken by XPUB creation or provider-based status.
-
-The command contracts were checked against [Electrum JSON-RPC documentation](https://electrum.readthedocs.io/en/latest/jsonrpc.html)
-and [upstream command definitions](https://github.com/spesmilo/electrum/blob/master/electrum/commands.py).
-The latter defines wallet-path injection and the signed, current-balance semantics
-of `getaddressbalance`; it is not a historical-receipts endpoint.
-
-## Upgrade and validation
-
-Historical stabilization baseline (not the full current upgrade path): for an
-installation already at `cbeba360`, stop invoice/worker writers, apply
-`migrations/004_core_payment_consistency.sql` then
-`migrations/005_idempotency_resource_reservation.sql`, deploy the matching code,
-and resume writers. Fresh installations use `sql.sql` and do not reapply these
-migrations. Earlier installations must first reach the baseline schema.
-
-Migration 004 clears old leases and scan scheduling, preserving payment evidence.
-Migration 005 preserves completed response bodies. Anonymous old `response_code=0`
-claims become Failed/409 for explicit reconciliation; blindly reexecuting them
-could duplicate an invoice created by the old code.
-
-Schedule `php payment_worker.php` independently of `php webhook_cron.php`.
-The payment entrypoint is CLI-only and returns empty HTTP 404 before configuration
-or DB access. Database checkout needs only `db_*` configuration. Stateless status
-needs RPC configuration and the token signing secret, but no configured/loaded
-wallet or wallet file; creation additionally needs an explicit wallet path.
-
-Run `composer install` with the existing lockfile, then `php tests/run_all.php`.
-For real persistence/concurrency and migration tests, set `BTCPAY_TEST_MYSQL_HOST`,
-`BTCPAY_TEST_MYSQL_PORT` (default 3306), `BTCPAY_TEST_MYSQL_USER` (default root), and
-`BTCPAY_TEST_MYSQL_PASS`. The test account must create/drop isolated test databases.
-Tests use random `btcpay_core_*` names and never target the application's DB.
-PHP needs PDO MySQL/SQLite, GMP/BCMath and, for process tests, pcntl/posix.
-GitHub Actions supplies MariaDB and these extensions.
-
-The acceptance suite covers all thirteen requested invariants, including actual
-100-process bursts and SIGKILL during the transaction. At the stabilization
-checkpoint all 53 test files passed with real MariaDB, and 213 PHP files passed
-syntax checks. Electrum calls were controlled test doubles; an actual daemon
-integration smoke test remains deployment validation.
-
-## XPUB provisioning follow-up (2026-09-08)
-
-DB-backed stores now share a durable sequence by public key/chain code across
-stores and SLIP-0132 aliases (migration 006). New wallet provisioning exports
-validated public metadata offline once. See [the follow-up audit](XPUB_FIRST_MULTI_WALLET_AUDIT.md)
-for corrected ownership, installation, repair, verification and receive-range
-synchronization limits. The per-store limitation above still applies to the
-legacy file index store, not the DB sequence.
-
-## Shared receive allocation and bounded synchronization
-
-See [receive coordination](RECEIVE_COORDINATION.md) for migration 007, the durable
-wallet binding, shared Greenfield/admin/stateless reservations, address-only v3
-tokens and CLI-only range registration. Provider status still never initializes
-the lazy receive database. External daemon writers must use the same allocator
-or a different receive branch. RPC registration does not imply completed SPV sync.
+Hlavní invoice tok existuje. Neuzavřené hranice: cílová kapacita/real Electrum,
+nastavitelná confirmation/reorg politika, provisioning crash reconciliation,
+receive/webhook observability a retence cache. Payouts navíc potřebují UTXO
+rezervace, monitoring potvrzení a recovery testy; zůstávají výchozí vypnuté.

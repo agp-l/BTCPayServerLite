@@ -20,7 +20,7 @@ mkdir($project, 0755);
 // Never serve the real repository or real configuration without a PHP handler.
 copy(dirname(__DIR__) . '/.htaccess', $project . '/.htaccess');
 $blocked = [
-    'config.php', 'config.php.bak', 'sql.sql', 'composer.json', 'composer.lock',
+    'config.php', 'config.php.bak', 'sql.sql', 'dump.sql.gz', 'composer.json', 'composer.lock',
     'dump.SQL', 'notes.log', 'old.php~', '.git/config', '.env', '.btcpay-config-test', '.install.lock',
     'vendor/autoload.php', 'classes/Database.php', 'tests/fixture.txt',
     'migrations/001.sql', 'docs/README.md', 'var/blockchain/observation.json',

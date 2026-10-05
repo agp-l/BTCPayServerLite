@@ -76,22 +76,6 @@ class WebhookCronApplication
         return $value;
     }
 
-    private function nullableStringConfig(string $key): ?string
-    {
-        $value = $this->config[$key] ?? null;
-        if ($value === null || $value === '') {
-            return null;
-        }
-        if (!is_string($value) || str_contains($value, "\0")) {
-            throw new WebhookDeliveryException(
-                'Webhook cron configuration is invalid.',
-                'configure_cron'
-            );
-        }
-
-        return $value;
-    }
-
     private function integerConfig(
         string $key,
         ?int $default,

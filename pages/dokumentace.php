@@ -890,6 +890,7 @@ $schema = [
                 <a href="#faktury">Faktury</a>
                 <a href="#stavy">Stavy plateb</a>
                 <a href="#webhooky">Webhooky</a>
+                <a href="#provoz">Provoz a kapacita</a>
                 <a href="#stateless">Stateless API</a>
             </nav>
             <p class="side-title">Další API</p>
@@ -899,7 +900,7 @@ $schema = [
                 <a href="#chyby">Chyby a retry</a>
                 <a href="#bezpecnost">Bezpečnost</a>
             </nav>
-            <span class="version">API v1x</span>
+            <span class="version">API v1 · 5. října 2026</span>
         </aside>
 
         <main id="obsah" class="content">
@@ -907,7 +908,7 @@ $schema = [
                 <p class="eyebrow">Veřejná dokumentace pro vývojáře</p>
                 <h1>Napojte svůj web na Bitcoin platby.</h1>
                 <p class="lead">BTCPay Server Lite nabízí JSON API pro faktury, checkout, podepsané webhooky a lehký
-                    stateless režim. Tato stránka popisuje skutečně implementované rozhraní aktuální verze.</p>
+                    stateless režim. Tato stránka popisuje implementovanou Greenfield podmnožinu aktuální verze; úplný BTCPay Server kontrakt není podporovaný.</p>
                 <div class="hero-tags">
                     <span>application/json</span><span>BTC-CHAIN</span><span>HMAC-SHA256</span><span>PHP
                         8+</span><span>Electrum</span></div>
@@ -952,7 +953,7 @@ $schema = [
       "customerEmail": "zakaznik@example.cz"
     },
     "checkout": {
-      "expirationMinutes": 20,
+      "expirationMinutes": 2880,
       "redirectURL": "https://shop.example.cz/dekujeme",
       "redirectAutomatically": true
     }
@@ -971,8 +972,8 @@ $schema = [
   "type": "Standard",
   "checkoutLink": "<?= docsE($baseUrl) ?>/pay?id=inv_8e9a31f7c20b",
   "createdTime": 1788277200,
-  "expirationTime": 1788278400,
-  "monitoringTime": 1788278400,
+  "expirationTime": 1788450000,
+  "monitoringTime": 1788536400,
   "archived": false,
   "status": "New",
   "additionalStatus": "None",
@@ -1060,7 +1061,7 @@ Accept: application/json</code></pre>
                             <tr>
                                 <td><span class="method">GET</span></td>
                                 <td><code>/health</code></td>
-                                <td>Stav služby</td>
+                                <td>Dosažitelnost HTTP; synchronizace neověřená</td>
                                 <td>Ne</td>
                             </tr>
                             <tr>
@@ -1158,7 +1159,7 @@ Accept: application/json</code></pre>
                 <div class="endpoint">
                     <div class="endpoint-title"><span class="method post">POST</span><span
                             class="endpoint-path">/stores/{storeId}/invoices</span></div>
-                    <p>Vytvoří novou Bitcoin fakturu a rezervuje pro ni přijímací adresu v Electrum peněžence obchodu.
+                    <p>Vytvoří DB fakturu a unikátní přijímací adresu. XPUB obchod ji odvodí lokálně bez Electrum RPC; explicitní legacy Electrum režim používá wallet mutaci.
                     </p>
                     <dl class="param-list">
                         <div class="param">
@@ -1207,7 +1208,7 @@ Accept: application/json</code></pre>
                             class="endpoint-path">/stores/{storeId}/invoices/{invoiceId}/payment-methods</span></div>
                     <p>Vrátí BTC adresu v poli <code class="inline">destination</code>, BIP21 URI v <code
                             class="inline">paymentLink</code>, očekávanou částku a zbývající částku <code
-                            class="inline">due</code>.</p>
+                            class="inline">due</code>. Čtení je pouze z DB. <code class="inline">paymentMethodPaid</code>, <code class="inline">totalPaid</code> a <code class="inline">due</code> jsou v BTC a zahrnují uložené partial receipts; <code class="inline">rate</code> vychází z původní ceny/měny faktury. <code class="inline">payments</code> je prázdné, protože snapshot není seznam tx/vout.</p>
                 </div>
 
                 <h3>PHP klient bez další knihovny</h3>
@@ -1223,7 +1224,7 @@ $payload = [
     'amount' =&gt; '1490.00',
     'currency' =&gt; 'CZK',
     'metadata' =&gt; ['orderId' =&gt; 'OBJ-2026-085'],
-    'checkout' =&gt; ['expirationMinutes' =&gt; 20],
+    'checkout' =&gt; ['expirationMinutes' =&gt; 2880],
 ];
 
 $curl = curl_init($apiBase . '/stores/' . rawurlencode($storeId) . '/invoices');
@@ -1269,7 +1270,7 @@ header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
                             </tr>
                             <tr>
                                 <td><span class="status s-processing">Processing</span></td>
-                                <td>Platba je viditelná, ale ještě není potvrzená.</td>
+                                <td>Rozpoznaná částečná nebo nepotvrzená platba; ještě nestačí k zaplacení.</td>
                                 <td>Zobrazit „platba se potvrzuje“; zboží ještě neposílat.</td>
                             </tr>
                             <tr>
@@ -1285,9 +1286,7 @@ header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
                         </tbody>
                     </table>
                 </div>
-                <p>Nespoléhejte pouze na návrat zákazníka z checkoutu. Autoritativní potvrzení zpracujte přes webhook
-                    <code class="inline">InvoiceSettled</code> a stav si můžete následně ověřit přes GET endpoint
-                    faktury.</p>
+                <p>Nespoléhejte pouze na návrat zákazníka z checkoutu. Webhook <code class="inline">InvoiceSettled</code> je oznámení. Před označením objednávky vždy ověřte aktuální fakturu přes autentizované API: stav Settled, vlastní store, částku, měnu a číslo objednávky. Samotný návrat ani podpis webhooku tato data nenahrazují.</p>
             </section>
 
             <section id="webhooky" class="doc-section">
@@ -1310,7 +1309,7 @@ header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
   }'</code></pre>
                     </div>
                     <p>Pokud <code class="inline">secret</code> nepošlete, server jej vytvoří. Uložte hodnotu vrácenou
-                        při registraci; v seznamu webhooků se secret znovu nevrací.</p>
+                        při registraci; v seznamu webhooků se secret znovu nevrací. Webhook založte před vytvořením faktury; nový webhook nepřebírá starší faktury.</p>
                 </div>
                 <h3>Payload webhooku</h3>
                 <div class="code-block">
@@ -1336,7 +1335,7 @@ header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
                         <tbody>
                             <tr>
                                 <td><code>InvoiceProcessing</code></td>
-                                <td>Platba je viditelná, ale nepotvrzená.</td>
+                                <td>Vznik rozpracované částečné nebo nepotvrzené platby.</td>
                             </tr>
                             <tr>
                                 <td><code>InvoiceSettled</code></td>
@@ -1351,12 +1350,17 @@ header('Location: ' . $invoice['checkoutLink'], true, 303);</code></pre>
                 </div>
                 <h3>Ověření podpisu v PHP</h3>
                 <p>Podpis je v hlavičce <code class="inline">BTCPay-Sig: sha256=…</code>. HMAC počítejte nad přesnými
-                    nezměněnými bajty HTTP těla, nikoli nad znovu zakódovaným JSONem.</p>
+                    nezměněnými bajty HTTP těla, nikoli nad znovu zakódovaným JSONem. Následuje kostra: funkce načtení faktury, ověření místní objednávky a transakčního označení právě jednou musíte implementovat ve svém backendu.</p>
                 <div class="code-block">
                     <div class="code-head"><span>PHP 8+</span><button class="copy-button"
                             type="button">Kopírovat</button></div>
                     <pre><code>&lt;?php
 $secret = getenv('BTCPAY_WEBHOOK_SECRET');
+$storeId = getenv('BTCPAY_STORE_ID');
+if (!is_string($secret) || $secret === '' || !is_string($storeId) || $storeId === '') {
+    http_response_code(500);
+    exit;
+}
 $rawBody = file_get_contents('php://input');
 $received = $_SERVER['HTTP_BTCPAY_SIG'] ?? '';
 $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $secret);
@@ -1368,27 +1372,55 @@ if (!hash_equals($expected, $received)) {
 
 $event = json_decode($rawBody, true, 32, JSON_THROW_ON_ERROR);
 
-// deliveryId nebo kombinaci invoiceId + type uložte jako idempotency klíč.
-if ($event['type'] === 'InvoiceSettled') {
-    markOrderAsPaidOnce($event['invoiceId']);
+if (($event['storeId'] ?? null) !== $storeId) {
+    http_response_code(401);
+    exit;
+}
+// deliveryId deduplikujte, invoice/order označte transakčně právě jednou.
+if (($event['type'] ?? null) === 'InvoiceSettled') {
+    $invoice = loadInvoiceFromTrustedApi($storeId, $event['invoiceId']);
+    // Ověřit Settled, vlastní store, ID objednávky, původní cenu a měnu.
+    if (!matchesSettledLocalOrder($invoice)) {
+        http_response_code(409);
+        exit;
+    }
+    markOrderAsPaidOnce($invoice['id']);
 }
 
 http_response_code(204);</code></pre>
                 </div>
                 <ul class="check-list">
                     <li>Vraťte HTTP 2xx rychle; dlouhou práci předejte vlastní frontě.</li>
-                    <li>Stejnou událost zpracujte bezpečně vícekrát.</li>
-                    <li>Před změnou objednávky vždy ověřte HMAC podpis.</li>
+                    <li>Stejnou událost zpracujte bezpečně vícekrát. Lease se získává až před HTTP; po pádu může přijít stejné delivery ID znovu i po prvním úspěchu receiveru.</li>
+                    <li>Před změnou objednávky ověřte HMAC i aktuální invoice proti své objednávce.</li>
                     <li>Webhook URL musí být veřejná HTTPS adresa; privátní sítě jsou v produkci blokované.</li>
                 </ul>
+            </section>
+
+            <section id="provoz" class="doc-section">
+                <p class="eyebrow">Provoz — monitoring a kapacita</p>
+                <h2>Čtení stavu nezatěžuje blockchain.</h2>
+                <p>XPUB tvorba faktury i DB checkout/API čtení používají lokální derivaci a databázi. Browser může obnovovat DB stav po 5 sekundách; tím se Electrum znovu nekontroluje. Stateless status může obnovit provider cache a bez klientských volání se sám nesleduje. Pro e-shop používejte DB faktury.</p>
+                <div class="table-wrap"><table>
+                    <thead><tr><th>Úloha</th><th>Chování</th></tr></thead>
+                    <tbody>
+                        <tr><td>Payment worker</td><td>První hodina faktury po 10 min, 1–6 h po 30 min, starší/Expired po 60 min. Settled se dál nekontroluje.</td></tr>
+                        <tr><td>Společný endpoint budget</td><td>Default 60 observation starts v rolling 60 s a dvě současně ve sdílené cache; nejvýše čtyři RPC na receipt observation. Cache hit budget nespotřebuje.</td></tr>
+                        <tr><td>Webhook a receive sync</td><td>Samostatné plánované workery; payment timer je nespouští. Receive synchronizace zpřístupní lokální XPUB rozsah peněžence.</td></tr>
+                        <tr><td>Health API</td><td>HTTP dosažitelnost. synchronized/fullySynched a blockchainInfo jsou neověřené null, žádný RPC. Nezaměňovat za zdravý daemon nebo doručenou platbu.</td></tr>
+                    </tbody>
+                </table></div>
+                <p>Budget chrání Electrum, negarantuje délku fronty. Například 1 000 nových invoices po 10 minutách vyžaduje 6 000 observations/h, což převyšuje výchozí limit 3 600/h ještě před síťovou latencí. Častější probuzení dávky (volitelně po minutě) neruší cadence jednotlivé faktury. Admin wallet a receive sync mají vlastní RPC mimo invoice budget.</p>
+                <p>Neuhrazený Expired se automaticky sleduje ještě 24 h po expiraci; známá partial platba déle. Za hranicí okna může správce ověřit jedno ID v Kontrole plateb nebo přes <code class="inline">php payment_worker.php --invoice=ID</code>. Zůstává min 10 min, lease a budget. Opakovaně placený Expired neřešte automatickou tvorbou další faktury.</p>
+                <p>Receipt provider ověřuje raw TXID/výstupy a přijatou platbu rozpozná i po utracení. Výška potvrzení stále pochází z vybraného Electrum serveru; nejde o SPV/Merkle důkaz. Settled je terminální a pozdější reorg se zatím nesleduje. Počet potvrzení není nastavitelný.</p>
+                <p><a href="<?= docsE($githubUrl . '/blob/main/docs/CAPACITY.md') ?>">Kapacita a limity</a> · <a href="<?= docsE($githubUrl . '/blob/main/docs/DEPLOYMENT.md') ?>">Nasazení a oprávnění</a> · <a href="<?= docsE($githubUrl . '/blob/main/docs/ROADMAP.md') ?>">Aktuální plán dokončení</a></p>
             </section>
 
             <section id="stateless" class="doc-section">
                 <p class="eyebrow">07 — Lehký režim</p>
                 <h2>Stateless faktury</h2>
                 <p class="section-intro">Stateless API vytvoří podepsaný platební odkaz bez databázového záznamu
-                    faktury. Hodí se pro jednoduché platební odkazy; nenabízí webhooky ani samostatný veřejný status
-                    endpoint.</p>
+                    faktury. Hodí se pro jednoduché platební odkazy; nemá webhooky ani trvalý DB stav zaplacení. JSON status vrací <code class="inline">GET /url-invoice?token=…&amp;action=check</code> a používá provider cache.</p>
                 <div class="endpoint">
                     <div class="endpoint-title"><span class="method post">POST</span><span
                             class="endpoint-path"><?= docsE($statelessUrl) ?></span></div>
@@ -1440,7 +1472,7 @@ http_response_code(204);</code></pre>
                     </div>
                     <div class="param">
                         <dt>expiration_minutes</dt>
-                        <dd>10 až 43 200 minut; hodnoty mimo rozsah se omezí na nejbližší hranici. Výchozí je 15.</dd>
+                        <dd>10 až 43 200 minut; hodnoty mimo rozsah se omezí na nejbližší hranici. Výchozí je 2 880 minut (48 hodin).</dd>
                     </div>
                 </dl>
             </section>
@@ -1472,7 +1504,7 @@ http_response_code(204);</code></pre>
                 <div class="note danger"><span class="note-icon" aria-hidden="true">!</span>
                     <div><strong>Výplaty pohybují skutečnými BTC</strong>
                         <p>Modul je ve výchozím nastavení vypnutý. Aktivujte jej až po migraci, záloze peněženky,
-                            nastavení samostatného klíče a testu na testnet/regtest.</p>
+                            nastavení samostatného klíče a testu na testnet/regtest. Společné UTXO rezervace, confirmation worker a úplná payout recovery ještě nejsou dokončené; modul není hotová automatická směnárna.</p>
                     </div>
                 </div>
                 <h3>Bezpečné dvoukrokové vytvoření</h3>
@@ -1506,7 +1538,7 @@ http_response_code(204);</code></pre>
                 <ul class="check-list">
                     <li>Každá nová obchodní operace musí mít unikátní <code class="inline">Idempotency-Key</code> o
                         délce 16–128 znaků.</li>
-                    <li>Při síťové chybě opakujte přesně stejný požadavek se stejným klíčem.</li>
+                    <li>Po síťové chybě načtěte detail. Create replay vrací existující výplatu; Prepared/AwaitingPayment sám znovu neodesílá. Broadcast obnovuje schválení s aktuální revision nad stejnou uloženou transakcí. Nikdy nezakládejte nový idempotency klíč pro retry.</li>
                     <li>Stav <code class="inline">InProgress</code> potvrzuje broadcast, nikoli potvrzení v blockchainu.
                     </li>
                     <li><code class="inline">approved: true</code> používejte jen u silně omezené a auditované

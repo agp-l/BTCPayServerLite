@@ -51,7 +51,24 @@ observations a dvěma přechody na Expired bez chyby. Jde o ověření konkrétn
 provozu; neprokazuje přijatou platbu, webhook ani kapacitu při vysoké zátěži.
 `success: true` při `scanned: 0` není ani ověřením blockchain RPC.
 
-Historické počty testů jsou v [pracovních záznamech](INSTALLER_MULTI_WALLET_PROGRESS.md).
-Tato reorganizace dokumentace nemění PHP, SQL ani platební chování; postačuje
-kontrola diffu, místních odkazů a shody návodů se zdroji. Celou sadu opakujte při
-změnách, které její scénáře mohou ovlivnit, nebo podle požadavků CI.
+## Apache a aktuální důkazy
+
+CI používá PHP 8.2/8.3, MariaDB 10.11 a izolovaný Apache fixture. Místně:
+
+```bash
+BTCPAY_TEST_APACHE_BINARY=/usr/sbin/apache2 php tests/ApacheBoundaryTest.php
+```
+
+Volitelně nastavte `BTCPAY_TEST_APACHE_MODULES`. Test spustí vlastní Apache na
+loopback/volném portu, s falešnými statickými soubory bez produkčního configu.
+Ověřuje interní cesty, veřejné routy/assets a Authorization v podadresáři;
+PHP vestavěný server tuto ochranu neověřuje. Bez explicitního binary se přeskočí.
+
+Nové regresní testy: BlockchainObservationBudgetTest (1000 různých adres,
+rolling window a 100 procesů), WebhookDeliveryLeaseTest (reálná DB a virtuální
+pomalá dávka delší než lease), HealthServiceTest, GreenfieldApiTest a late rescan
+v PaymentWorkerMonitorTest/DatabaseUpgradeTest. Virtuální čas není reálná rychlost
+sítě; process fixture není kapacitní certifikace serveru.
+
+Výsledky tohoto průchodu a jejich hranice: [STABILIZATION](STABILIZATION_2026_10.md).
+Historie: [HISTORY](HISTORY.md). Testy opakovat podle skutečně ovlivněných scénářů.

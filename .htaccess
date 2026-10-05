@@ -7,7 +7,7 @@ RewriteRule (?:^|/)\.(?!well-known(?:/|$)) - [F,END,NC]
 RewriteRule ^admin/views(?:/|$) - [F,END,NC]
 
 # Configuration, SQL dumps and editor backups must never be served as static text.
-<FilesMatch "(?i)(?:^config\.php(?:\..*)?$|^composer\.(?:json|lock)$|^\.|~$|\.(?:sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)$)">
+<FilesMatch "(?i)(?:^config\.php(?:\..*)?$|^composer\.(?:json|lock)$|^\.|~$|\.(?:sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)(?:\.(?:gz|bz2|xz|zip|zst))?$)">
     Require all denied
 </FilesMatch>
 

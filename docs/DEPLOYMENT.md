@@ -237,7 +237,7 @@ location ~* ^/admin/views(/|$) { return 403; }
 location ~ /\.(?!well-known/) { return 403; }
 location ~* (^|/)config\.php(\..*)?$ { return 403; }
 location ~* (^|/)composer\.(json|lock)$ { return 403; }
-location ~* (\.(sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)|~)$ { return 403; }
+location ~* (\.(sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)(\.(gz|bz2|xz|zip|zst))?|~)$ { return 403; }
 location /api/v1/ { rewrite ^ /api.php last; }
 location / { try_files $uri /index.php?$query_string; }
 ```

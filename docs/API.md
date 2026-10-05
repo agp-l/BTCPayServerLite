@@ -100,9 +100,9 @@ curl -X POST "$APP_URL/api.php/api/v1/stores/$STORE_ID/payouts" \
   --data '{"destination":"bc1q...","amount":"500.00","currency":"CZK","approved":false}'
 ```
 
-Výchozí stav je `AwaitingApproval`. Následné `POST /api/v1/payouts/{payoutId}` s tělem `{"revision":0}` výplatu schválí, podepíše a odešle. Před broadcastem se podepsaná raw transakce uloží do ledgeru; při dočasné chybě se má opakovat stejný požadavek, nikoli vytvářet výplata s novým idempotency klíčem. Volba `"approved":true` je určena pouze pro plně automatizované, silně omezené integrace.
+Výchozí stav je `AwaitingApproval`. Následné `POST /api/v1/payouts/{payoutId}` s tělem `{"revision":0}` výplatu schválí, podepíše a odešle. Před broadcastem se podepsaná raw transakce uloží do ledgeru; při dočasné chybě nejprve načtěte detail výplaty. Create replay vrací stejný záznam, ale sám neobnoví broadcast stavu Prepared/AwaitingPayment. Obnovu provádí approve přes POST detailu s aktuální revision; tím se znovu použije uložená transakce. Nevytvářejte nový idempotency klíč. Volba `"approved":true` je určena pouze pro plně automatizované, silně omezené integrace.
 
-Aktuální stav `InProgress` znamená, že Electrum přijal broadcast. Automatický potvrzovací worker a přechod na `Completed` budou doplněny v další etapě spolu s pull payments a refundacemi.
+Aktuální stav `InProgress` znamená, že Electrum přijal broadcast. Automatický potvrzovací worker a přechod na `Completed` nejsou implementované. Před automatickými výplatami je nutná samostatná UTXO/reconciliation/crash etapa dle ROADMAP.
 
 #### Aktuální hranice kompatibility
 
@@ -117,14 +117,14 @@ Referenční implementace a kontrakty: [Greenfield e-commerce integrace](https:/
 
 ### `api_stateless.php`
 
-Vytváří stateless fakturu bez databázového invoice záznamu. Vytváření je omezené konfigurovanými API klienty. Instalovaná aplikace používá sdílený receive koordinátor a DB rezervaci indexu; samotná XPUB derivace nepotřebuje wallet lock. Electrum mutace používají společný per-wallet zámek. Provider-based status potřebuje pouze token a blockchain provider; nenačítá wallet. Kanonický endpoint je `POST /api/stateless/invoices`; starší `POST /api` zůstává kompatibilní. Veřejná výsledná URL má tvar `/url-invoice?token=...`.
+Vytváří stateless fakturu bez databázového invoice záznamu. Vytváření je omezené konfigurovanými API klienty. Instalovaná aplikace používá sdílený receive koordinátor a DB rezervaci indexu; samotná XPUB derivace nepotřebuje wallet lock. Electrum mutace používají společný per-wallet zámek. Provider-based status potřebuje pouze token a blockchain provider; nenačítá wallet. Kanonický endpoint je `POST /api/stateless/invoices`; starší `POST /api` zůstává kompatibilní. Veřejná výsledná URL má tvar `/url-invoice?token=...`; JSON status je GET stejné cesty s `action=check`. Status může obnovit společnou provider cache, na rozdíl od DB checkoutu. Nemá durable terminální stav ani webhooky a bez klientských volání se sám nesleduje.
 
 ### Samostatné použití stateless jádra
 
 Následující příklad je explicitní samostatný legacy Electrum režim, nikoli doporučené složení instalované aplikace. Nepotřebuje DB, ale nesmí nezávisle přidělovat adresy z větve používané instalovaným XPUB koordinátorem. Instalovaná aplikace používá `BtcStatelessFactory` se sdíleným alokátorem; status zůstává walletless. Viz [koordinace adres](RECEIVE_COORDINATION.md). Přenositelná vrstva používá tyto komponenty:
 
 - `BitcoinAmount`, `ElectrumRPCFactory`, `ElectrumRPC`, `ElectrumWallet`, `WalletLockManager` a jejich výjimky,
-- `BlockchainProviderInterface`, `ElectrumBlockchainProvider`, `AddressPaymentObservation`, `BlockchainProviderException`,
+- `BlockchainProviderInterface`, `ElectrumBlockchainProvider`, `ElectrumReceiptBlockchainProvider`, `BlockchainObservationBudget`, `PaymentCheckPolicy`, `AddressPaymentObservation`, `BlockchainProviderException` a runtime Bitcoin závislosti,
 - `BtcInvoiceManagerException`, `BtcStatelessTokenCodec`, `BtcStatelessInvoiceGateway`, `BtcStatelessInvoiceManager`,
 - volitelně `BtcStatelessService`, `BtcStatelessFactory` a příslušné HTTP controllery,
 - `CheckoutQrCodeGenerator` a `endroid/qr-code` pouze pro lokální QR na platební stránce.
@@ -134,7 +134,7 @@ Minimální vytvoření faktury přímo z jádra:
 ```php
 $rpc = BtcPayLite\ElectrumRPCFactory::fromConfig($config);
 $wallet = new BtcPayLite\ElectrumWallet($rpc);
-$provider = new BtcPayLite\ElectrumBlockchainProvider($rpc);
+$provider = new BtcPayLite\ElectrumReceiptBlockchainProvider($rpc);
 $invoices = new BtcPayLite\BtcStatelessInvoiceManager($wallet, $secretKey, null, $provider);
 $result = $invoices->createStatelessInvoice(
     '0.00100000',

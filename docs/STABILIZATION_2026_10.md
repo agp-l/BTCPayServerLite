@@ -11,7 +11,7 @@ Zachovat fungující PHP/Electrum/XPUB architekturu. Checkout a API čtení maj�
 atomickou rezervaci adres, invoice leases a transakční webhook outbox.
 Nezavádět novou peněženku, Lightning ani směnárnu během stabilizace.
 
-Pořadí práce:
+Pořadí provedeného průchodu:
 
 1. Přečíst aktuální dokumentaci a cesty RPC, spustit současné testy s izolovanou DB.
 2. Opravit předčasné rezervace webhooků a ověřit pomalé doručování i obnovu po pádu.
@@ -25,18 +25,23 @@ Pořadí práce:
 7. Každý funkční krok ověřit a samostatně zapsat do main; nakonec zapsat výsledky
    a zbývající rizika bez tvrzení o neověřené produkční kapacitě.
 
-## Zjištění z aktuálního kódu
+## Výchozí zjištění auditu
 
-| Oblast | Zjištění | Další krok |
+Tabulka zachycuje závady výchozí revize 3e8768b. Webhook claim, endpoint budget,
+API/health a ochrana Apache jsou již opravené; podrobnosti a důkazy níže.
+Není to aktuální seznam otevřených úkolů. Ten je pouze v ROADMAP.
+
+| Oblast | Výchozí zjištění | Výsledek tohoto průchodu |
 |---|---|---|
-| Platební jádro | XPUB derivace je lokální, checkout čte DB, worker ukládá stav a outbox v jedné transakci. Receipt provider už rozpoznává utracené příjmy. | Zachovat hranice a doplnit cílené ověření. |
-| Webhooky | Processor rezervuje celou dávku před prvním HTTP requestem. 100 požadavků s timeoutem 10 s přesahuje 300s lease posledních záznamů. | Rezervovat vždy až těsně před doručením. |
-| Kapacita | Single-flight/cache chrání stejnou adresu, ale ne součet dotazů různých adres. CLI má 100 kontrol / 45 s a doporučený timer 10 minut. | Změřit RPC a čekání; přidat společnou ochranu/diagnostiku podle výsledků. |
-| API health | Controller vrací synchronized=true a server info fullySynched=true bez měření. | Oddělit dosažitelnost API od doloženého stavu blockchainu, bez RPC při pollingu. |
-| API platby | Payment-methods vrací rate=1, nulové partial payments a celou splatnou částku až do Settled. | Použít uložené integer satoshi a původní cenu/měnu. |
-| Dokumentace | README uvádí katalog 001–010, ale kód obsahuje 011. Starší stavový přehled stále plánuje již implementovaný receipt provider; architektura uvádí zastaralou 2s cache. | Jedna aktuální ROADMAP, odstranit rozporné instrukce. |
-| Webserver | Root .htaccess chrání config, ale chybí explicitní zákaz runtime cache, vendor, testů, SQL a záloh. | Ověřit a doplnit Apache pravidla i Nginx postup. |
-| Výplaty | Vypnuté ve výchozím stavu; monitoring potvrzení a společné UTXO rezervace nejsou dokončené. | Neoznačovat za hotovou směnárnu; samostatná etapa. |
+| Platební jádro | Lokální XPUB, DB checkout, leases/outbox a receipt provider již existovaly. | Zachovány a ověřeny; nepřestavováno podle starých plánů. |
+| Webhooky | Upfront batch claims mohly v pomalé dávce spotřebovat lease před odesláním. | Opraveno claimem jedné delivery těsně před HTTP; DB lease/crash test. |
+| Kapacita | Ochrana stejné adresy neomezovala součet různých adres. | Společný endpoint budget, max souběh, pause, queue lag a dokumentované plánovací meze. |
+| API health | Nezměřený sync byl hlášen jako úspěšný. | Neznámé nullable hodnoty bez RPC; pravdivá CLI diagnostika. |
+| API platby | Partial/doplatek a původní fiat rate se nepromítaly do payment-methods. | Uložená payment presentation a cena; přesné received/due, bez vymyšlených TX rows. |
+| Dokumentace | Staré katalogy, cache intervaly a již splněné plány byly rozporné. | Jednotné aktuální návody, ROADMAP a veřejná PHP stránka; mezistavy odstraněny. |
+| Webserver | Interní runtime/code/zálohy neměly souhrnný zákaz. | Apache ochrana ověřena skutečným serverem, Nginx postup popsaný. |
+| Pozdní platby | Neuhrazený Expired za 24h oknem nešlo cíleně kontrolovat workerem. | Admin/CLI rescan jednoho ID se stejným lease/outboxem a min 10 min. |
+| Výplaty | Výchozí vypnuté, bez úplného UTXO/reconciliation/confirmation řešení. | Vypnutí zachováno, opraven retry popis; další finanční práce pouze v ROADMAP. |
 
 ## Ověření
 
@@ -95,7 +100,7 @@ Synchronizace skutečného Electra ani kompatibilita všech CMS tím nejsou prok
 
 `.htaccess` blokuje interní adresáře, dotfiles, SQL/log/cache/wallet soubory
 a zálohy před front controllery. Skutečný izolovaný Apache 2.4.58 prošel testem
-21 interních cest i zachovaných assets, checkoutu, veřejné dokumentace, API
+22 interních cest i zachovaných assets, checkoutu, veřejné dokumentace, API
 a Authorization v podadresáři. Test používá pouze falešné statické soubory,
 nikoli produkční konfiguraci. V CI je přidaný Apache test a PHP 8.2/8.3 matice;
 checkout používá současnou verzi 7.0.1. Nginx postup je popsaný, nebyl živě ověřen.
@@ -108,3 +113,43 @@ Používají stejný worker, invoice lease, endpoint budget a atomický outbox.
 Minimální 10min odstup zůstává; chybějící ID neskenuje jiné faktury. Žádná nová
 migrace ani paralelní settlement logika. Testy ověřují skutečnou DB, starý Expired,
 Settled guard, min interval a HTTP CSRF/role hranice.
+
+## Checkpoint: úklid a dokumentace
+
+README, architektura, současný stav, ROADMAP i veřejná PHP dokumentace nyní
+popisují stejnou implementaci. Odstraněny čtyři staré pracovní deníky/audity
+a původní archivovaný refactor checklist; dokončené výsledky shrnuje HISTORY
+a plné texty zůstávají v Git historii. Repair návod byl nejprve přenesen do
+RECEIVE_COORDINATION, aby úklid neodstranil provozní postup. Migrace, vendor,
+kompatibilní vstupní body a používané deployment/repair skripty zachovány.
+
+Smazán doloženě nepoužívaný private nullableStringConfig v webhook aplikaci.
+Payout retry hláška i návody nyní rozlišují create replay od approve aktuální
+revision; finanční chování ani výchozí vypnutí se nemění. Lock/vendor metadata
+11 balíčků souhlasí, Composer validate a offline install dry-run prošly.
+Plošné advisory block=false odstraněno. mdanter/ecc a fgrosse/phpasn1 jsou
+opuštěné; dvě konkrétní ECC advisories ověřeny z primárního oznámení a databáze.
+Úplný online Composer audit se nedokončil kvůli Packagist timeoutu; žádné tvrzení
+o nulových zranitelnostech. DEPENDENCIES ukládá fakta a podmínky kompatibilní náhrady.
+
+Veřejná stránka opravuje stateless status/default 48 h, nullable health, partial
+API, worker/capacity popis a povinné ověření invoice/order po HMAC. Příklady
+nevydávají samotný callback za zaplacení. Další práce pouze v ROADMAP.
+
+## Závěrečné lokální ověření
+
+- **76 testovacích souborů prošlo, 0 selhalo**, PHP 8.3.6, izolovaná MariaDB
+  10.11.14 a Apache 2.4.58; DB i Apache prostředí bylo explicitně zapnuté.
+- **268** tracked aplikačních/testovacích PHP souborů prošlo syntaxí.
+- **92** místních Markdown odkazů má existující cíle; staré deníky nemají
+  zbývající reference v aktuální dokumentaci.
+- Veřejná PHP stránka se vykreslila s URL v podadresáři; všechny navigační anchors
+  a oba PHP příklady prošly kontrolou/syntaxí. Nebyl proveden nový mobilní
+  browser vizuální test; CSS rozložení se neměnilo.
+- Composer validate a offline install dry-run prošly, lockfile/vendor verze
+  zachovány. Online audit limit viz DEPENDENCIES. `git diff --check` bez chyby.
+
+První 76-file běh odhalil jediný zastaralý source-string test očekávající starý
+Apache pattern. Byl nahrazen skutečným Apache pokrytím config/temp/backup cest;
+finální úplný běh již prošel. Reálná cílová platba, host capacity, Nginx/HTTPS
+ani payout service/crash audit nejsou tímto výsledkem prokázány.

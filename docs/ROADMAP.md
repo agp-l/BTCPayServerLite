@@ -1,107 +1,84 @@
-# Další práce na jádru a provozu
+# Další práce a podmínky dokončení
 
-Stav revize: **5. října 2026**. Úsporné kontroly navazují na `7722727`.
-[README](../README.md) · [Architektura](CORE_PAYMENT_ARCHITECTURE.md)
+Revize **5. října 2026**. Jediný aktuální plán projektu.
+[Současný stav](PROJECT_STATUS_2026_10.md) · [Audit a výsledky](STABILIZATION_2026_10.md)
 
-Toto je plán, nikoli seznam dokončených oprav. Zachováváme PHP, bitcoin-p8,
-Electrum RPC factory, DB index reservation, invoice leases, provider a webhook
-outbox. Jednotlivé kroky mají mít malý commit, vlastní ověření a provozní návod.
+Zachovat fungující PHP/Electrum/XPUB systém. Novou práci odvozovat z aktuálního
+kódu, konkrétní závady a testu, nikoli z historických checklistů. Každý krok
+má samostatný commit a jasný důkaz. Produkční data, indexy ani původní klíče
+nepřepisovat jako součást úklidu.
 
-## Co už není potřeba znovu přepisovat
+## Uzavřeno v jádru
 
-- XPUB faktury používají lokální derivaci a společnou atomickou DB sekvenci.
-- Wallet mutace mají explicitní cestu a společný per-wallet file lock.
-- Provider status je walletless a souběžné kontroly sdílejí cache/single-flight.
-- PaymentWorker zapisuje observation, stav, outbox a uvolnění lease transakčně.
-- Checkout čte DB; WebhookProcessor doručuje události vytvořené workerem.
-- Pro vlastní e-shop je doplněn režim 10/30/60 minut, checkout upozornění a
-  receipt provider s lokální kontrolou TXID/výstupů, immutable cache a omezeným
-  načítáním historie. Migrace 011 odděluje skutečné příjmy od zůstatku.
-  Testy pokrývají utracení před prvním skenem, vlastní change, dělené platby,
-  mempool/confirmed/reorg, migraci, persistenci a webhook outbox.
-- Instalátor, admin aktualizátor DB, zapamatování přihlášení a admin monitoring
-  mají implementaci i cílené testy. Tyto oblasti rozšiřovat podle konkrétní chyby.
+- Lokální XPUB derivace, společná DB sekvence a receive koordinace; explicitní
+  wallet scope a mutation locks; žádný RPC při XPUB tvorbě nebo DB checkoutu.
+- Invoice leases, observation mimo DB transakci, atomický stav + webhook outbox,
+  trvalá invoice idempotency a původní non-regressing state machine.
+- Receipt monitoring včetně již utracených příjmů a vlastního change, migrace 011,
+  bounded historie/raw TX, 10/30/60min cadence a per-address cache.
+- Společný endpoint budget a omezení souběhu různých adres; krátká pause při
+  transport/auth výpadku, queue age a volitelný minutový scheduler tick.
+- Webhook claim až před doručením; pomalá dávka nespotřebuje lease pozdějších událostí.
+- Pravdivý HTTP health, DB payment-methods partial/due/rate a cílený rescan jedné
+  pozdní faktury se stejnými leases/outboxem a minimálně desetiminutovým odstupem.
+- Apache ochrana interních souborů s testem skutečného serveru; nové provozní návody,
+  jednotná veřejná dokumentace a odstranění zastaralých plánů.
 
-## 1. Nejbližší ověření před dalším rozšiřováním
+Tyto body znovu hromadně nepřepisovat. Main neznamená automatické nasazení na
+uživatelův server. Systém aktuálně funguje podle provozovatele; následující
+ověření se týká změněné verze a náročnějších podmínek.
 
-### Celá platba a webhook na skutečné testovací síti
+## P0: ověřit nasazenou verzi a skutečnou kapacitu
 
-**Důvod:** majitel již potvrdil skutečnou platbu a automatické označení v e-shopu.
-Nový receipt provider je ověřen strukturálními transakcemi a skutečnou DB/HTTP
-integrací; po nasazení migrace 011 zbývá zopakovat průchod na jeho Electru.
-Výpadek/retry webhooku, pozdní platbu a restart ověřit i na cílové instalaci.
+| Práce | Podmínka dokončení |
+|---|---|
+| Platba a webhook na používaném Electru / testovací síti | Zaznamenat commit a verze; partial → Processing, plný confirmed receipt → Settled, HMAC + autentizované API ověření v e-shopu, právě jednou paid/sklad/doklad. Zopakovat utracení před prvním skenem, late rescan, nedostupný callback, retry a restart. |
+| Kapacita cílové instalace | Změřit HTTP/DB latenci, oldest due age, RPC count/latenci a receive backlog pro reprezentativní počet nových i starších invoices; zpomalit RPC a vypnout daemon. Budget ochrání upstream, fronta se po obnově musí vyprázdnit podle stanoveného SLA. Viz CAPACITY. |
+| Reprodukovatelné nasazení a obnova | Čisté prostředí projde DEPLOYMENT bez improvizovaných oprav; GMP/Composer v CLI i webu, tři plánovače, nový cache/lock soubor čitelný oběma účty, restart a obnova nesníží XPUB index ani nezneplatní staré tokeny. |
+| Webserver na cílovém hostingu | Zvenku interní URL vrací 403/404 bez obsahu; checkout/API/Authorization fungují. Apache fixture je ověřený, konkrétní Nginx/HTTPS konfiguraci ověřit zvlášť. |
 
-**Hotovo, až:** vznikne XPUB faktura, částečná platba ji převede do Processing,
-plná potvrzená částka do Settled a testovací receiver ověří HMAC webhooku. Další
-poll stav nevrátí zpět. Při nedostupném receiveru zůstane delivery ve frontě a po
-obnově se doručí; receiver zvládne opakování stejného delivery ID. Zvlášť ověřit
-pozdní platbu a restart workeru. Nevyžaduje novou paralelní payment logiku.
+Pro veřejné CMS integrace ověřit nullable health hodnoty; Lite vědomě neprohlašuje
+neověřenou synchronizaci za true. Předchozí simple-store testy jsou historie,
+nikoli důkaz kompatibility libovolného pluginu nebo nové produkční kapacity.
 
-### Reprodukce instalace a obnovy
+## P1: odstranit zbývající konstrukční slabiny
 
-**Důvod:** původní závady byly rozdílné PHP a práva uživatelů web/CLI. Generátor
-ACL existuje, ale je třeba prokázat celý postup bez oprav improvizovaných v chatu.
+| Oblast | Konkrétní práce a akceptace |
+|---|---|
+| Confirmation / reorg | Navrhnout explicitní počet potvrzení a následnou reconciliation po settlement. Doložit chain tip/confirmation evidence, chování při reorg a účetní korekci; nevracet historické Settled na New. Vlastní Electrum/Bitcoin Core či SPV důvěru zvolit před rozšířením finančního rizika. |
+| Provisioning po pádu | Persistentní ID operace, owned path a resume/reconciliation mezi create wallet a DB commitem; SIGKILL/timeout testy. Neznámý existující wallet soubor se nikdy automaticky nepřepíše ani nesmaže. |
+| Závislosti | Náhrada opuštěného mdanter/ecc a fgrosse/phpasn1 v kompatibilním Bitcoin stacku; ověřit stejné adresy pro všechny script/prefix/network varianty, raw TX/QR a rollback. Žádné ruční editace vendor. Konkrétní advisories a současný rozsah jsou v DEPENDENCIES. |
+| Všechny fronty | Přidat bounded heartbeat/queue age receive a webhook workerů, poslední skutečnou observation odlišit od prázdného běhu. Žádné secrets; jasná retence a alerty při stagnaci. |
+| Cache a HTTP zátěž | Retence raw TX/cache s bezpečným odstraněním pouze neaktivních dat, měření inode/disk růstu; live lockfiles nemazat. Reverzní proxy/API limity pro CPU/DB a per-client zátěž, odděleně od Electrum budgetu. |
+| Obnova DB | Cíleně ověřit FK/CHECK/defaults/backfill tam, kde chrání core; upgrade ze skutečné staré DB a nezávislý restore test. Nepřidávat odhadnuté automatické ALTER podle obecného diffu. |
+| E-shop idempotency | Ve simple-store doplnit stabilní Idempotency-Key a reconciliation nejistého create. To je samostatný repozitář; nezaměňovat nový pokus za retry stejné operace. |
 
-**Hotovo, až:** nový testovací server projde pouze návodem DEPLOYMENT: Composer,
-GMP obou PHP, admin, obchod, adresa, faktura, všechny tři workery, migrace a obnova
-config/DB/wallet. Po restartu i při nově vytvořených cache/lock souborech fungují
-oba účty. Obnova nesmí snížit XPUB index ani zneplatnit původní tokeny.
+## P2: údržba podle měření
 
-## 2. Další opravy jádra podle rizika
+Omezit duplicitní admin wallet RPC pomocí snapshotu jednoho requestu; doplnit
+strukturovanou diagnostiku lock I/O proti běžnému busy; definovat support matrix
+PHP a distribuční balíček, než se odstraní verzovaný vendor. Další Greenfield
+endpointy přidávat podle doložené potřeby integrace. Původní Node demo i staré
+refactor checklisty jsou uzavřené; nevracejí se do aktivního plánu.
 
-| Priorita | Otevřená věc a místo v kódu | Podmínka dokončení |
-|---|---|---|
-| Vysoká před širším provozem | Receipt provider kontroluje raw TXID a výstupy, ale výška potvrzení pochází z walletless Electrum historie, nikoli vlastní SPV/Merkle kontroly. | Ověřit proti používané verzi daemonu a skutečné síti; při širším provozu zvážit vlastní Electrum server nebo Bitcoin Core/NBXplorer. Statelessem nenahrazovat durable DB stav e-shopu. |
-| Vysoká | `PaymentWorker::ELIGIBLE_SQL`: Expired bez platební indikace vypadá z pravidelných kontrol po 24 h. | Dokumentovaná obchodní politika a omezený explicitní rescan konkrétní faktury/adresy s autorizací a limity; bez neomezeného skenování celé historie. Partial Processing nikdy automaticky nevracet do New. |
-| Vysoká | Přerušení offline provisioningu může zanechat wallet soubor bez dokončeného obchodu. Viz cílená revize core. | Persistentní identita operace a bezpečná reconciliation/resume; pádové testy mezi vytvořením souboru a DB commitem. Existující peněženku nikdy nepřepsat či smazat jen podle chybějícího DB řádku. |
-| Střední | `PaymentWorkerMonitor` drží poslední CLI/manual běh; nehlídá webhook/receive worker. Empty success není payment observation. | Samostatně zobrazit aktivitu, neprázdnou úspěšnou observation a zdraví front všech tří workerů. Uchování historie musí mít limit/retenci a žádná tajemství. Neodvozovat zapnutý plánovač pouze z jednoho CLI běhu. |
-| Střední | Aktualizátor DB neporovnává defaults, FK, CHECK ani dokončení backfillů. | Rozšířit cíleně tam, kde chybějící invariant ohrožuje core, s testy na čistém importu i staré DB. Žádné automatické opravné SQL odhadnuté ze samotného diffu. |
-| Střední | `WalletBusyException` stále může směšovat provozní chybu a obsazený lock; některá admin čtení opakují RPC. | Typované příčiny bez raw tajemství; request-scoped read snapshot podle změřených opakovaných volání. Stejnou lock doménu a cache chování ponechat. |
+## Samostatná etapa před zapnutím směnárny / automatických payoutů
 
-Rozpoznání platby utracené před prvním pozorováním je doplněno přes historii
-transakcí, nikoli přejmenováním balance. Zůstává závislost na správné a úplné
-historii vybraného Electrum serveru a existující terminální politika Settled.
-To samo nedokončuje účetnictví nebo automatické výplaty budoucí směnárny.
+Payout modul zůstává vypnutý. Vlastní service nemá samostatnou kompletní
+persistence/crash sadu srovnatelnou s invoice jádrem; samotný route test nestačí.
 
-## 3. Výplaty před budoucí směnárnou
+1. Společná rezervace UTXO přes admin i všechny stores téže wallet; dva writers
+   nesmějí připravit konfliktní spend. Testy souběhu, limity a uvolnění rezervací.
+2. Payout state machine a reconciliation nejistého broadcastu/restartu vždy
+   nad stejnou uloženou transakcí. Create replay vrací stávající záznam; obnovu
+   broadcastu provádí approve s aktuální revision, nikdy nový idempotency klíč.
+3. Bounded confirmation worker a chování při reorg/replacement; InProgress
+   není Completed. Skutečný testnet/regtest průchod i pád mezi RPC a DB zápisem.
+4. Teprve potom účetnictví směny, refundace, pull payments a další UI.
 
-Současný payout ledger ukládá podepsanou transakci před broadcastem, ale
-`InProgress` není potvrzená výplata. Neaktivovat automatickou směnárnu jen na
-základě existence payout endpointu.
+## Pořadí příštího průchodu
 
-1. Prověřit souběžné rezervace UTXO napříč všemi cestami utrácení téže wallet,
-   obnovu po pádu a limity. Nesmí vznikat dvě operace utrácející stejný vstup.
-2. Dopsat reconciliation stejné uložené transakce při nejistém výsledku broadcastu;
-   retry nesmí sestavit druhou platbu. Ověřit stav daemonu i DB po restartu.
-3. Přidat vlastní bounded monitoring potvrzení, explicitní payout state machine
-   a chování při reorg / nahrazené transakci. Oddělit od invoice state machine.
-4. Až potom navazovat účetní evidenci směny, refundace, pull payments a další UI.
-
-Hotovo znamená testy souběhu a pádů plus průchod skutečnou testovací sítí,
-nikoli pouze úspěšný návrat RPC broadcast.
-
-## 4. Úklid a kapacita v samostatných krocích
-
-Node/EJS demo bylo 10. září na výslovný požadavek vlastníka odstraněno včetně
-spouštěcích a konfiguračních souborů. PHP šablony a společné assets zůstaly;
-pro případné obnovení slouží historie Gitu. Tento bod je uzavřený.
-
-- **Závislosti:** zmapovat původ a advisories zamčených knihoven, důvod verzovaného
-  vendor a vypnutého Composer advisory blocking. Zachovat bitcoin-p8 v tomto
-  stabilizačním průchodu; případné změny až s kontrolou derivací a kompatibility.
-- **Webserver:** ověřit skutečnou ochranu zdrojů, config, runtime cache, záloh a
-  ostatních nepublikovatelných souborů v Apache/Nginx. Samotný PHP test nepotvrzuje deployment pravidla.
-- **Kapacita:** změřit latenci fronty, počet RPC, velikost DB/cache a chování při
-  pomalém Electru. Dnešní 100procesové testy ověřují invarianty, ne garantovanou
-  kapacitu celé služby. Před více hosty vyřešit sdílení file locks/cache; oddělené
-  lokální filesystémy stejný název adresáře nespojí.
-- **Integrace:** první reálný CMS plugin ověřit proti implementované podmnožině
-  Greenfield. Nové endpointy přidávat až podle doloženého požadavku integrace.
-
-## Pořadí příštího vývojového průchodu
-
-Nejdřív dokončit provozní důkazy z bodu 1, ověřit nový receipt provider
-na cílovém Electrum daemonu a použité síti. Potom uzavřít provisioning crash recovery
-a monitoring front. Payout reconciliation a potvrzení řešit jako samostatnou
-etapu před směnárnou. Úspěchy průběžně zapsat do historie a odkazovat na commit,
-scénář a prostředí; neoznačovat celý projekt jako auditovaný jednou sadou testů.
+Nasadit aktuální main a uzavřít P0 na cílové testovací instalaci. Paralelně v
+samostatné větvi připravit kompatibilní náhradu kryptografických závislostí;
+sloučit až po derivation/receipt regresích. Potom provisioning recovery a dohled
+všech front. Payouty řešit odděleně. Výsledky zapisovat s commitem, scénářem a
+prostředím, bez tvrzení o neověřených serverech nebo neomezeném výkonu.
