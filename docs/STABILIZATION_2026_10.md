@@ -90,3 +90,12 @@ Ověření: **75 testovacích souborů prošlo, 0 selhalo** s izolovanou MariaDB
 Nové případy pokrývají partial receipt, utracený příjem, přeplatek, legacy Settled,
 uložený fiat kurz, nulová RPC čtení health a HTTP zákaz CLI diagnostiky.
 Synchronizace skutečného Electra ani kompatibilita všech CMS tím nejsou prokázány.
+
+## Checkpoint: veřejná hranice webserveru
+
+`.htaccess` blokuje interní adresáře, dotfiles, SQL/log/cache/wallet soubory
+a zálohy před front controllery. Skutečný izolovaný Apache 2.4.58 prošel testem
+19 interních cest i zachovaných assets, checkoutu, veřejné dokumentace, API
+a Authorization v podadresáři. Test používá pouze falešné statické soubory,
+nikoli produkční konfiguraci. V CI je přidaný Apache test a PHP 8.2/8.3 matice;
+checkout používá současnou verzi 7.0.1. Nginx postup je popsaný, nebyl živě ověřen.

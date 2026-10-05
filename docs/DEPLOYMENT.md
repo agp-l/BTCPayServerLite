@@ -217,3 +217,40 @@ Zdroje: [PHP phpize](https://www.php.net/manual/en/install.pecl.phpize.php),
 Admin **Nástroje → Kontrola plateb** ukazuje skutečné běhy a umožní ruční kontrolu.
 Generátor `bin/deployment.php --payment-systemd=service|timer` a přesné instalační
 kroky jsou v [Kontrole plateb](PAYMENT_MONITORING.md). Nezapínejte cron i timer současně.
+
+## Webserver: interní soubory a veřejné routy
+
+Apache 2.4 potřebuje `mod_rewrite` a pro projektové `.htaccess` oprávnění
+`AllowOverride FileInfo AuthConfig` (nebo `All`). Pravidla musí být nasazená
+společně s PHP: blokují interní adresáře, skryté soubory, SQL, cache, logy
+a zálohy konfigurace. Veřejná dokumentace je PHP route `/dokumentace`, nikoli
+výpis adresáře `/docs`. Test s izolovaným skutečným Apache ověřuje instalaci
+v podadresáři, zakázané soubory, assets, `/pay`, `/dokumentace`, API i předání
+Authorization. PHP vestavěný server `.htaccess` nečte.
+
+Nginx `.htaccess` nečte. Ve vlastním server blocku nastavte ekvivalentní ochranu
+**před** obecným PHP handlerem. Příklad pro aplikaci v kořeni originu:
+
+```nginx
+location ~* ^/(classes|vendor|tests|migrations|docs|var|bin)(/|$) { return 403; }
+location ~* ^/admin/views(/|$) { return 403; }
+location ~ /\.(?!well-known/) { return 403; }
+location ~* (^|/)config\.php(\..*)?$ { return 403; }
+location ~* (^|/)composer\.(json|lock)$ { return 403; }
+location ~* (\.(sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)|~)$ { return 403; }
+location /api/v1/ { rewrite ^ /api.php last; }
+location / { try_files $uri /index.php?$query_string; }
+```
+
+PHP handler musí obsluhovat jen existující PHP soubory přes váš PHP-FPM socket;
+nepřebírejte cizí cestu socketu. Pro `/BTCPayLite/` přidejte prefix do zákazů
+a rewrite/try_files cílů. Tento fragment není otestovaná kompletní konfigurace
+Nginx. Zkontrolujte `nginx -t` a skutečné odpovědi. Zálohy a wallet soubory
+ukládejte mimo document root, ochrana podle přípon nenahradí oddělené umístění.
+
+Po nasazení zvenku ověřte: `/config.php`, `/config.php.bak`, `/sql.sql`,
+`/var/blockchain/`, `/vendor/autoload.php`, `/.git/config`, `/bin/health_check.php`
+musí vracet 403/404 a žádný obsah souboru. `/dokumentace`, checkout, assets
+a autentizované API musí fungovat. Test nezávisí na znalosti reálných tajných dat.
+Při větším provozu lze worker budit každou minutu (`--payment-tick=60`);
+jednotlivé adresy nadále dodržují 10/30/60 minut. Viz [kapacita](CAPACITY.md).

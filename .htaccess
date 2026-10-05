@@ -1,7 +1,13 @@
 RewriteEngine On
 
-# Configuration and installer temporary files contain secrets and must never be served.
-<FilesMatch "^(config\.php|\.install\.lock|\.btcpay-config-.*)$">
+# Deny internal code, cache, history and backups before the public front controllers.
+# Applies both at the origin root and in an installation subdirectory.
+RewriteRule ^(?:classes|vendor|tests|migrations|docs|var|bin)(?:/|$) - [F,END,NC]
+RewriteRule (?:^|/)\.(?!well-known(?:/|$)) - [F,END,NC]
+RewriteRule ^admin/views(?:/|$) - [F,END,NC]
+
+# Configuration, SQL dumps and editor backups must never be served as static text.
+<FilesMatch "(?i)(?:^config\.php(?:\..*)?$|^composer\.(?:json|lock)$|^\.|~$|\.(?:sql|log|ini|env|lock|bak|backup|old|orig|save|swp|sqlite|db|wallet|hex)$)">
     Require all denied
 </FilesMatch>
 
