@@ -55,11 +55,11 @@
   --status-danger-ink: #7c2222;
 
   /* Interaction */
-  --selection-background: var(--selection-background);
+  --selection-background: #c9f3dd;
   --placeholder-text: #9aa0a6;
   --scrollbar-thumb: #b6bac0;
   --control-active: #122549;
-  --overlay-background: var(--overlay-background);
+  --overlay-background: rgba(20, 23, 26, 0.35);
 
   /* Shape and elevation */
   --control-height: 40px;
@@ -85,6 +85,8 @@ body {
   font-size: 14.5px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button, input, select, textarea { font: inherit; }
