@@ -184,11 +184,12 @@ Nepřidávejte zde `--offline`; Electrum offline příkazy ve stejném datovém 
 odmítá, pokud tam existuje daemon lock. Aplikace pro offline provisioning používá
 izolovaný adresář. Pro kontrolu verze nikdy nepotřebujete tisknout seed.
 
-Naplánujte pod zvoleným worker účtem pravidelné CLI spouštění (např. každou minutu,
-přizpůsobte požadované latenci a dávkám):
+Naplánujte pod zvoleným worker účtem pravidelné CLI spouštění. Kontrola plateb
+běží každých 10 minut; doručení webhooků a registrace nových adres mohou běžet
+každou minutu, protože neopakují walletless kontrolu zaplacení:
 
 ```cron
-* * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/payment_worker.php
+*/10 * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/payment_worker.php
 * * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/webhook_cron.php
 * * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/wallet_receive_sync.php
 ```

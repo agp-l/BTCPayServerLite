@@ -6,7 +6,7 @@ systému aplikujte `010_payment_worker_runtime.sql`. Fresh `sql.sql` ji obsahuje
 Tlačítko spouští stejný PaymentWorker jako CLI, přímo v PHP bez shellu. Kontroluje
 nejvýše 20 splatných kontrol v dávce s rozpočtem 12 sekund. Před další observation
 musí zbývat celý její deklarovaný čas; manuální RPC má timeout nejvýše 5 sekund.
-DB práce může přidat dobu čekání na DB. Další ruční běh je možný po 15 sekundách.
+DB práce může přidat dobu čekání na DB. Další ruční běh je možný po 10 minutách.
 Zbytek fronty vyřídí další kliknutí nebo plánovač. GET pouze načítá diagnostiku.
 Otevření checkoutu ani vytvoření XPUB faktury worker nespouští.
 
@@ -26,9 +26,39 @@ Otevření checkoutu ani vytvoření XPUB faktury worker nespouští.
 Otevřený běžný checkout obnovuje uložený stav přibližně každých 5 sekund
 (15 sekund v neaktivní kartě; při chybách pomaleji). Blockchain nekontroluje.
 Platba se proto kontroluje i po zavření prohlížeče, pokud běží serverový plánovač.
-Při nastavení timeru podle návodu níže se worker spouští přibližně 15 sekund
-po dokončení předchozí dávky. Skutečný čas závisí i na intervalu webhook workeru
+Při nastavení timeru podle návodu níže se worker spouští přibližně každých 10 minut.
+Skutečný čas závisí i na intervalu webhook workeru
 a na potvrzení transakce v bitcoinové síti.
+
+## Úsporné sledování pro vlastní e-shop
+
+| Stáří faktury | Interval další kontroly |
+|---|---|
+| První hodina | 10 minut |
+| Od 1 do 6 hodin | 30 minut |
+| Od 6 hodin nebo po expiraci | 60 minut |
+| Settled | Další kontrola se neprovádí |
+
+Stejný režim platí pro `New` i `Processing`; zpomalení nezruší rozpoznanou platbu.
+Faktury standardně platí 48 hodin. Do checkoutu je doplněna informace o intervalu
+a o možném několikahodinovém potvrzování v bitcoinové síti. Zpomalení se týká
+on-chain BTC, nikoli Lightning plateb na jiném BTCPay Serveru.
+
+Worker chrání minimální odstup také podle `last_checked_at`. Ani starý timer po
+15 sekundách, opakované klikání nebo dřívější `next_check_at` tedy nezpůsobí další
+observation stejné faktury před 10 minutami. Chyba se zkouší znovu nejdříve za
+10 minut. Provider sdílí cache a cooldown mezi procesy pro stejný endpoint/adresu;
+zápis cooldownu proběhne před RPC, takže platí i při pádu procesu.
+
+URL (stateless) faktura používá tento odstup přes provider cache, přestože její
+stavový endpoint navštěvuje prohlížeč častěji. Její automatické sledování vyžaduje
+otevřenou stránku nebo vlastní volání status API; pro e-shop používejte DB faktury
+přes Greenfield API, které sleduje serverový worker i po zavření stránky.
+
+Jedna čekající faktura znamená přibližně 6, 2 nebo 1 obnovení adresy za hodinu.
+Počet roste s počtem faktur; nejde o garanci, že libovolný veřejný Electrum server
+tuto zátěž dovolí. Electrum samotné navíc udržuje synchronizaci své peněženky.
+Webhook worker pouze doručuje uložené události, blockchain znovu nekontroluje.
 
 Historie administrátorské peněženky je samostatný pohled do Electra. Její data
 načítá otevření stránky nebo tlačítko **Obnovit**, nikoli checkout polling.
@@ -49,7 +79,7 @@ CLI a ruční tlačítko mají samostatný poslední běh, výsledek, poslední 
 pokud žádná faktura není na řadě. Samotný CLI příkaz od administrátora se také
 zaznamená jako CLI: web nemůže tvrdit, že je cron či systemd skutečně zapnutý.
 
-CLI starší než 120 sekund je opožděné. Running bez instance locku je přerušený
+CLI starší než 30 minut je opožděné. Running bez instance locku je přerušený
 běh. Pád před připojením do DB nemůže zapsat heartbeat; projeví se chybějícím nebo
 starým záznamem a výpisem služby. Ukládají se pouze pevné chybové kódy, žádné RPC
 odpovědi, hesla nebo traces. Tabulka obsahuje dva poslední běhy, není to auditní
@@ -80,12 +110,13 @@ sudo install -m 644 /tmp/btcpay-lite-payment-worker.service /etc/systemd/system/
 sudo install -m 644 /tmp/btcpay-lite-payment-worker.timer /etc/systemd/system/btcpay-lite-payment-worker.timer
 sudo systemctl daemon-reload
 sudo systemctl enable --now btcpay-lite-payment-worker.timer
+sudo systemctl restart btcpay-lite-payment-worker.timer
 systemctl status btcpay-lite-payment-worker.timer --no-pager
 systemctl list-timers btcpay-lite-payment-worker.timer --no-pager
 journalctl -u btcpay-lite-payment-worker.service -n 30 --no-pager
 ```
 
-Timer spouští novou dávku přibližně 15 sekund po dokončení předchozí; dlouhá dávka
+Timer spouští novou dávku přibližně každých 10 minut od začátku předchozí; dlouhá dávka
 se nepřekrývá. Viz [systemd.timer](https://www.freedesktop.org/software/systemd/man/systemd.timer.html).
 Nevytváří se závislost na odhadnutém jménu vaší Electrum nebo MariaDB služby.
 Při startu nepřipravené DB/RPC se zaznamená chyba a další běh ji zkusí znovu.
@@ -96,10 +127,10 @@ v prostředí služby, pokud nepoužíváte výchozí projektový var/blockchain
 Alternativa: přes `crontab -e` uživatele workeru nastavte jednu řádku:
 
 ```cron
-* * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/payment_worker.php
+*/10 * * * * /usr/bin/php8.3 /opt/lampp/htdocs/BTCPayLite/payment_worker.php
 ```
 
-Cron pak kontroluje přibližně jednou za minutu. Nenastavujte současně cron i timer.
+Cron pak kontroluje přibližně jednou za 10 minut. Nenastavujte současně cron i timer.
 Zastavení timeru: `sudo systemctl disable --now btcpay-lite-payment-worker.timer`.
 Pro migraci vyčkejte i dokončení již běžící služby a dalších workerů.
 
@@ -116,7 +147,7 @@ Receive sync je další samostatný worker. Jejich heartbeat tato stránka nemě
 
 ## Když se střídají chyby a prázdné úspěšné běhy
 
-Po chybě worker odloží fakturu o 30 sekund. Timer může mezitím vykázat prázdnou
+Po chybě worker odloží fakturu nejméně o 10 minut. Timer může mezitím vykázat prázdnou
 úspěšnou dávku; to nedokazuje funkční RPC. `error_type` proto zůstává až do další
 neprázdné dávky bez chyby. Poslední úspěch v tabulce stále znamená dokončení běhu.
 

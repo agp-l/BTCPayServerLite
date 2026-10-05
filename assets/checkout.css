@@ -114,3 +114,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid #b9d9b1; outline-offs
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+/* The verification delay remains visible before the customer sends BTC. */
+.verification-notice {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid #dce7d8;
+  border-radius: 12px;
+  background: #f2f7ef;
+  color: #3f5740;
+  font-size: 13px;
+  line-height: 1.6;
+}

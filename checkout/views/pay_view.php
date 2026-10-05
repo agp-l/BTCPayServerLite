@@ -91,6 +91,7 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
         </section>
 
         <section id="payment-panel" class="payment-panel<?= $isSettled ? ' is-hidden' : '' ?>">
+            <p class="verification-notice"><?= htmlspecialchars(\BtcPayLite\PaymentCheckPolicy::customerNotice(), ENT_QUOTES, 'UTF-8') ?></p>
             <div class="amount-section">
                 <span>Částka k úhradě</span>
                 <div><strong id="payment-amount"><?= htmlspecialchars((string) $checkout['amount'], ENT_QUOTES, 'UTF-8') ?></strong> <small>BTC</small></div>
@@ -167,7 +168,7 @@ $redirectAutomatically = $redirectUrl !== '' && ($checkout['redirect_automatical
 
         <noscript>
             <p class="notice notice-static">
-                Pro automatickou kontrolu platby povolte JavaScript nebo stránku ručně obnovte.
+                Pro automatické zobrazování stavu povolte JavaScript nebo stránku ručně obnovte.
             </p>
         </noscript>
     </section>

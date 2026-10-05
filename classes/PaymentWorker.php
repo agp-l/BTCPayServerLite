@@ -51,7 +51,11 @@ class PaymentWorker
             }
             ++$stats['scanned'];
             try {
-                $observation = $this->blockchain->observeAddress(
+                $interval = PaymentCheckPolicy::interval((int) $invoice['created_at'], ($this->clock)(), (string) $invoice['status']);
+                $observation = $this->blockchain instanceof ElectrumBlockchainProvider
+                    ? $this->blockchain->observeAddressAtInterval((string) $invoice['btc_address'],
+                        BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis(), $interval)
+                    : $this->blockchain->observeAddress(
                     (string) $invoice['btc_address'],
                     BitcoinAmount::fromBtc((string) $invoice['amount'])->satoshis()
                 );
@@ -61,7 +65,7 @@ class PaymentWorker
                 $stats['deliveries_queued'] += $result['deliveries_queued'];
             } catch (Throwable $exception) {
                 ++$stats['failed'];
-                $this->releaseFailedLease((string) $invoice['id'], $token);
+                $this->releaseFailedLease((string) $invoice['id'], $token, $interval);
                 $code = PaymentFailureDiagnostics::code($exception);
                 $this->failureCodes[$code] = ($this->failureCodes[$code] ?? 0) + 1;
                 error_log('PaymentWorker failed for ' . $invoice['id'] . ': ' . json_encode(PaymentFailureDiagnostics::details($exception)));
@@ -80,14 +84,15 @@ class PaymentWorker
               WHERE " . self::ELIGIBLE_SQL . "
                 AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())
                 AND (next_check_at IS NULL OR next_check_at <= ?)
+                AND (last_checked_at IS NULL OR last_checked_at <= ?)
            ORDER BY next_check_at ASC, expires_at ASC, id ASC LIMIT 1"
         );
         $now = ($this->clock)();
-        $update->execute([$token, $this->leaseSeconds, $now - 86400, $now]);
+        $update->execute([$token, $this->leaseSeconds, $now - 86400, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
         if ($update->rowCount() !== 1) {
             return null;
         }
-        $select = $pdo->prepare('SELECT id, btc_address, amount FROM invoices WHERE payment_processing_token = ?');
+        $select = $pdo->prepare('SELECT id, btc_address, amount, created_at, status FROM invoices WHERE payment_processing_token = ?');
         $select->execute([$token]);
         $row = $select->fetch(PDO::FETCH_ASSOC);
         return is_array($row) ? $row : null;
@@ -115,11 +120,7 @@ class PaymentWorker
                 $observation, (int) $invoice['expires_at'], $now,
                 (int) $invoice['confirmed_balance_sats'] > 0 || (int) $invoice['mempool_delta_sats'] > 0);
             InvoiceStateMachine::assertTransition($current, $status);
-            $next = match ($status) {
-                'Settled' => null,
-                'Expired' => $now + 300,
-                default => $now + 15,
-            };
+            $next = PaymentCheckPolicy::nextCheck((int) $invoice['created_at'], $now, $status);
             $update = $pdo->prepare(
                 'UPDATE invoices SET status = ?, confirmed_balance_sats = ?, mempool_delta_sats = ?,
                     payment_observed_at = ?, last_checked_at = ?, next_check_at = ? WHERE id = ?'
@@ -139,14 +140,15 @@ class PaymentWorker
         });
     }
 
-    private function releaseFailedLease(string $invoiceId, string $token): void
+    private function releaseFailedLease(string $invoiceId, string $token, int $interval): void
     {
         try {
             $stmt = $this->database->getPdo()->prepare(
                 'UPDATE invoices SET payment_processing_token = NULL, payment_processing_until = NULL,
-                    next_check_at = ? WHERE id = ? AND payment_processing_token = ?'
+                    last_checked_at = ?, next_check_at = ? WHERE id = ? AND payment_processing_token = ?'
             );
-            $stmt->execute([($this->clock)() + 30, $invoiceId, $token]);
+            $now = ($this->clock)();
+            $stmt->execute([$now, $now + $interval, $invoiceId, $token]);
         } catch (Throwable) {
             // A dead connection/process leaves a bounded persistent lease.
         }

@@ -49,7 +49,7 @@ try {
     coreSame('Succeeded',$snapshot['runs']['cli']['state'],'Empty process heartbeat should succeed');
     coreSame('observation_failed',$snapshot['runs']['cli']['error_type'],'Empty batch erased unresolved payment failure');
     coreSame('CLI se spouští; předchozí chyba kontroly zatím není ověřeně vyřešena',PaymentWorkerMonitor::automaticState($snapshot),'False recovery advertised');
-    $pdo->exec("UPDATE invoices SET next_check_at=NULL WHERE id='monitor-invoice'");
+    $pdo->exec("UPDATE invoices SET next_check_at=NULL,last_checked_at=NULL WHERE id='monitor-invoice'");
     $provider->fail=false; $r=$runner->run('cli');
     coreSame(1,$r['stats']['transitioned'],'Shared runner did not transition invoice');
     coreSame('Settled',$pdo->query("SELECT status FROM invoices WHERE id='monitor-invoice'")->fetchColumn(),'Invoice not settled');
@@ -65,7 +65,9 @@ try {
     $monitor->start('cli',str_repeat('a',32));
     coreSame('CLI běh byl přerušen',PaymentWorkerMonitor::automaticState($monitor->snapshot()),'Abandoned run invisible');
     $runner->run('cli'); coreSame('Succeeded',$monitor->snapshot()['runs']['cli']['state'],'Interrupted run not recoverable');
-    $pdo->exec("UPDATE payment_worker_runtime SET started_at=UNIX_TIMESTAMP()-121 WHERE source='cli'");
+    $pdo->exec("UPDATE payment_worker_runtime SET started_at=UNIX_TIMESTAMP()-601 WHERE source='cli'");
+    coreCheck(PaymentWorkerMonitor::automaticState($monitor->snapshot()) !== 'CLI kontrola je opožděná','Ten-minute timer incorrectly reported stale');
+    $pdo->exec("UPDATE payment_worker_runtime SET started_at=UNIX_TIMESTAMP()-1801 WHERE source='cli'");
     coreSame('CLI kontrola je opožděná',PaymentWorkerMonitor::automaticState($monitor->snapshot()),'Stale run reported current');
     $failing=new PaymentWorkerRunner($db,static function(){ throw new RuntimeException('secret config detail'); });
     try { $failing->run('cli'); throw new LogicException('Factory error swallowed'); } catch (RuntimeException $e) {}

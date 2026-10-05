@@ -64,6 +64,9 @@ $assetUrl = static fn (string $name): string => $assetBaseUrl . '/assets/' . $na
         </span>
       </header>
 
+      <?php if ($checkout['status'] !== 'paid'): ?>
+        <p class="verification-notice"><?= $escape(\BtcPayLite\PaymentCheckPolicy::customerNotice()) ?></p>
+      <?php endif; ?>
       <div class="amount-section">
         <span>Částka k úhradě</span>
         <div><strong><?= $escape($checkout['amount']) ?></strong> <small>BTC</small></div>

@@ -131,7 +131,8 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
             (string) $invoice['a'],
             isset($invoice['r']) ? (string) $invoice['r'] : null,
             $expected,
-            $walletPath
+            $walletPath,
+            PaymentCheckPolicy::interval((int) $invoice['t'], $now, $isExpired ? 'Expired' : 'New')
         );
         $missing = BitcoinAmount::max(
             BitcoinAmount::fromSatoshis(0),
@@ -206,11 +207,15 @@ final class BtcStatelessInvoiceManager implements BtcStatelessInvoiceGateway
         string $address,
         ?string $requestId,
         BitcoinAmount $expected,
-        ?string $walletPath
+        ?string $walletPath,
+        int $interval
     ): array {
         // Provider status depends only on signed token data and a walletless observation.
         if ($this->blockchainProvider !== null) {
-            $amounts = $this->blockchainProvider->observeAddress($address, $expected->satoshis())->toAmountArray();
+            $observation = $this->blockchainProvider instanceof ElectrumBlockchainProvider
+                ? $this->blockchainProvider->observeAddressAtInterval($address, $expected->satoshis(), $interval)
+                : $this->blockchainProvider->observeAddress($address, $expected->satoshis());
+            $amounts = $observation->toAmountArray();
             return ['electrum_status' => null, 'confirmed' => $amounts['confirmed'], 'received' => $amounts['received']];
         }
 

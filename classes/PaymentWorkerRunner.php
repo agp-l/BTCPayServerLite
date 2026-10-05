@@ -40,7 +40,8 @@ final class PaymentWorkerRunner
         if ((int) $stmt->fetchColumn() !== 1) { return ['busy'=>true, 'reason'=>'running']; }
         try {
             if ($source === 'manual') {
-                $row = $pdo->query("SELECT started_at > UNIX_TIMESTAMP()-15 FROM payment_worker_runtime WHERE source='manual'")->fetchColumn();
+                $row = $pdo->query('SELECT started_at > UNIX_TIMESTAMP()-' . PaymentCheckPolicy::MIN_INTERVAL
+                    . " FROM payment_worker_runtime WHERE source='manual'")->fetchColumn();
                 if ((bool) $row) { return ['busy'=>true, 'reason'=>'cooldown']; }
             }
             $token = bin2hex(random_bytes(16));

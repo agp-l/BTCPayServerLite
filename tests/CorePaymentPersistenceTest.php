@@ -149,7 +149,7 @@ try {
     coreSame('New', coreInvoice('inv_rollback')['status'], 'Status committed without outbox');
     coreSame(0, (int) coreInvoice('inv_rollback')['confirmed_balance_sats'], 'Observation committed without outbox');
     $pdo->exec('DROP TRIGGER fail_outbox');
-    $pdo->exec("UPDATE invoices SET next_check_at=0 WHERE id='inv_rollback'");
+    $pdo->exec("UPDATE invoices SET next_check_at=0,last_checked_at=NULL WHERE id='inv_rollback'");
     coreSame(1, coreWorker($dir . '/rollback')['deliveries_queued'], 'Retry lost outbox event');
     coreSame(1, (int) $pdo->query("SELECT COUNT(*) FROM webhook_deliveries WHERE invoice_id='inv_rollback'")->fetchColumn(), 'Outbox event duplicated');
     $pdo = null;

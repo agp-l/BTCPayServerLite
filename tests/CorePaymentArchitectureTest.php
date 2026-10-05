@@ -75,12 +75,12 @@ coreSame(2, $observation->getConfirmedBalanceSatoshis(), 'Confirmed current bala
 coreSame(-1, $observation->getMempoolDeltaSatoshis(), 'Signed mempool delta');
 coreSame(1, $observation->getCurrentBalanceSatoshis(), 'Current net balance');
 $cacheFile = glob($dir . '/semantics/*.json')[0];
-$data = json_decode(file_get_contents($cacheFile), true); $data['time'] = time() - 5;
+$data = json_decode(file_get_contents($cacheFile), true); $data['time'] = time() - 605;
 file_put_contents($cacheFile, json_encode($data));
 $lock = fopen(substr($cacheFile, 0, -5) . '.lock', 'c'); flock($lock, LOCK_EX);
 $queries = (int) file_get_contents($dir . '/queries');
 try {
-    $stale = (new ElectrumBlockchainProvider($rpc, 2, $dir . '/semantics'))->observeAddress('bc1qnegative');
+    $stale = (new ElectrumBlockchainProvider($rpc, 2, $dir . '/semantics', 1200))->observeAddress('bc1qnegative');
     coreSame($data['time'], $stale->getObservedAt(), 'Stale fallback replaced its original timestamp');
     coreSame($queries, (int) file_get_contents($dir . '/queries'), 'Stale fallback queried Electrum');
 } finally { flock($lock, LOCK_UN); fclose($lock); }

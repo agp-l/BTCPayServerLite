@@ -49,8 +49,9 @@ final class PaymentWorkerMonitor
         $running = (int) $stmt->fetchColumn() === 0;
         $stmt = $this->pdo->prepare('SELECT COUNT(*) AS due, MIN(next_check_at) AS oldest_due_at FROM invoices WHERE '
             . PaymentWorker::ELIGIBLE_SQL . ' AND (next_check_at IS NULL OR next_check_at <= ?)
+            AND (last_checked_at IS NULL OR last_checked_at <= ?)
             AND (payment_processing_until IS NULL OR payment_processing_until <= UNIX_TIMESTAMP())');
-        $stmt->execute([$now - 86400, $now]);
+        $stmt->execute([$now - 86400, $now, $now - PaymentCheckPolicy::MIN_INTERVAL]);
         $queue = $stmt->fetch(PDO::FETCH_ASSOC);
         $stale = (int) $this->pdo->query('SELECT COUNT(*) FROM invoices WHERE payment_processing_token IS NOT NULL AND payment_processing_until <= UNIX_TIMESTAMP()')->fetchColumn();
         return ['now'=>$now, 'running'=>$running, 'runs'=>$runs, 'due'=>(int)$queue['due'],
@@ -64,7 +65,7 @@ final class PaymentWorkerMonitor
         if ($cli['state'] === 'Failed') { return 'Poslední CLI běh skončil chybou'; }
         if ($cli['state'] === 'Running' && !$snapshot['running']) { return 'CLI běh byl přerušen'; }
         $age = $snapshot['now'] - (int) $cli['started_at'];
-        if ($age > 120) { return 'CLI kontrola je opožděná'; }
+        if ($age > PaymentCheckPolicy::CLI_STALE_AFTER) { return 'CLI kontrola je opožděná'; }
         if ($cli['error_type'] !== null && $cli['state'] !== 'Running') {
             return 'CLI se spouští; předchozí chyba kontroly zatím není ověřeně vyřešena';
         }

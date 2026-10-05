@@ -10,17 +10,16 @@ use Throwable;
 class ElectrumBlockchainProvider implements BlockchainProviderInterface
 {
     private const LOCK_WAIT_SECONDS = 1.5;
-    private const FAILURE_COOLDOWN_SECONDS = 2;
     private array $memoryCache = [];
     private string $cacheDir;
 
     public function __construct(
         private ElectrumRPC $rpc,
-        private int $ttlSeconds = 2,
+        private int $ttlSeconds = PaymentCheckPolicy::MIN_INTERVAL,
         ?string $cacheDir = null,
         private int $staleSeconds = 30
     ) {
-        $this->ttlSeconds = max(1, $ttlSeconds);
+        $this->ttlSeconds = max(PaymentCheckPolicy::MIN_INTERVAL, $ttlSeconds);
         $this->staleSeconds = max($this->ttlSeconds, $staleSeconds);
         $this->cacheDir = $cacheDir ?? (getenv('BTCPAY_BLOCKCHAIN_CACHE_DIR') ?: dirname(__DIR__) . '/var/blockchain');
     }
@@ -33,6 +32,12 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
 
     public function observeAddress(string $address, int $expectedSatoshis = 0): AddressPaymentObservation
     {
+        return $this->observeAddressAtInterval($address, $expectedSatoshis, $this->ttlSeconds);
+    }
+
+    public function observeAddressAtInterval(string $address, int $expectedSatoshis, int $interval): AddressPaymentObservation
+    {
+        $interval = max($this->ttlSeconds, min(PaymentCheckPolicy::MAX_INTERVAL, $interval));
         $address = trim($address);
         if ($address === '' || strlen($address) > 100 || $expectedSatoshis < 0) {
             throw new BlockchainProviderException('Invalid observation request.', 'observe_address', 400);
@@ -40,13 +45,13 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
         // Namespace by endpoint as well as address: never mix different networks/daemons.
         $key = hash('sha256', 'balance-v2|' . $this->rpc->getEndpoint() . '|' . $address);
         $cached = $this->memoryCache[$key] ?? null;
-        if ($cached !== null && time() - $cached->getObservedAt() < $this->ttlSeconds) {
+        if ($cached !== null && time() - $cached->getObservedAt() < $interval) {
             return $cached;
         }
         if (!is_dir($this->cacheDir) && !@mkdir($this->cacheDir, 0770, true) && !is_dir($this->cacheDir)) {
             throw $this->busy(null, 'cache_directory');
         }
-        $cached = $this->readCache($key, $address, $this->ttlSeconds);
+        $cached = $this->readCache($key, $address, $interval);
         if ($cached !== null) {
             return $this->remember($key, $cached);
         }
@@ -68,7 +73,7 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
                 // Never issue an uncoalesced RPC on timeout/cache miss.
                 return $this->staleOrFail($key, $address, null, 'cache_lock_timeout');
             }
-            $cached = $this->readCache($key, $address, $this->ttlSeconds);
+            $cached = $this->readCache($key, $address, $interval);
             if ($cached !== null) {
                 return $this->remember($key, $cached);
             }
@@ -77,12 +82,15 @@ class ElectrumBlockchainProvider implements BlockchainProviderInterface
                 return $this->staleOrFail($key, $address, null, 'upstream_backoff');
             }
             try {
+                // Persist the cooldown before RPC: even a killed process must not retry immediately.
+                if (@file_put_contents($this->path($key, 'retry'), (string) (time() + $interval)) === false) {
+                    throw $this->busy(null, 'cache_write');
+                }
                 $observation = $this->queryElectrum($address);
                 $this->writeCache($key, $observation);
                 return $this->remember($key, $observation);
             } catch (Throwable $exception) {
                 // Back off across processes on upstream failure, too.
-                @file_put_contents($this->path($key, 'retry'), (string) (time() + self::FAILURE_COOLDOWN_SECONDS));
                 return $this->staleOrFail($key, $address, $exception);
             }
         } finally {

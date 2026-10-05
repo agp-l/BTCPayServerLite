@@ -11,7 +11,7 @@ final class PaymentWorkerSchedule
     public static function render(string $kind, string $root, string $php, string $user): string
     {
         if ($kind === 'timer') {
-            return "[Unit]\nDescription=BTCPay Lite payment monitoring timer\n\n[Timer]\nOnBootSec=15s\nOnUnitInactiveSec=15s\nAccuracySec=1s\nUnit=btcpay-lite-payment-worker.service\n\n[Install]\nWantedBy=timers.target\n";
+            return "[Unit]\nDescription=BTCPay Lite payment monitoring timer\n\n[Timer]\nOnBootSec=10min\nOnUnitActiveSec=10min\nAccuracySec=1s\nUnit=btcpay-lite-payment-worker.service\n\n[Install]\nWantedBy=timers.target\n";
         }
         if ($kind !== 'service' || !preg_match('/\A[a-z_][a-z0-9_-]*\z/i', $user) || $user === 'root') {
             throw new InvalidArgumentException('Use --payment-systemd=service|timer and a non-root --worker-user for the service.');
