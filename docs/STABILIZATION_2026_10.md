@@ -167,3 +167,24 @@ nyní považují PHP warnings/notices za selhání. Cílená sada prošla.
 
 Deprecations zachovaných starých Bitcoin knihoven nejsou vydávány za opravené;
 jejich náhrada je samostatná ověřovaná práce v DEPENDENCIES a ROADMAP.
+
+## Závěrečný checkpoint GitHubu
+
+Zdrojové změny jsou ověřeny na commitu
+`677d33b2522d62c84bda61cdc66078a916560009`:
+[CI 37381039808](https://github.com/agp-l/BTCPayServerLite/actions/runs/37381039808)
+**success**, PHP **8.2 i 8.3**. Oba logy nemají PHP warnings/notices ani SKIP;
+obsahují skutečný Apache test, 100 souběžných DB XPUB creations a webhook
+lease test přes pomalou 390s dávku. Lokální úplná sada po poslední opravě
+znovu **76/76**, bez selhání. Zelený výsledek byl ověřen i čtením logů.
+
+Osm postupných commitů od výchozího main odděluje audit, webhooky, Electrum
+budget, API/health, webserver, cílený rescan, úklid dokumentace a creation
+kontrakt. Tento poslední dokumentační checkpoint ukládá jejich výsledky.
+Při závěrečné kontrole nebyla v repozitáři žádná otevřená GitHub issue ani PR;
+platným pracovním seznamem je ROADMAP, nikoli smazané historické podklady.
+
+Main obsahuje také změnu veřejné stránky `pages/dokumentace.php`. Cílová
+instalace se tím automaticky neaktualizuje: nasazení podle DEPLOYMENT, vlastní
+Electrum a měření kapacity zůstávají akceptací v ROADMAP. V tomto průchodu se
+nezasahovalo do produkčních klíčů, wallet souborů, DB ani časovačů.
