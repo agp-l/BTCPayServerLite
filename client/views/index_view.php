@@ -167,7 +167,7 @@ $statusClasses = [
           <div class="webhook-main">
             <strong><?php echo htmlspecialchars($webhook['store_name'], ENT_QUOTES, 'UTF-8'); ?></strong>
             <code title="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?></code>
-            <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div></div>
+            <div class="credential"><span class="credential-label">Podpisový secret</span><div class="credential-value"><input type="password" readonly value="<?php echo htmlspecialchars($webhook['secret'], ENT_QUOTES, 'UTF-8'); ?>" aria-label="Tajný klíč webhooku"><button type="button" class="ghost-btn" data-reveal aria-label="Zobrazit webhook secret"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><button type="button" class="ghost-btn" data-copy-input aria-label="Kopírovat tajný klíč webhooku"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></div></div>
           </div>
           <details class="disclosure compact-disclosure webhook-actions"><summary><i class="fa-solid fa-pen"></i> Upravit</summary><div class="disclosure-body form-stack"><form method="post" action="<?php echo $clientUrl; ?>" class="form-stack"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="update_webhook"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>"><div class="field"><label>HTTPS URL</label><div class="input-wrap"><input type="url" name="url" maxlength="2048" value="<?php echo htmlspecialchars($webhook['url'], ENT_QUOTES, 'UTF-8'); ?>" required></div></div><button class="ghost-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Uložit URL</button></form><form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Vyměnit webhook secret?"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="action" value="rotate_webhook_secret"><input type="hidden" name="webhook_id" value="<?php echo htmlspecialchars($webhook['id'], ENT_QUOTES, 'UTF-8'); ?>"><button class="ghost-btn" type="submit"><i class="fa-solid fa-rotate"></i> Vyměnit secret</button></form></div></details>
           <form method="post" action="<?php echo $clientUrl; ?>" data-confirm="Opravdu chcete webhook odstranit?">
@@ -257,10 +257,6 @@ $statusClasses = [
   };
   showToast(<?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
-  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(button.dataset.copy || ''); showToast('Zkopírováno do schránky.'); }
-    catch (error) { showToast('Kopírování se nepodařilo.'); }
-  }));
   document.querySelectorAll('[data-reveal]').forEach((button) => button.addEventListener('click', () => {
     const input = button.parentElement?.querySelector('input');
     if (!input) return;

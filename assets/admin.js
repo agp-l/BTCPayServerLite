@@ -1,4 +1,79 @@
 (() => {
+  const showCopyMessage = (message) => {
+    const toast = document.getElementById('toast');
+    const text = document.getElementById('toastMsg');
+    if (!toast || !text) return;
+    text.textContent = message;
+    toast.classList.add('show');
+    window.setTimeout(() => toast.classList.remove('show'), 3000);
+  };
+
+  const fallbackCopy = (value) => {
+    const activeElement = document.activeElement;
+    const selection = window.getSelection();
+    const ranges = [];
+    if (selection) {
+      for (let index = 0; index < selection.rangeCount; index += 1) {
+        ranges.push(selection.getRangeAt(index).cloneRange());
+      }
+    }
+    const inputSelection = activeElement && typeof activeElement.selectionStart === 'number'
+      ? [activeElement.selectionStart, activeElement.selectionEnd, activeElement.selectionDirection]
+      : null;
+    const input = document.createElement('textarea');
+    input.value = value;
+    input.readOnly = true;
+    input.setAttribute('aria-hidden', 'true');
+    input.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(input);
+    let copied = false;
+    try {
+      input.focus({ preventScroll: true });
+      input.select();
+      input.setSelectionRange(0, value.length);
+      copied = document.execCommand('copy');
+    } catch (_error) {
+      copied = false;
+    } finally {
+      input.remove();
+      if (activeElement && typeof activeElement.focus === 'function') {
+        activeElement.focus({ preventScroll: true });
+        if (inputSelection) activeElement.setSelectionRange(...inputSelection);
+      }
+      if (selection) {
+        selection.removeAllRanges();
+        ranges.forEach((range) => selection.addRange(range));
+      }
+    }
+    return copied;
+  };
+
+  document.querySelectorAll('[data-copy], [data-copy-input]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const input = button.hasAttribute('data-copy-input')
+        ? button.parentElement.querySelector('input')
+        : null;
+      const value = input ? input.value : (button.dataset.copy || '');
+      if (!value) {
+        showCopyMessage('Není co kopírovat.');
+        return;
+      }
+      let copied = false;
+      if (window.isSecureContext && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(value);
+          copied = true;
+        } catch (_error) {
+          copied = false;
+        }
+      }
+      if (!copied) copied = fallbackCopy(value);
+      showCopyMessage(copied
+        ? 'Zkopírováno do schránky.'
+        : 'Kopírování se nepodařilo. Zobrazte text a zkopírujte jej ručně.');
+    });
+  });
+
   const body = document.body;
   const openButton = document.querySelector('[data-sidebar-open]');
   const closeTargets = document.querySelectorAll('[data-sidebar-close]');

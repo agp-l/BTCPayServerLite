@@ -146,10 +146,6 @@ $storesUrl = $routeUrl('/admin/stores');
     window.setTimeout(() => toast.classList.remove('show'), 3000);
   };
   showToast(<?php echo json_encode($toastMsg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
-  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(button.dataset.copy || ''); showToast('Zkopírováno do schránky.'); }
-    catch (error) { showToast('Kopírování se nepodařilo.'); }
-  }));
   document.querySelectorAll('[data-reveal]').forEach((button) => button.addEventListener('click', () => {
     const input = button.parentElement?.querySelector('input');
     if (!input) return;
